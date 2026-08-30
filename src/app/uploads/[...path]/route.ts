@@ -15,7 +15,7 @@ const MIME: Record<string, string> = {
 };
 
 function uploadRoot() {
-  return process.env.UPLOAD_DIR?.trim() || "/var/www/akmaofficial-uploads";
+  return process.env.UPLOAD_DIR?.trim() || path.join(process.cwd(), "public", "uploads");
 }
 
 export async function GET(

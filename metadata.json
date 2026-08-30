@@ -1,0 +1,6 @@
+{
+  "name": "آکما | Akma Official",
+  "description": "تولیدکننده و پخش عمده محصولات مراقبت از کفش آکما همراه با کاتالوگ محصولات و پنل مدیریت جامع",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

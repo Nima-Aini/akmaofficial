@@ -28,6 +28,31 @@ export type Banner = {
   enabled: boolean;
 };
 
+export type BottomBanner = {
+  id: string;
+  image: string;
+  href: string;
+  alt: string;
+  enabled: boolean;
+};
+
+export type SectionTitles = {
+  featuredBadge: string;
+  featuredTitle: string;
+  featuredSubtitle: string;
+  promoBadge: string;
+  promoTitle: string;
+  promoSubtitle: string;
+  promoCtaLabel: string;
+  promoCtaHref: string;
+  priceTableBadge: string;
+  priceTableTitle: string;
+  priceTableSubtitle: string;
+  stepsBadge: string;
+  stepsTitle: string;
+  stepsSubtitle: string;
+};
+
 export type Feature = { icon: string; title: string; desc: string };
 export type PriceRow = { name: string; note: string; price: number };
 export type Step = { title: string; desc: string };
@@ -189,11 +214,40 @@ export const DEFAULT_SITE: SiteSettings = {
     "فروش عمده فوم تمیزکننده کفش، خوشبوکننده کفش و پولیش سفیدکننده لژ آکما با قیمت همکاری. ارسال به سراسر کشور. سفارش تلفنی: ۰۹۰۳۳۲۵۳۰۶۵",
 };
 
+export const DEFAULT_BOTTOM_BANNERS: BottomBanner[] = [
+  {
+    id: "bottom-banner-1",
+    image: "/images/craft.png",
+    href: "/products",
+    alt: "محصولات مراقبت از کفش آکما",
+    enabled: true,
+  },
+];
+
+export const DEFAULT_SECTION_TITLES: SectionTitles = {
+  featuredBadge: "منتخب فروشگاه",
+  featuredTitle: "محصولات ویژه آکما",
+  featuredSubtitle: "پرفروش‌ترین و محبوب‌ترین اقلام جهت ویترین فروشگاهی شما",
+  promoBadge: "پیشنهاد آکما",
+  promoTitle: "پیشنهادات و استندهای ویژه",
+  promoSubtitle: "پکیج‌های فروشگاهی آماده برای افزایش سودآوری",
+  promoCtaLabel: "مشاهده همه محصولات",
+  promoCtaHref: "/products",
+  priceTableBadge: "شفافیت قیمت",
+  priceTableTitle: "قیمت واحد محصولات",
+  priceTableSubtitle: "قیمت‌های خرده‌فروشی پیشنهادی؛ برای قیمت همکاری و خرید عمده تماس بگیرید یا آنلاین سفارش دهید.",
+  stepsBadge: "بدون پیچیدگی",
+  stepsTitle: "سفارش در چند قدم ساده",
+  stepsSubtitle: "امکان ثبت سفارش آنلاین از طریق سبد خرید و یا تماس مستقیم تلفنی",
+};
+
 export const DEFAULT_SETTINGS: Record<string, unknown> = {
   theme: DEFAULT_THEME,
   hero: DEFAULT_HERO,
   marquee: DEFAULT_MARQUEE,
   banners: DEFAULT_BANNERS,
+  bottomBanners: DEFAULT_BOTTOM_BANNERS,
+  sectionTitles: DEFAULT_SECTION_TITLES,
   features: DEFAULT_FEATURES,
   priceTable: DEFAULT_PRICE_TABLE,
   steps: DEFAULT_STEPS,

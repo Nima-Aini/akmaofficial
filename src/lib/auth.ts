@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { db } from "@/db";
 import { adminUsers } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { getMemoryAdmins, updateMemoryAdmin } from "./store";
 
 const SESSION_COOKIE = "akma_admin_session";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 12; // 12h
@@ -83,14 +84,70 @@ export async function getSessionUsername(): Promise<string | null> {
 export async function requireAdmin(): Promise<boolean> {
   const username = await getSessionUsername();
   if (!username) return false;
-  try {
-    const rows = await db
-      .select({ id: adminUsers.id })
-      .from(adminUsers)
-      .where(eq(adminUsers.username, username))
-      .limit(1);
-    return rows.length > 0;
-  } catch {
-    return false;
+  if (db) {
+    try {
+      const rows = await db
+        .select({ id: adminUsers.id })
+        .from(adminUsers)
+        .where(eq(adminUsers.username, username))
+        .limit(1);
+      if (rows.length > 0) return true;
+    } catch {
+      // check memory store fallback
+    }
   }
+  const memAdmins = getMemoryAdmins();
+  return memAdmins.some((a) => a.username === username);
 }
+
+export async function verifyAdminCredentials(username: string, password: string): Promise<boolean> {
+  if (db) {
+    try {
+      const rows = await db
+        .select()
+        .from(adminUsers)
+        .where(eq(adminUsers.username, username))
+        .limit(1);
+      if (rows[0]) {
+        return verifyPassword(password, rows[0].passwordHash);
+      }
+    } catch {
+      // fallback to memory
+    }
+  }
+  const memAdmins = getMemoryAdmins();
+  const found = memAdmins.find((a) => a.username === username);
+  if (!found) return false;
+  return verifyPassword(password, found.passwordHash);
+}
+
+export async function updateAdminCredentials(
+  sessionUser: string,
+  newUsername: string,
+  newPasswordHash?: string,
+): Promise<boolean> {
+  updateMemoryAdmin(sessionUser, newUsername, newPasswordHash);
+  if (db) {
+    try {
+      const rows = await db
+        .select()
+        .from(adminUsers)
+        .where(eq(adminUsers.username, sessionUser))
+        .limit(1);
+      const admin = rows[0];
+      if (admin) {
+        await db
+          .update(adminUsers)
+          .set({
+            username: newUsername,
+            ...(newPasswordHash ? { passwordHash: newPasswordHash } : {}),
+          })
+          .where(eq(adminUsers.id, admin.id));
+      }
+    } catch (e) {
+      console.warn("Failed to update admin credentials in DB:", e);
+    }
+  }
+  return true;
+}
+

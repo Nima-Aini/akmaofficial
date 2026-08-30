@@ -5,19 +5,23 @@ import Link from "next/link";
 import { Plus, Trash2 } from "lucide-react";
 import {
   DEFAULT_BANNERS,
+  DEFAULT_BOTTOM_BANNERS,
   DEFAULT_CONTACT,
   DEFAULT_FEATURES,
   DEFAULT_HERO,
   DEFAULT_MARQUEE,
   DEFAULT_PRICE_TABLE,
+  DEFAULT_SECTION_TITLES,
   DEFAULT_SITE,
   DEFAULT_STEPS,
   DEFAULT_THEME,
   type Banner,
+  type BottomBanner,
   type ContactSettings,
   type Feature,
   type HeroSettings,
   type PriceRow,
+  type SectionTitles,
   type SiteSettings,
   type Step,
   type ThemeSettings,
@@ -208,6 +212,7 @@ export function HeroBannersSection({
   const hero = { ...DEFAULT_HERO, ...(settings.hero as Partial<HeroSettings>) };
   const marquee = (settings.marquee as string[]) ?? DEFAULT_MARQUEE;
   const banners = (settings.banners as Banner[]) ?? DEFAULT_BANNERS;
+  const bottomBanners = (settings.bottomBanners as BottomBanner[]) ?? DEFAULT_BOTTOM_BANNERS;
   const setHero = (patch: Partial<HeroSettings>) => setKey("hero", { ...hero, ...patch });
 
   const setBanner = (i: number, patch: Partial<Banner>) => {
@@ -415,6 +420,106 @@ export function HeroBannersSection({
           </button>
         </div>
       </SectionCard>
+
+      <SectionCard
+        title="بنرهای انتهای صفحه (Bottom Banners)"
+        desc="بنرهای تصویری انتهای صفحه بدون هیچ عنوان یا متنی؛ مشتری با کلیک روی آنها به صفحه مورد نظر هدایت می‌شود."
+        onSave={() => saveKey("bottomBanners")}
+        saving={saving}
+      >
+        <div className="space-y-6">
+          {bottomBanners.map((bb, i) => (
+            <div key={bb.id} className="rounded-2xl border border-line p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-muted">بنر انتهایی {i + 1}</span>
+                <div className="flex items-center gap-3">
+                  <Toggle
+                    label={bb.enabled ? "فعال" : "غیرفعال"}
+                    checked={bb.enabled}
+                    onChange={(v) =>
+                      setKey(
+                        "bottomBanners",
+                        bottomBanners.map((x, j) => (j === i ? { ...x, enabled: v } : x)),
+                      )
+                    }
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setKey(
+                        "bottomBanners",
+                        bottomBanners.filter((x) => x.id !== bb.id),
+                      )
+                    }
+                    className="grid size-10 place-items-center rounded-xl border border-line text-rose-400 hover:border-rose-400"
+                    aria-label="حذف بنر"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <ImageUploader
+                  label="تصویر بنر (بدون متن روی تصویر)"
+                  value={bb.image}
+                  onChange={(v) =>
+                    setKey(
+                      "bottomBanners",
+                      bottomBanners.map((x, j) =>
+                        j === i ? { ...x, image: typeof v === "string" ? v : (v[0] ?? "") } : x,
+                      ),
+                    )
+                  }
+                  kind="banners"
+                  hint="تصویر با کیفیت و بدون متن اضافی آپلود کنید."
+                />
+                <div className="space-y-4">
+                  <Field
+                    label="لینک هدایت (اختیاری)"
+                    value={bb.href || ""}
+                    onChange={(v) =>
+                      setKey(
+                        "bottomBanners",
+                        bottomBanners.map((x, j) => (j === i ? { ...x, href: v } : x)),
+                      )
+                    }
+                    dir="ltr"
+                    hint="مثلاً /products یا لینک مستقیم"
+                  />
+                  <Field
+                    label="توضیح تصویر (Alt)"
+                    value={bb.alt || ""}
+                    onChange={(v) =>
+                      setKey(
+                        "bottomBanners",
+                        bottomBanners.map((x, j) => (j === i ? { ...x, alt: v } : x)),
+                      )
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() =>
+              setKey("bottomBanners", [
+                ...bottomBanners,
+                {
+                  id: `bottom-banner-${Date.now()}`,
+                  image: "/images/craft.png",
+                  href: "/products",
+                  alt: "محصولات آکما",
+                  enabled: true,
+                },
+              ])
+            }
+            className="btn btn-ghost h-11 w-full text-xs"
+          >
+            <Plus size={14} /> افزودن بنر انتهای صفحه
+          </button>
+        </div>
+      </SectionCard>
     </div>
   );
 }
@@ -494,13 +599,128 @@ export function ContentSection({
   saving: boolean;
 }) {
   const site = { ...DEFAULT_SITE, ...(settings.site as Partial<SiteSettings>) };
+  const sectionTitles = {
+    ...DEFAULT_SECTION_TITLES,
+    ...(settings.sectionTitles as Partial<SectionTitles>),
+  };
   const features = (settings.features as Feature[]) ?? DEFAULT_FEATURES;
   const steps = (settings.steps as Step[]) ?? DEFAULT_STEPS;
   const priceTable = (settings.priceTable as PriceRow[]) ?? DEFAULT_PRICE_TABLE;
   const setSite = (patch: Partial<SiteSettings>) => setKey("site", { ...site, ...patch });
+  const setTitles = (patch: Partial<SectionTitles>) =>
+    setKey("sectionTitles", { ...sectionTitles, ...patch });
 
   return (
     <div className="space-y-5">
+      <SectionCard
+        title="عناوین و متن‌های بخش‌های صفحه اصلی"
+        desc="تمام تیترها، بج‌ها و توضیحات بخش‌های صفحه اصلی را می‌توانید مستقیماً از اینجا شخصی‌سازی کنید."
+        onSave={() => saveKey("sectionTitles")}
+        saving={saving}
+      >
+        <div className="space-y-6">
+          {/* Featured Products */}
+          <div className="rounded-2xl border border-line p-4 space-y-4">
+            <h4 className="text-xs font-black text-accent">بخش محصولات ویژه (اسلایدر صفحه اصلی)</h4>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label="متن بج بالای بخش"
+                value={sectionTitles.featuredBadge}
+                onChange={(v) => setTitles({ featuredBadge: v })}
+              />
+              <Field
+                label="عنوان اصلی بخش"
+                value={sectionTitles.featuredTitle}
+                onChange={(v) => setTitles({ featuredTitle: v })}
+              />
+            </div>
+            <Field
+              label="توضیح زیر عنوان"
+              value={sectionTitles.featuredSubtitle}
+              onChange={(v) => setTitles({ featuredSubtitle: v })}
+            />
+          </div>
+
+          {/* Promo / Akma offers */}
+          <div className="rounded-2xl border border-line p-4 space-y-4">
+            <h4 className="text-xs font-black text-accent">بخش پیشنهاد و استندهای ویژه</h4>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label="متن بج بالای بخش"
+                value={sectionTitles.promoBadge}
+                onChange={(v) => setTitles({ promoBadge: v })}
+              />
+              <Field
+                label="عنوان بخش"
+                value={sectionTitles.promoTitle}
+                onChange={(v) => setTitles({ promoTitle: v })}
+              />
+            </div>
+            <Field
+              label="توضیح زیر عنوان"
+              value={sectionTitles.promoSubtitle}
+              onChange={(v) => setTitles({ promoSubtitle: v })}
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label="متن دکمه زیر بنرها"
+                value={sectionTitles.promoCtaLabel}
+                onChange={(v) => setTitles({ promoCtaLabel: v })}
+              />
+              <Field
+                label="لینک دکمه زیر بنرها"
+                value={sectionTitles.promoCtaHref}
+                onChange={(v) => setTitles({ promoCtaHref: v })}
+                dir="ltr"
+              />
+            </div>
+          </div>
+
+          {/* Price table */}
+          <div className="rounded-2xl border border-line p-4 space-y-4">
+            <h4 className="text-xs font-black text-accent">بخش جدول قیمت واحد محصولات</h4>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label="متن بج بالای جدول"
+                value={sectionTitles.priceTableBadge}
+                onChange={(v) => setTitles({ priceTableBadge: v })}
+              />
+              <Field
+                label="عنوان بخش قیمت واحد"
+                value={sectionTitles.priceTableTitle}
+                onChange={(v) => setTitles({ priceTableTitle: v })}
+              />
+            </div>
+            <Field
+              label="توضیح زیر عنوان قیمت واحد"
+              value={sectionTitles.priceTableSubtitle}
+              onChange={(v) => setTitles({ priceTableSubtitle: v })}
+            />
+          </div>
+
+          {/* Steps */}
+          <div className="rounded-2xl border border-line p-4 space-y-4">
+            <h4 className="text-xs font-black text-accent">بخش مراحل ثبت سفارش</h4>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label="متن بج بالای بخش"
+                value={sectionTitles.stepsBadge}
+                onChange={(v) => setTitles({ stepsBadge: v })}
+              />
+              <Field
+                label="عنوان بخش مراحل سفارش"
+                value={sectionTitles.stepsTitle}
+                onChange={(v) => setTitles({ stepsTitle: v })}
+              />
+            </div>
+            <Field
+              label="توضیح زیر عنوان مراحل"
+              value={sectionTitles.stepsSubtitle}
+              onChange={(v) => setTitles({ stepsSubtitle: v })}
+            />
+          </div>
+        </div>
+      </SectionCard>
       <SectionCard title="هویت و محتوای سایت" onSave={() => saveKey("site")} saving={saving}>
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label="نام فروشگاه" value={site.name} onChange={(v) => setSite({ name: v })} />

@@ -15,6 +15,7 @@ import {
 import { getActiveProducts, getProductBySlug, getSettings } from "@/lib/store";
 import { DEFAULT_CONTACT, type ContactSettings } from "@/lib/defaults";
 import { ProductCard } from "@/components/product-card";
+import { AddToCartButton } from "@/components/add-to-cart-button";
 import { Reveal } from "@/components/effects";
 import { formatPrice, telHref, toFa } from "@/lib/format";
 
@@ -69,27 +70,29 @@ export default async function ProductPage({
       <div className="mt-8 grid gap-10 lg:grid-cols-2 lg:gap-14">
         {/* gallery */}
         <Reveal className="relative">
-          <div className="card overflow-hidden !rounded-[2rem]">
+          <div className="card overflow-hidden !rounded-[2rem] bg-card">
             {product.badge && (
               <span className="absolute top-5 right-5 z-10 rounded-full bg-gradient-to-l from-accent2 to-accent px-4 py-2 text-xs font-extrabold text-on-accent shadow-lg shadow-accent/25">
                 {product.badge}
               </span>
             )}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={product.images[0] ?? "/images/products/foam-bottle.png"}
-              alt={product.name}
-              className="aspect-square w-full object-cover"
-            />
+            <div className="relative aspect-square w-full bg-surface/30 p-6 flex items-center justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={product.images[0] ?? "/images/products/foam-bottle.png"}
+                alt={product.name}
+                className="max-h-full max-w-full object-contain transition-transform duration-300 hover:scale-105"
+              />
+            </div>
             {product.images.length > 1 && (
-              <div className="flex gap-3 border-t border-line bg-surface p-4">
+              <div className="flex gap-3 border-t border-line bg-surface p-4 overflow-x-auto">
                 {product.images.map((im, i) => (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     key={i}
                     src={im}
                     alt={`${product.name} — تصویر ${toFa(i + 1)}`}
-                    className="size-16 rounded-xl border border-line object-cover"
+                    className="size-16 rounded-xl border border-line object-contain bg-card p-1 shrink-0"
                   />
                 ))}
               </div>
@@ -112,7 +115,7 @@ export default async function ProductPage({
           </Reveal>
 
           <Reveal delay={80}>
-            <div className="card mt-7 p-6">
+            <div className="card mt-7 p-6 space-y-6">
               <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
                   <p className="text-xs text-muted">قیمت بسته (عمده)</p>
@@ -135,15 +138,25 @@ export default async function ProductPage({
                 )}
               </div>
 
-              <a href={telHref(phone)} className="btn btn-primary mt-6 h-14 w-full text-base">
-                <Phone size={19} />
-                سفارش تلفنی — {toFa(phone)}
-              </a>
-              <p className="mt-3 text-center text-[11px] leading-5 text-muted">
-                جهت ثبت سفارش محصول با شماره بالا تماس حاصل فرمایید. {contact.note}
+              {/* Add to cart action with quantity selector */}
+              <div className="border-t border-line pt-6">
+                <AddToCartButton product={product} size="lg" showQty={true} />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <a
+                  href={telHref(phone)}
+                  className="btn btn-ghost h-12 flex-1 text-xs font-bold"
+                >
+                  <Phone size={16} />
+                  مشاوره و سفارش تلفنی — {toFa(phone)}
+                </a>
+              </div>
+              <p className="text-center text-[11px] leading-5 text-muted">
+                امکان ثبت مستقیم سفارش و دریافت کد رهگیری آنی، یا تماس تلفنی جهت سفارش عمده.
               </p>
 
-              <div className="mt-5 grid grid-cols-3 gap-2 border-t border-line pt-5 text-center">
+              <div className="grid grid-cols-3 gap-2 border-t border-line pt-5 text-center">
                 {[
                   { icon: Truck, t: "ارسال سراسری" },
                   { icon: BadgeCheck, t: "قیمت همکاری" },

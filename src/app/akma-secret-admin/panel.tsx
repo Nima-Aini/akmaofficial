@@ -12,6 +12,7 @@ import {
   Paintbrush,
   PhoneCall,
   ShieldCheck,
+  ShoppingBag,
 } from "lucide-react";
 import {
   ContactSection,
@@ -22,9 +23,11 @@ import {
   ThemeSection,
 } from "./sections";
 import { ProductsSection, type AdminProduct } from "./products-section";
+import { OrdersSection } from "./orders-section";
 
 const TABS = [
   { key: "dashboard", label: "داشبورد", icon: Gauge },
+  { key: "orders", label: "سفارش‌ها", icon: ShoppingBag },
   { key: "products", label: "محصولات", icon: Boxes },
   { key: "hero", label: "هیرو و بنرها", icon: ImageIcon },
   { key: "theme", label: "تم و ظاهر", icon: Paintbrush },
@@ -146,6 +149,7 @@ export function AdminPanel() {
           {tab === "dashboard" && (
             <DashboardSection settings={settings} productCount={products.filter((p) => p.active).length} />
           )}
+          {tab === "orders" && <OrdersSection toast={toast} />}
           {tab === "products" && (
             <ProductsSection products={products} setProducts={setProducts} toast={toast} />
           )}

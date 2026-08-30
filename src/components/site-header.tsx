@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Menu, Phone, X, Sparkle } from "lucide-react";
 import { telHref, toFa } from "@/lib/format";
@@ -25,7 +24,6 @@ export function SiteHeader({
 }) {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const pathname = usePathname();
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 24);
@@ -33,8 +31,6 @@ export function SiteHeader({
     window.addEventListener("scroll", fn, { passive: true });
     return () => window.removeEventListener("scroll", fn);
   }, []);
-
-  useEffect(() => setOpen(false), [pathname]);
 
   return (
     <>
@@ -47,7 +43,7 @@ export function SiteHeader({
       >
         <div className="mx-auto max-w-7xl px-5 lg:px-8">
           <div className="flex h-[72px] items-center justify-between gap-4">
-            <Link href="/" className="group flex items-center gap-3">
+            <Link href="/" className="group flex items-center gap-3" onClick={() => setOpen(false)}>
               <span className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-accent2 to-accent text-on-accent shadow-lg shadow-accent/20 transition-transform duration-300 group-hover:rotate-6">
                 <Sparkle size={20} strokeWidth={2.2} />
               </span>
@@ -101,12 +97,13 @@ export function SiteHeader({
               <Link
                 key={n.href}
                 href={n.href}
+                onClick={() => setOpen(false)}
                 className="rounded-xl px-4 py-3 text-sm font-semibold text-muted transition-colors hover:bg-card hover:text-ink"
               >
                 {n.label}
               </Link>
             ))}
-            <a href={telHref(phone)} className="btn btn-primary mt-2 h-12 text-sm">
+            <a href={telHref(phone)} onClick={() => setOpen(false)} className="btn btn-primary mt-2 h-12 text-sm">
               <Phone size={16} />
               سفارش تلفنی — {toFa(phone)}
             </a>

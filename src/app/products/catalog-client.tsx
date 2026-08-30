@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Search, SlidersHorizontal, PackageSearch } from "lucide-react";
 import { CATEGORIES } from "@/lib/defaults";
@@ -25,13 +25,12 @@ export function CatalogClient({
   phone: string;
 }) {
   const params = useSearchParams();
-  const [cat, setCat] = useState(params.get("cat") ?? "all");
+  const urlCat = params.get("cat");
+  const [selectedCat, setSelectedCat] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<SortKey>("default");
 
-  useEffect(() => {
-    setCat(params.get("cat") ?? "all");
-  }, [params]);
+  const cat = selectedCat ?? urlCat ?? "all";
 
   const filtered = useMemo(() => {
     let list = [...products];
@@ -67,7 +66,7 @@ export function CatalogClient({
           {CATEGORIES.map((c) => (
             <button
               key={c.key}
-              onClick={() => setCat(c.key)}
+              onClick={() => setSelectedCat(c.key)}
               className={`chip px-4 py-2 text-xs font-semibold ${cat === c.key ? "active" : "text-muted"}`}
             >
               {c.label}
@@ -116,7 +115,7 @@ export function CatalogClient({
           <button
             onClick={() => {
               setQ("");
-              setCat("all");
+              setSelectedCat("all");
             }}
             className="btn btn-ghost h-10 px-6 text-xs"
           >

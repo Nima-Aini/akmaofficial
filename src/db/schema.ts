@@ -43,4 +43,34 @@ export const adminUsers = pgTable("admin_users", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export type OrderItem = {
+  productId: number;
+  productName: string;
+  productImage: string;
+  price: number;
+  unitPrice?: string;
+  quantity: number;
+};
+
+export const orders = pgTable("orders", {
+  id: serial("id").primaryKey(),
+  trackingCode: text("tracking_code").notNull().unique(),
+  customerName: text("customer_name").notNull(),
+  customerPhone: text("customer_phone").notNull(),
+  customerAddress: text("customer_address").notNull(),
+  customerProvince: text("customer_province").notNull().default(""),
+  customerCity: text("customer_city").notNull().default(""),
+  postalCode: text("postal_code").notNull().default(""),
+  notes: text("notes").notNull().default(""),
+  items: jsonb("items").$type<OrderItem[]>().notNull().default([]),
+  totalAmount: bigint("total_amount", { mode: "number" }).notNull().default(0),
+  status: text("status").notNull().default("pending"), // pending | processing | shipped | delivered | cancelled
+  shippingCode: text("shipping_code").notNull().default(""),
+  trackingLink: text("tracking_link").notNull().default(""),
+  adminNotes: text("admin_notes").notNull().default(""),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 export type ProductRow = typeof products.$inferSelect;
+export type OrderRow = typeof orders.$inferSelect;
