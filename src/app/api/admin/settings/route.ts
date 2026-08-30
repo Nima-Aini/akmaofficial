@@ -9,6 +9,8 @@ const ALLOWED_KEYS = new Set([
   "hero",
   "marquee",
   "banners",
+  "bottomBanners",
+  "sectionTitles",
   "features",
   "priceTable",
   "steps",

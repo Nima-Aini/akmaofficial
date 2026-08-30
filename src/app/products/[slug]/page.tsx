@@ -149,11 +149,11 @@ export default async function ProductPage({
                   className="btn btn-ghost h-12 flex-1 text-xs font-bold"
                 >
                   <Phone size={16} />
-                  مشاوره و سفارش تلفنی — {toFa(phone)}
+                  مشاوره و پشتیبانی تلفنی — {toFa(phone)}
                 </a>
               </div>
               <p className="text-center text-[11px] leading-5 text-muted">
-                امکان ثبت مستقیم سفارش و دریافت کد رهگیری آنی، یا تماس تلفنی جهت سفارش عمده.
+                امکان ثبت مستقیم سفارش، صدور آنی کد رهگیری و ارسال سریع پستی و تیپاکس به سراسر کشور.
               </p>
 
               <div className="grid grid-cols-3 gap-2 border-t border-line pt-5 text-center">

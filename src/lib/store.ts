@@ -236,21 +236,46 @@ export async function getActiveProducts(): Promise<ProductRow[]> {
 }
 
 export async function getProductBySlug(slug: string): Promise<ProductRow | null> {
+  if (!slug) return null;
+  const raw = String(slug).trim();
+  let decoded = raw;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    decoded = raw;
+  }
+  const numericId = Number(raw);
+  const isNum = !isNaN(numericId) && numericId > 0;
+
   const memStore = getMemoryStore();
   if (db) {
     try {
       await ensureSeeded();
-      const rows = await db
-        .select()
-        .from(products)
-        .where(eq(products.slug, slug))
-        .limit(1);
-      if (rows[0]) return rows[0];
+      const allRows: ProductRow[] = await db.select().from(products);
+      const match = allRows.find(
+        (p: ProductRow) =>
+          p.slug === raw ||
+          p.slug === decoded ||
+          (Boolean(p.slug) && decodeURIComponent(p.slug) === decoded) ||
+          (Boolean(p.slug) && decodeURIComponent(p.slug).toLowerCase() === decoded.toLowerCase()) ||
+          (isNum && p.id === numericId)
+      );
+      if (match) return match;
     } catch {
       // fall back to memory
     }
   }
-  return memStore.products.find((p) => p.slug === slug) ?? null;
+
+  return (
+    memStore.products.find(
+      (p: ProductRow) =>
+        p.slug === raw ||
+        p.slug === decoded ||
+        (Boolean(p.slug) && decodeURIComponent(p.slug) === decoded) ||
+        (Boolean(p.slug) && decodeURIComponent(p.slug).toLowerCase() === decoded.toLowerCase()) ||
+        (isNum && p.id === numericId)
+    ) ?? null
+  );
 }
 
 export type ProductInput = {

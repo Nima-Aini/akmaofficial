@@ -16,7 +16,7 @@ export default async function ProductsPage() {
         <p className="text-xs font-bold tracking-[0.25em] text-accent">فروشگاه عمده آکما</p>
         <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">محصولات</h1>
         <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-muted">
-          محصول موردنظر را انتخاب کنید و برای ثبت سفارش و قیمت همکاری با ما تماس بگیرید.
+          محصولات موردنظر خود را به سبد خرید اضافه کنید و سفارش خود را با صدور آنی کد رهگیری ثبت نمایید.
         </p>
       </header>
       <CatalogClient products={products} phone={phone} />

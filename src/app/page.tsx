@@ -3,14 +3,13 @@ import {
   ArrowLeft,
   BadgePercent,
   ClipboardList,
+  Headphones,
   Phone,
-  Send,
   Sparkle,
-  Store,
+  Truck,
 } from "lucide-react";
 import { getActiveProducts, getSettings } from "@/lib/store";
 import {
-  CATEGORIES,
   DEFAULT_BANNERS,
   DEFAULT_BOTTOM_BANNERS,
   DEFAULT_CONTACT,
@@ -52,8 +51,6 @@ export default async function HomePage() {
   const featured = products.filter((p) => p.featured).slice(0, 6);
   const showcase = featured.length > 0 ? featured : products.slice(0, 6);
 
-  const catIcons = [Sparkle, Send, BadgePercent, Store];
-
   return (
     <div className="overflow-hidden">
       {/* ================= HERO ================= */}
@@ -89,14 +86,13 @@ export default async function HomePage() {
               </Reveal>
               <Reveal delay={260}>
                 <div className="mt-9 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
-                  <Link href={hero.primaryCta.href} className="btn btn-primary h-13 px-8 text-sm">
+                  <Link href={hero.primaryCta.href} className="btn btn-primary h-13 px-8 text-sm shadow-lg shadow-accent/20">
                     {hero.primaryCta.label}
                     <ArrowLeft size={17} />
                   </Link>
-                  <a href={hero.secondaryCta.href} className="btn btn-ghost h-13 px-8 text-sm">
-                    <Phone size={17} className="text-accent" />
+                  <Link href={hero.secondaryCta.href} className="btn btn-ghost h-13 px-8 text-sm">
                     {hero.secondaryCta.label}
-                  </a>
+                  </Link>
                 </div>
               </Reveal>
               <Reveal delay={340}>
@@ -131,13 +127,11 @@ export default async function HomePage() {
                 </div>
                 <div className="card float-slow absolute -bottom-6 -right-3 z-10 flex items-center gap-3 px-5 py-4 sm:-right-8">
                   <span className="grid size-11 place-items-center rounded-xl bg-gradient-to-br from-accent2 to-accent text-on-accent">
-                    <Phone size={19} />
+                    <Truck size={19} />
                   </span>
                   <span>
-                    <span className="block text-[11px] text-muted">ثبت سفارش سریع</span>
-                    <a href={telHref(phone)} className="block text-base font-black tracking-wide" dir="ltr">
-                      {toFa(phone)}
-                    </a>
+                    <span className="block text-[11px] text-muted">ارسال سریع سفارشات</span>
+                    <span className="block text-sm font-black text-accent">تیپاکس سراسری</span>
                   </span>
                 </div>
               </div>
@@ -167,52 +161,9 @@ export default async function HomePage() {
         </div>
       )}
 
-      {/* ================= CATEGORIES ================= */}
-      <section className="mx-auto max-w-7xl px-5 py-20 lg:px-8">
-        <Reveal>
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <p className="text-xs font-bold tracking-[0.25em] text-accent">
-                {sectionTitles.categoriesBadge || "دسته‌بندی‌ها"}
-              </p>
-              <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">
-                {sectionTitles.categoriesTitle || "هر آنچه ویترین شما نیاز دارد"}
-              </h2>
-            </div>
-            <Link href="/products" className="btn btn-ghost h-11 px-6 text-xs">
-              همه محصولات
-              <ArrowLeft size={15} />
-            </Link>
-          </div>
-        </Reveal>
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {CATEGORIES.filter((c) => c.key !== "all").map((c, i) => {
-            const Icon = catIcons[i % catIcons.length];
-            return (
-              <Reveal key={c.key} delay={i * 80}>
-                <Link
-                  href={`/products?cat=${c.key}`}
-                  className="card card-hover group flex h-full items-center gap-4 p-6"
-                >
-                  <span className="grid size-13 shrink-0 place-items-center rounded-2xl border border-line bg-surface text-accent transition-all duration-300 group-hover:border-accent group-hover:shadow-[0_0_30px_-8px_var(--accent)]">
-                    <Icon size={22} strokeWidth={1.8} />
-                  </span>
-                  <span>
-                    <span className="block font-extrabold">{c.label}</span>
-                    <span className="mt-1 flex items-center gap-1 text-[11px] text-muted transition-colors group-hover:text-accent">
-                      مشاهده محصولات <ArrowLeft size={12} />
-                    </span>
-                  </span>
-                </Link>
-              </Reveal>
-            );
-          })}
-        </div>
-      </section>
-
       {/* ================= FEATURED PRODUCTS ================= */}
       {showcase.length > 0 && (
-        <section className="mx-auto max-w-7xl px-5 py-10 lg:px-8">
+        <section className="mx-auto max-w-7xl px-5 py-16 lg:px-8">
           <Reveal>
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
@@ -246,7 +197,7 @@ export default async function HomePage() {
 
       {/* ================= PROMO BANNERS ================= */}
       {banners.length > 0 && (
-        <section className="mx-auto grid max-w-7xl gap-5 px-5 py-20 lg:grid-cols-2 lg:px-8">
+        <section className="mx-auto grid max-w-7xl gap-5 px-5 py-14 lg:grid-cols-2 lg:px-8">
           {banners.map((b, i) => (
             <Reveal key={b.id} delay={i * 120}>
               <Link
@@ -396,13 +347,13 @@ export default async function HomePage() {
           </div>
           <Reveal delay={200}>
             <div className="mt-12 flex flex-wrap justify-center gap-3">
-              <Link href="/products" className="btn btn-primary h-13 px-9 text-sm">
+              <Link href="/products" className="btn btn-primary h-13 px-9 text-sm shadow-lg shadow-accent/20">
                 <ClipboardList size={17} />
-                مشاهده و ثبت سفارش محصولات
+                ثبت سفارش آنلاین محصولات
               </Link>
               <a href={telHref(phone)} className="btn btn-ghost h-13 px-9 text-sm">
-                <Phone size={17} className="text-accent" />
-                سفارش تلفنی — {toFa(phone)}
+                <Headphones size={17} className="text-accent" />
+                مشاوره و پشتیبانی — {toFa(phone)}
               </a>
             </div>
           </Reveal>

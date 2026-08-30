@@ -80,18 +80,12 @@ export function SiteFooter({
           </div>
 
           <div>
-            <h4 className="text-sm font-extrabold tracking-wide">دسته‌بندی محصولات</h4>
+            <h4 className="text-sm font-extrabold tracking-wide">خدمات و سفارش</h4>
             <ul className="mt-5 space-y-3 text-sm text-muted">
-              {CATEGORIES.filter((c) => c.key !== "all").map((c) => (
-                <li key={c.key}>
-                  <Link
-                    className="transition-colors hover:text-accent"
-                    href={`/products?cat=${c.key}`}
-                  >
-                    {c.label}
-                  </Link>
-                </li>
-              ))}
+              <li><Link className="transition-colors hover:text-accent" href="/products">کاتالوگ و ثبت سفارش آنلاین</Link></li>
+              <li><Link className="transition-colors hover:text-accent" href="/track">پیگیری وضعیت سفارش</Link></li>
+              <li><Link className="transition-colors hover:text-accent" href="/checkout">سبد خرید و تسویه‌حساب</Link></li>
+              <li><Link className="transition-colors hover:text-accent" href="/#price-table">شفافیت قیمت واحد</Link></li>
             </ul>
           </div>
 
