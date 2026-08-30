@@ -12,6 +12,8 @@ import {
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { FloatingCallBar } from "@/components/floating-call-bar";
+import { CartProvider } from "@/context/cart-context";
+import { CartDrawer } from "@/components/cart-drawer";
 
 const RADIUS_MAP: Record<ThemeSettings["radius"], string> = {
   sm: "12px",
@@ -64,10 +66,13 @@ export default async function RootLayout({
         />
       </head>
       <body className="grain min-h-dvh antialiased">
-        <SiteHeader name={site.name} latin={site.latinName} phone={phone} />
-        <main>{children}</main>
-        <SiteFooter site={site} contact={contact} />
-        <FloatingCallBar phone={phone} />
+        <CartProvider>
+          <SiteHeader name={site.name} latin={site.latinName} phone={phone} />
+          <main>{children}</main>
+          <SiteFooter site={site} contact={contact} />
+          <FloatingCallBar phone={phone} />
+          <CartDrawer />
+        </CartProvider>
       </body>
     </html>
   );
