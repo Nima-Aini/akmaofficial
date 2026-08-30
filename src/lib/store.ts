@@ -3,6 +3,7 @@ import { adminUsers, orders, products, settings, type OrderItem, type OrderRow, 
 import { asc, desc, eq, or } from "drizzle-orm";
 import { DEFAULT_ADMIN, DEFAULT_SETTINGS, PRODUCT_SEEDS } from "./defaults";
 import { hashPassword } from "./auth";
+import { toEnDigits } from "./format";
 
 type MemoryAdmin = {
   id: number;
@@ -508,7 +509,8 @@ export async function getOrderById(id: number): Promise<OrderRow | null> {
 export async function getOrderByTrackingCode(
   codeOrPhone: string,
 ): Promise<OrderRow | null> {
-  const query = codeOrPhone.trim().toUpperCase();
+  const normalized = toEnDigits(codeOrPhone).trim();
+  const query = normalized.toUpperCase();
   const rawQuery = codeOrPhone.trim();
   const memStore = getMemoryStore();
 
@@ -520,7 +522,9 @@ export async function getOrderByTrackingCode(
         .where(
           or(
             eq(orders.trackingCode, query),
+            eq(orders.customerPhone, normalized),
             eq(orders.customerPhone, rawQuery),
+            eq(orders.shippingCode, normalized),
             eq(orders.shippingCode, rawQuery),
           ),
         )
@@ -536,8 +540,9 @@ export async function getOrderByTrackingCode(
     memStore.orders.find(
       (o) =>
         o.trackingCode.toUpperCase() === query ||
+        o.customerPhone === normalized ||
         o.customerPhone === rawQuery ||
-        (o.shippingCode && o.shippingCode === rawQuery),
+        (o.shippingCode && (o.shippingCode === normalized || o.shippingCode === rawQuery)),
     ) ?? null
   );
 }

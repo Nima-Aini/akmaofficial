@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { getActiveProducts, getSettings } from "@/lib/store";
 import { DEFAULT_CONTACT, type ContactSettings } from "@/lib/defaults";
@@ -19,7 +20,9 @@ export default async function ProductsPage() {
           محصولات موردنظر خود را به سبد خرید اضافه کنید و سفارش خود را با صدور آنی کد رهگیری ثبت نمایید.
         </p>
       </header>
-      <CatalogClient products={products} phone={phone} />
+      <Suspense fallback={<div className="py-20 text-center text-xs text-muted">در حال بارگذاری کاتالوگ…</div>}>
+        <CatalogClient products={products} phone={phone} />
+      </Suspense>
     </div>
   );
 }

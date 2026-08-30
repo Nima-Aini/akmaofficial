@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createOrder, type OrderInput } from "@/lib/store";
+import { normalizePhone, toEnDigits } from "@/lib/format";
 import type { OrderItem } from "@/db/schema";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const customerName = String(body.customerName ?? "").trim();
-    const customerPhone = String(body.customerPhone ?? "").trim();
+    const rawPhone = String(body.customerPhone ?? "").trim();
+    const customerPhone = normalizePhone(rawPhone);
     const customerAddress = String(body.customerAddress ?? "").trim();
     const customerProvince = String(body.customerProvince ?? "").trim();
     const customerCity = String(body.customerCity ?? "").trim();
-    const postalCode = String(body.postalCode ?? "").trim();
+    const postalCode = toEnDigits(String(body.postalCode ?? "")).trim();
     const notes = String(body.notes ?? "").trim();
     const rawItems = Array.isArray(body.items) ? body.items : [];
 

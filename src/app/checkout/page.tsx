@@ -15,7 +15,7 @@ import {
   Search,
 } from "lucide-react";
 import { useCart } from "@/context/cart-context";
-import { formatPrice, toFa } from "@/lib/format";
+import { formatPrice, normalizePhone, toEnDigits, toFa } from "@/lib/format";
 
 export default function CheckoutPage() {
   const { items, totalAmount, totalCount, clearCart } = useCart();
@@ -41,11 +41,12 @@ export default function CheckoutPage() {
     e.preventDefault();
     setError(null);
 
+    const cleanPhone = normalizePhone(phone);
     if (!name.trim()) {
       setError("لطفاً نام و نام خانوادگی خود را وارد کنید.");
       return;
     }
-    if (!phone.trim() || phone.replace(/\D/g, "").length < 10) {
+    if (!cleanPhone || cleanPhone.length < 10) {
       setError("لطفاً شماره تماس معتبر (۱۰ یا ۱۱ رقم) وارد کنید.");
       return;
     }
@@ -65,11 +66,11 @@ export default function CheckoutPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customerName: name.trim(),
-          customerPhone: phone.trim(),
+          customerPhone: cleanPhone,
           customerProvince: province.trim(),
           customerCity: city.trim(),
           customerAddress: address.trim(),
-          postalCode: postalCode.trim(),
+          postalCode: toEnDigits(postalCode).trim(),
           notes: notes.trim(),
           items,
         }),
