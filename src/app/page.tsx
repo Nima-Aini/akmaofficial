@@ -12,18 +12,22 @@ import { getActiveProducts, getSettings } from "@/lib/store";
 import {
   CATEGORIES,
   DEFAULT_BANNERS,
+  DEFAULT_BOTTOM_BANNERS,
   DEFAULT_CONTACT,
   DEFAULT_FEATURES,
   DEFAULT_HERO,
   DEFAULT_MARQUEE,
   DEFAULT_PRICE_TABLE,
+  DEFAULT_SECTION_TITLES,
   DEFAULT_SITE,
   DEFAULT_STEPS,
   type Banner,
+  type BottomBanner,
   type ContactSettings,
   type Feature,
   type HeroSettings,
   type PriceRow,
+  type SectionTitles,
   type SiteSettings,
   type Step,
 } from "@/lib/defaults";
@@ -37,10 +41,12 @@ export default async function HomePage() {
   const hero = { ...DEFAULT_HERO, ...(s.hero as Partial<HeroSettings>) };
   const marquee = (s.marquee as string[]) ?? DEFAULT_MARQUEE;
   const banners = ((s.banners as Banner[]) ?? DEFAULT_BANNERS).filter((b) => b.enabled);
+  const bottomBanners = ((s.bottomBanners as BottomBanner[]) ?? DEFAULT_BOTTOM_BANNERS).filter((b) => b.enabled);
   const features = (s.features as Feature[]) ?? DEFAULT_FEATURES;
   const priceTable = (s.priceTable as PriceRow[]) ?? DEFAULT_PRICE_TABLE;
   const steps = (s.steps as Step[]) ?? DEFAULT_STEPS;
   const site = { ...DEFAULT_SITE, ...(s.site as Partial<SiteSettings>) };
+  const sectionTitles = { ...DEFAULT_SECTION_TITLES, ...(s.sectionTitles as Partial<SectionTitles>) };
   const contact = { ...DEFAULT_CONTACT, ...(s.contact as Partial<ContactSettings>) };
   const phone = contact.phones[0] ?? "09033253065";
   const featured = products.filter((p) => p.featured).slice(0, 6);
@@ -128,7 +134,7 @@ export default async function HomePage() {
                     <Phone size={19} />
                   </span>
                   <span>
-                    <span className="block text-[11px] text-muted">ثبت سفارش فقط با یک تماس</span>
+                    <span className="block text-[11px] text-muted">ثبت سفارش سریع</span>
                     <a href={telHref(phone)} className="block text-base font-black tracking-wide" dir="ltr">
                       {toFa(phone)}
                     </a>
@@ -166,9 +172,11 @@ export default async function HomePage() {
         <Reveal>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <p className="text-xs font-bold tracking-[0.25em] text-accent">دسته‌بندی‌ها</p>
+              <p className="text-xs font-bold tracking-[0.25em] text-accent">
+                {sectionTitles.categoriesBadge || "دسته‌بندی‌ها"}
+              </p>
               <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">
-                هر آنچه ویترین شما نیاز دارد
+                {sectionTitles.categoriesTitle || "هر آنچه ویترین شما نیاز دارد"}
               </h2>
             </div>
             <Link href="/products" className="btn btn-ghost h-11 px-6 text-xs">
@@ -208,10 +216,17 @@ export default async function HomePage() {
           <Reveal>
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
-                <p className="text-xs font-bold tracking-[0.25em] text-accent">منتخب فروشگاه</p>
+                <p className="text-xs font-bold tracking-[0.25em] text-accent">
+                  {sectionTitles.featuredBadge || "منتخب فروشگاه"}
+                </p>
                 <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">
-                  محصولات ویژه آکما
+                  {sectionTitles.featuredTitle || "محصولات ویژه آکما"}
                 </h2>
+                {sectionTitles.featuredSubtitle && (
+                  <p className="mt-2 text-xs text-muted max-w-xl">
+                    {sectionTitles.featuredSubtitle}
+                  </p>
+                )}
               </div>
               <Link href="/products" className="btn btn-ghost h-11 px-6 text-xs">
                 مشاهده همه
@@ -229,7 +244,6 @@ export default async function HomePage() {
         </section>
       )}
 
-
       {/* ================= PROMO BANNERS ================= */}
       {banners.length > 0 && (
         <section className="mx-auto grid max-w-7xl gap-5 px-5 py-20 lg:grid-cols-2 lg:px-8">
@@ -242,7 +256,7 @@ export default async function HomePage() {
                 <div className="grid sm:grid-cols-2">
                   <div className="relative z-10 p-8 sm:p-10">
                     <span className="text-[11px] font-bold tracking-[0.25em] text-accent">
-                      پیشنهاد آکما
+                      {sectionTitles.promoBadge || "پیشنهاد آکما"}
                     </span>
                     <h3 className="mt-4 text-2xl font-black leading-snug">{b.title}</h3>
                     <p className="mt-3 text-[13px] leading-7 text-muted">{b.subtitle}</p>
@@ -271,49 +285,36 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* ================= ABOUT / CRAFT ================= */}
-      <section className="mx-auto max-w-7xl px-5 py-14 lg:px-8">
-        <div className="grid items-center gap-12 lg:grid-cols-2">
-          <Reveal className="relative order-2 lg:order-1">
-            <div className="card overflow-hidden !rounded-[2.2rem]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/images/craft.png"
-                alt="احیای کفش با محصولات آکما"
-                loading="lazy"
-                className="aspect-[5/4] w-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-bg/55 to-transparent" />
-            </div>
-            <div className="card float-slow absolute -top-6 left-4 z-10 px-5 py-4 sm:-left-6">
-              <p className="text-2xl font-black text-accent">+۱۰۰٪</p>
-              <p className="mt-1 text-[11px] text-muted">تمرکز بر کیفیت و بسته‌بندی</p>
-            </div>
-          </Reveal>
-          <div className="order-1 lg:order-2">
-            <Reveal>
-              <p className="text-xs font-bold tracking-[0.25em] text-accent">چرا آکما؟</p>
-              <h2 className="mt-3 text-3xl font-black leading-snug tracking-tight sm:text-4xl">
-                {site.aboutTitle}
-              </h2>
-              <p className="mt-6 text-[15px] leading-9 text-muted">{site.aboutText}</p>
-            </Reveal>
-            <div className="mt-9 grid gap-4 sm:grid-cols-2">
-              {features.map((f, i) => (
-                <Reveal key={f.title + i} delay={i * 80}>
-                  <div className="card card-hover flex h-full gap-4 p-5">
-                    <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-accent2 to-accent text-on-accent">
-                      <DynIcon name={f.icon} size={19} />
-                    </span>
-                    <span>
-                      <span className="block text-sm font-extrabold">{f.title}</span>
-                      <span className="mt-1.5 block text-xs leading-6 text-muted">{f.desc}</span>
-                    </span>
-                  </div>
-                </Reveal>
-              ))}
-            </div>
+      {/* ================= WHY AKMA (مزایا و هویت) ================= */}
+      <section className="mx-auto max-w-7xl px-5 py-16 lg:px-8">
+        <Reveal>
+          <div className="text-center max-w-3xl mx-auto">
+            <p className="text-xs font-bold tracking-[0.25em] text-accent">
+              {sectionTitles.whyAkmaBadge || "چرا آکما؟"}
+            </p>
+            <h2 className="mt-3 text-3xl font-black leading-snug tracking-tight sm:text-4xl">
+              {sectionTitles.whyAkmaTitle || site.aboutTitle}
+            </h2>
+            <p className="mt-5 text-[15px] leading-8 text-muted">
+              {sectionTitles.whyAkmaSubtitle || site.aboutText}
+            </p>
           </div>
+        </Reveal>
+
+        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {features.map((f, i) => (
+            <Reveal key={f.title + i} delay={i * 80}>
+              <div className="card card-hover flex h-full flex-col gap-4 p-6">
+                <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-accent2 to-accent text-on-accent shadow-md shadow-accent/20">
+                  <DynIcon name={f.icon} size={20} />
+                </span>
+                <div>
+                  <span className="block text-sm font-extrabold">{f.title}</span>
+                  <span className="mt-2 block text-xs leading-6 text-muted">{f.desc}</span>
+                </div>
+              </div>
+            </Reveal>
+          ))}
         </div>
       </section>
 
@@ -321,10 +322,15 @@ export default async function HomePage() {
       <section id="price-table" className="mx-auto max-w-7xl scroll-mt-28 px-5 py-20 lg:px-8">
         <Reveal>
           <div className="text-center">
-            <p className="text-xs font-bold tracking-[0.25em] text-accent">شفافیت قیمت</p>
-            <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">قیمت واحد محصولات</h2>
+            <p className="text-xs font-bold tracking-[0.25em] text-accent">
+              {sectionTitles.priceTableBadge || "شفافیت قیمت"}
+            </p>
+            <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">
+              {sectionTitles.priceTableTitle || "قیمت واحد محصولات"}
+            </h2>
             <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-muted">
-              قیمت‌های خرده‌فروشی پیشنهادی؛ برای قیمت همکاری و خرید عمده تماس بگیرید.
+              {sectionTitles.priceTableSubtitle ||
+                "قیمت‌های خرده‌فروشی پیشنهادی؛ برای قیمت همکاری و خرید عمده تماس بگیرید یا آنلاین سفارش دهید."}
             </p>
           </div>
         </Reveal>
@@ -361,10 +367,17 @@ export default async function HomePage() {
         <div className="mx-auto max-w-7xl px-5 lg:px-8">
           <Reveal>
             <div className="text-center">
-              <p className="text-xs font-bold tracking-[0.25em] text-accent">بدون سبد خرید، بدون پیچیدگی</p>
+              <p className="text-xs font-bold tracking-[0.25em] text-accent">
+                {sectionTitles.stepsBadge || "سفارش آسان"}
+              </p>
               <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">
-                سفارش در سه قدم ساده
+                {sectionTitles.stepsTitle || "سفارش در چند قدم ساده"}
               </h2>
+              {sectionTitles.stepsSubtitle && (
+                <p className="mx-auto mt-3 max-w-lg text-xs leading-6 text-muted">
+                  {sectionTitles.stepsSubtitle}
+                </p>
+              )}
             </div>
           </Reveal>
           <div className="relative mt-14 grid gap-6 md:grid-cols-3">
@@ -383,18 +396,50 @@ export default async function HomePage() {
           </div>
           <Reveal delay={200}>
             <div className="mt-12 flex flex-wrap justify-center gap-3">
-              <a href={telHref(phone)} className="btn btn-primary h-13 px-9 text-sm">
-                <Phone size={17} />
-                تماس برای ثبت سفارش — {toFa(phone)}
-              </a>
-              <Link href="/products" className="btn btn-ghost h-13 px-9 text-sm">
-                <ClipboardList size={17} className="text-accent" />
-                انتخاب محصولات
+              <Link href="/products" className="btn btn-primary h-13 px-9 text-sm">
+                <ClipboardList size={17} />
+                مشاهده و ثبت سفارش محصولات
               </Link>
+              <a href={telHref(phone)} className="btn btn-ghost h-13 px-9 text-sm">
+                <Phone size={17} className="text-accent" />
+                سفارش تلفنی — {toFa(phone)}
+              </a>
             </div>
           </Reveal>
         </div>
       </section>
+
+      {/* ================= BOTTOM BANNERS ================= */}
+      {bottomBanners.length > 0 && (
+        <section className="mx-auto max-w-7xl px-5 py-16 lg:px-8">
+          <div className={`grid gap-5 ${bottomBanners.length === 1 ? "grid-cols-1" : "sm:grid-cols-2"}`}>
+            {bottomBanners.map((bb, idx) => {
+              const content = (
+                <div className="card overflow-hidden !rounded-[2rem] border border-line transition-transform duration-500 hover:scale-[1.01]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={bb.image}
+                    alt={bb.alt || site.name}
+                    loading="lazy"
+                    className="w-full object-cover max-h-[380px]"
+                  />
+                </div>
+              );
+              return (
+                <Reveal key={bb.id} delay={idx * 100}>
+                  {bb.href ? (
+                    <Link href={bb.href} className="block group">
+                      {content}
+                    </Link>
+                  ) : (
+                    content
+                  )}
+                </Reveal>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

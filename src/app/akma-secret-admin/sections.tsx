@@ -619,6 +619,31 @@ export function ContentSection({
         saving={saving}
       >
         <div className="space-y-6">
+          {/* Why Akma */}
+          <div className="rounded-2xl border border-line p-4 space-y-4">
+            <h4 className="text-xs font-black text-accent">بخش چرا آکما؟ (معرفی و مزایای برند)</h4>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label="متن بج بالای بخش"
+                value={sectionTitles.whyAkmaBadge}
+                onChange={(v) => setTitles({ whyAkmaBadge: v })}
+                hint="مثلاً: چرا آکما؟"
+              />
+              <Field
+                label="عنوان اصلی بخش"
+                value={sectionTitles.whyAkmaTitle}
+                onChange={(v) => setTitles({ whyAkmaTitle: v })}
+                hint="مثلاً: آکما؛ انتخاب فروشگاه‌های حرفه‌ای"
+              />
+            </div>
+            <Textarea
+              label="متن معرفی و توضیحات بخش چرا آکما"
+              value={sectionTitles.whyAkmaSubtitle}
+              onChange={(v) => setTitles({ whyAkmaSubtitle: v })}
+              rows={3}
+            />
+          </div>
+
           {/* Featured Products */}
           <div className="rounded-2xl border border-line p-4 space-y-4">
             <h4 className="text-xs font-black text-accent">بخش محصولات ویژه (اسلایدر صفحه اصلی)</h4>

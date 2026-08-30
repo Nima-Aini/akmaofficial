@@ -37,6 +37,12 @@ export type BottomBanner = {
 };
 
 export type SectionTitles = {
+  whyAkmaBadge: string;
+  whyAkmaTitle: string;
+  whyAkmaSubtitle: string;
+  categoriesBadge: string;
+  categoriesTitle: string;
+  categoriesSubtitle: string;
   featuredBadge: string;
   featuredTitle: string;
   featuredSubtitle: string;
@@ -225,6 +231,13 @@ export const DEFAULT_BOTTOM_BANNERS: BottomBanner[] = [
 ];
 
 export const DEFAULT_SECTION_TITLES: SectionTitles = {
+  whyAkmaBadge: "چرا آکما؟",
+  whyAkmaTitle: "آکما؛ انتخاب فروشگاه‌های حرفه‌ای",
+  whyAkmaSubtitle:
+    "آکما با تمرکز بر کیفیت، بسته‌بندی شکیل و قیمت همکاری رقابتی، مجموعه‌ای کامل از محصولات مراقبت از کفش را برای عرضه در فروشگاه‌های کفش، کتانی، کیف و چرم، کالای ورزشی و مراکز خدمات کفش تولید می‌کند.",
+  categoriesBadge: "دسته‌بندی‌ها",
+  categoriesTitle: "هر آنچه ویترین شما نیاز دارد",
+  categoriesSubtitle: "انواع فوم تمیزکننده، خوشبوکننده، پولیش و استندهای اختصاصی",
   featuredBadge: "منتخب فروشگاه",
   featuredTitle: "محصولات ویژه آکما",
   featuredSubtitle: "پرفروش‌ترین و محبوب‌ترین اقلام جهت ویترین فروشگاهی شما",
@@ -236,7 +249,7 @@ export const DEFAULT_SECTION_TITLES: SectionTitles = {
   priceTableBadge: "شفافیت قیمت",
   priceTableTitle: "قیمت واحد محصولات",
   priceTableSubtitle: "قیمت‌های خرده‌فروشی پیشنهادی؛ برای قیمت همکاری و خرید عمده تماس بگیرید یا آنلاین سفارش دهید.",
-  stepsBadge: "بدون پیچیدگی",
+  stepsBadge: "سفارش آسان",
   stepsTitle: "سفارش در چند قدم ساده",
   stepsSubtitle: "امکان ثبت سفارش آنلاین از طریق سبد خرید و یا تماس مستقیم تلفنی",
 };

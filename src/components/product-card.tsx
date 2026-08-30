@@ -1,6 +1,9 @@
+"use client";
+
 import Link from "next/link";
-import { ArrowLeft, Phone, PackageCheck, PackageX } from "lucide-react";
+import { ArrowLeft, PackageCheck, PackageX, Phone } from "lucide-react";
 import { formatPrice, telHref } from "@/lib/format";
+import { AddToCartButton } from "./add-to-cart-button";
 import type { ProductRow } from "@/db/schema";
 
 export function ProductCard({
@@ -9,7 +12,7 @@ export function ProductCard({
   delay = 0,
 }: {
   product: ProductRow;
-  phone: string;
+  phone?: string;
   delay?: number;
 }) {
   const img = product.images[0] ?? "/images/products/foam-bottle.png";
@@ -26,14 +29,14 @@ export function ProductCard({
 
       <Link
         href={`/products/${product.slug}`}
-        className="relative block aspect-square w-full overflow-hidden bg-surface"
+        className="relative block aspect-square w-full overflow-hidden bg-surface/30 p-4 flex items-center justify-center"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={img}
           alt={product.name}
           loading="lazy"
-          className="size-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.06]"
+          className="max-h-full max-w-full object-contain transition-transform duration-700 ease-out group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-bg/40 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
       </Link>
@@ -60,7 +63,7 @@ export function ProductCard({
           </h3>
         </Link>
         {product.subtitle && (
-          <p className="-mt-1.5 text-xs text-muted">{product.subtitle}</p>
+          <p className="-mt-1.5 line-clamp-2 text-xs text-muted">{product.subtitle}</p>
         )}
 
         <div className="mt-auto flex items-end justify-between border-t border-line pt-4">
@@ -75,22 +78,27 @@ export function ProductCard({
           </div>
         </div>
 
-        <div className="flex gap-2">
-          <Link
-            href={`/products/${product.slug}`}
-            className="btn btn-ghost h-11 flex-1 text-xs"
-          >
-            جزئیات
-            <ArrowLeft size={14} />
-          </Link>
-          <a
-            href={telHref(phone)}
-            className="btn btn-primary h-11 flex-[1.4] text-xs"
-            aria-label={`سفارش تلفنی ${product.name}`}
-          >
-            <Phone size={14} />
-            سفارش تلفنی
-          </a>
+        <div className="space-y-2 pt-1">
+          <AddToCartButton product={product} size="md" />
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/products/${product.slug}`}
+              className="btn btn-ghost h-10 flex-1 text-xs"
+            >
+              مشاهده و خرید
+              <ArrowLeft size={14} />
+            </Link>
+            {phone && (
+              <a
+                href={telHref(phone)}
+                className="btn btn-ghost grid size-10 place-items-center rounded-xl text-muted hover:text-accent"
+                aria-label={`تماس برای ${product.name}`}
+                title="سفارش تلفنی"
+              >
+                <Phone size={15} />
+              </a>
+            )}
+          </div>
         </div>
       </div>
     </article>
