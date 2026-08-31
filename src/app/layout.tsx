@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Vazirmatn } from "next/font/google";
 import "./globals.css";
 import { getSettings } from "@/lib/store";
 import {
@@ -14,6 +15,13 @@ import { SiteFooter } from "@/components/site-footer";
 import { FloatingCallBar } from "@/components/floating-call-bar";
 import { CartProvider } from "@/context/cart-context";
 import { CartDrawer } from "@/components/cart-drawer";
+
+const vazirmatn = Vazirmatn({
+  subsets: ["arabic", "latin"],
+  weight: ["300", "400", "500", "600", "700", "800", "900"],
+  display: "swap",
+  variable: "--font-vazirmatn",
+});
 
 const RADIUS_MAP: Record<ThemeSettings["radius"], string> = {
   sm: "12px",
@@ -46,6 +54,7 @@ export default async function RootLayout({
     <html
       lang="fa"
       dir="rtl"
+      className={vazirmatn.variable}
       data-mode={theme.mode}
       data-btn={theme.buttonShape}
       style={
@@ -57,14 +66,6 @@ export default async function RootLayout({
         } as React.CSSProperties
       }
     >
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap"
-          rel="stylesheet"
-        />
-      </head>
       <body className="grain min-h-dvh antialiased">
         <CartProvider>
           <SiteHeader name={site.name} latin={site.latinName} phone={phone} />

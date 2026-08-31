@@ -10,7 +10,7 @@
   --color-accent: var(--accent);
   --color-accent2: var(--accent2);
   --color-on-accent: var(--accent-contrast);
-  --font-sans: "Vazirmatn", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-sans: var(--font-vazirmatn), "Vazirmatn", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --radius-card: var(--radius);
 }
 
