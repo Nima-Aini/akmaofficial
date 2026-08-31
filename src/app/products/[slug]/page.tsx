@@ -106,7 +106,7 @@ export default async function ProductPage({
             <span className="inline-block rounded-full border border-line px-3.5 py-1.5 text-[11px] font-bold text-muted">
               {product.categoryLabel}
             </span>
-            <h1 className="mt-4 text-3xl font-black leading-snug tracking-tight sm:text-4xl">
+            <h1 className="mt-4 text-2xl font-black leading-snug sm:text-4xl">
               {product.name}
             </h1>
             {product.subtitle && (
@@ -228,7 +228,7 @@ export default async function ProductPage({
       {relatedFinal.length > 0 && (
         <section className="mt-20">
           <div className="flex items-end justify-between">
-            <h2 className="text-2xl font-black tracking-tight">محصولات مرتبط</h2>
+            <h2 className="text-2xl font-black leading-snug">محصولات مرتبط</h2>
             <Link
               href="/products"
               className="flex items-center gap-1.5 text-xs font-bold text-muted transition-colors hover:text-accent"

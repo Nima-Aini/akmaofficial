@@ -51,7 +51,7 @@ export function SiteHeader({
                 <Sparkle size={20} strokeWidth={2.2} />
               </span>
               <span className="leading-none">
-                <span className="block text-xl font-black tracking-tight">{name}</span>
+                <span className="block text-xl font-black">{name}</span>
                 <span className="block text-[10px] font-bold tracking-[0.35em] text-muted">
                   {latin}
                 </span>

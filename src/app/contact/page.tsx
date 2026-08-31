@@ -24,8 +24,8 @@ export default async function ContactPage() {
     <div className="mx-auto max-w-7xl px-5 py-14 lg:px-8">
       <Reveal>
         <header className="text-center">
-          <p className="text-xs font-bold tracking-[0.25em] text-accent">همیشه پاسخگو هستیم</p>
-          <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">تماس با آکما</h1>
+          <p className="text-xs font-bold text-accent">همیشه پاسخگو هستیم</p>
+          <h1 className="mt-3 text-3xl font-black leading-snug sm:text-5xl">تماس با آکما</h1>
           <p className="mx-auto mt-5 max-w-2xl text-sm leading-8 text-muted">
             {contact.note}
           </p>

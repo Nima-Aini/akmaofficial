@@ -68,7 +68,7 @@ export function ProductCard({
 
         <div className="mt-auto flex items-end justify-between border-t border-line pt-4">
           <div>
-            <p className="text-2xl font-black tracking-tight text-accent">
+            <p className="text-2xl font-black text-accent">
               {formatPrice(product.price)}
               <span className="mr-1.5 text-xs font-bold text-muted">تومان</span>
             </p>

@@ -69,7 +69,7 @@ export function SiteFooter({
           </div>
 
           <div>
-            <h4 className="text-sm font-extrabold tracking-wide">دسترسی سریع</h4>
+            <h4 className="text-sm font-extrabold">دسترسی سریع</h4>
             <ul className="mt-5 space-y-3 text-sm text-muted">
               <li><Link className="transition-colors hover:text-accent" href="/">خانه</Link></li>
               <li><Link className="transition-colors hover:text-accent" href="/products">محصولات</Link></li>
@@ -80,7 +80,7 @@ export function SiteFooter({
           </div>
 
           <div>
-            <h4 className="text-sm font-extrabold tracking-wide">خدمات و سفارش</h4>
+            <h4 className="text-sm font-extrabold">خدمات و سفارش</h4>
             <ul className="mt-5 space-y-3 text-sm text-muted">
               <li><Link className="transition-colors hover:text-accent" href="/products">کاتالوگ و ثبت سفارش آنلاین</Link></li>
               <li><Link className="transition-colors hover:text-accent" href="/track">پیگیری وضعیت سفارش</Link></li>
@@ -90,7 +90,7 @@ export function SiteFooter({
           </div>
 
           <div>
-            <h4 className="text-sm font-extrabold tracking-wide">ارتباط با ما</h4>
+            <h4 className="text-sm font-extrabold">ارتباط با ما</h4>
             <ul className="mt-5 space-y-4 text-sm text-muted">
               {contact.phones.map((p) => (
                 <li key={p}>
@@ -124,7 +124,7 @@ export function SiteFooter({
 
         <div className="mt-14 flex flex-col items-center justify-between gap-4 border-t border-line pt-7 text-xs text-muted sm:flex-row">
           <p>© {year} {site.name} — تمامی حقوق محفوظ است.</p>
-          <p className="tracking-wide">{site.tagline}</p>
+          <p>{site.tagline}</p>
         </div>
       </div>
     </footer>
