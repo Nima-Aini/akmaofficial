@@ -43,6 +43,7 @@ jobs:
       - name: Validate deployment script
         run: |
           bash -n ops/akma-deploy
+          bash -n ops/akma-deploy-ssh
           bash -n ops/akma-server
 
       - name: Lint
@@ -84,5 +85,5 @@ jobs:
           test -n "$DEPLOY_HOST"
           test -n "$DEPLOY_PORT"
           test -n "$DEPLOY_USER"
-          ssh -i ~/.ssh/akma_deploy -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
-            "sudo /usr/local/sbin/akma-deploy '$COMMIT_SHA'"
+          ssh -i ~/.ssh/akma_deploy -p "$DEPLOY_PORT" \
+            "$DEPLOY_USER@$DEPLOY_HOST" "$COMMIT_SHA"

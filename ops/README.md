@@ -63,10 +63,18 @@ Install the two root-owned commands and restricted sudo rule:
 
 ```bash
 install -o root -g root -m 0755 /srv/akma/repository/ops/akma-deploy /usr/local/sbin/akma-deploy
+install -o root -g root -m 0755 /srv/akma/repository/ops/akma-deploy-ssh /usr/local/sbin/akma-deploy-ssh
 install -o root -g root -m 0755 /srv/akma/repository/ops/akma-server /usr/local/sbin/akma-server
 sed 's/DEPLOY_USER/github-deploy/' /srv/akma/repository/ops/sudoers-akma-deploy > /etc/sudoers.d/akma-deploy
 chmod 0440 /etc/sudoers.d/akma-deploy
 visudo -cf /etc/sudoers.d/akma-deploy
+```
+
+Install the dedicated public key with a forced command so it cannot open a
+general shell or run any command other than a validated deployment SHA:
+
+```text
+restrict,command="/usr/local/sbin/akma-deploy-ssh" ssh-ed25519 ... github-akma-production
 ```
 
 On the first cutover, the deployment command replaces only the existing
