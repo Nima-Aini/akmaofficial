@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
@@ -19,11 +20,48 @@ import { AddToCartButton } from "@/components/add-to-cart-button";
 import { Reveal } from "@/components/effects";
 import { formatPrice, telHref, toFa } from "@/lib/format";
 
+type ProductPageProps = {
+  params: Promise<{ slug: string }>;
+};
+
+function absoluteUrl(path: string): string {
+  const siteUrl = (process.env.SITE_URL ?? "https://akmaofficial.ir").replace(/\/$/, "");
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${siteUrl}${path.startsWith("/") ? "" : "/"}${path}`;
+}
+
+export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const product = await getProductBySlug(slug);
+  if (!product || !product.active) return {};
+
+  const image = absoluteUrl(product.images[0] ?? "/favicon.ico");
+  const canonical = `/products/${encodeURIComponent(product.slug)}`;
+
+  return {
+    title: `${product.name} | آکما`,
+    description: product.subtitle || product.description.slice(0, 160),
+    alternates: { canonical },
+    openGraph: {
+      type: "website",
+      title: product.name,
+      description: product.subtitle || product.description.slice(0, 160),
+      url: canonical,
+      images: [{ url: image, alt: product.name }],
+    },
+    other: {
+      product_id: String(product.id),
+      product_name: product.name,
+      product_price: String(product.price),
+      product_old_price: String(product.price),
+      availability: product.inStock ? "instock" : "outofstock",
+    },
+  };
+}
+
 export default async function ProductPage({
   params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
+}: ProductPageProps) {
   const { slug } = await params;
   const [product, s, all] = await Promise.all([
     getProductBySlug(slug),

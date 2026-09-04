@@ -1,0 +1,25 @@
+[Unit]
+Description=AKMA Next.js production service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=akma
+Group=akma
+Environment=NODE_ENV=production
+Environment=HOSTNAME=127.0.0.1
+Environment=PORT=3000
+EnvironmentFile=/etc/akma/akma.env
+WorkingDirectory=/srv/akma/current/.next/standalone
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=5
+TimeoutStartSec=30
+TimeoutStopSec=30
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

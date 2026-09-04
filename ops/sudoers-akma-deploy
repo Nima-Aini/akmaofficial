@@ -1,0 +1,2 @@
+# Replace DEPLOY_USER with the restricted Linux account used by GitHub Actions.
+DEPLOY_USER ALL=(root) NOPASSWD: /usr/local/sbin/akma-deploy [0-9a-f]*

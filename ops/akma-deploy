@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+APP_ROOT="/srv/akma"
+REPOSITORY="$APP_ROOT/repository"
+RELEASES="$APP_ROOT/releases"
+CURRENT="$APP_ROOT/current"
+ENV_FILE="/etc/akma/akma.env"
+BACKUPS="/var/backups/akma"
+SERVICE="akma.service"
+LOCK_FILE="/run/lock/akma-deploy.lock"
+HEALTH_URL="http://127.0.0.1:3000/api/health"
+
+commit="${1:-}"
+if [[ ! "$commit" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "Expected a full 40-character Git commit SHA." >&2
+  exit 2
+fi
+
+exec 9>"$LOCK_FILE"
+flock -n 9 || { echo "Another deployment is already running." >&2; exit 3; }
+
+test -d "$REPOSITORY/.git"
+test -f "$ENV_FILE"
+mkdir -p "$RELEASES" "$BACKUPS"
+
+git -C "$REPOSITORY" fetch --prune origin main
+git -C "$REPOSITORY" merge-base --is-ancestor "$commit" origin/main
+git -C "$REPOSITORY" cat-file -e "$commit^{commit}"
+
+release="$RELEASES/$(date -u +%Y%m%d%H%M%S)-${commit:0:12}"
+mkdir "$release"
+git -C "$REPOSITORY" archive "$commit" | tar -x -C "$release"
+
+set -a
+# shellcheck disable=SC1090
+source "$ENV_FILE"
+set +a
+
+cd "$release"
+corepack enable
+corepack prepare pnpm@11.19.0 --activate
+pnpm install --frozen-lockfile
+pnpm check:migrations
+pnpm typecheck
+pnpm lint
+pnpm build
+
+test -n "${DATABASE_URL:-}"
+backup="$BACKUPS/akma-$(date -u +%Y%m%d%H%M%S)-${commit:0:12}.dump"
+pg_dump --format=custom --file="$backup" "$DATABASE_URL"
+
+pnpm db:migrate
+
+mkdir -p .next/standalone/.next
+cp -a .next/static .next/standalone/.next/static
+
+previous=""
+if [[ -L "$CURRENT" ]]; then
+  previous="$(readlink -f "$CURRENT")"
+fi
+
+ln -sfn "$release" "$CURRENT.next"
+mv -Tf "$CURRENT.next" "$CURRENT"
+systemctl restart "$SERVICE"
+
+healthy=false
+for _ in {1..20}; do
+  if curl --fail --silent --show-error --max-time 3 "$HEALTH_URL" | grep -q '"database":"connected"'; then
+    healthy=true
+    break
+  fi
+  sleep 2
+done
+
+if [[ "$healthy" != true ]]; then
+  echo "New release failed its health check; restoring the previous release." >&2
+  if [[ -n "$previous" && -d "$previous" ]]; then
+    ln -sfn "$previous" "$CURRENT.next"
+    mv -Tf "$CURRENT.next" "$CURRENT"
+    systemctl restart "$SERVICE"
+  fi
+  exit 1
+fi
+
+mapfile -t old_releases < <(find "$RELEASES" -mindepth 1 -maxdepth 1 -type d -print | sort -r | tail -n +6)
+for old_release in "${old_releases[@]}"; do
+  resolved="$(readlink -f "$old_release")"
+  case "$resolved" in
+    "$RELEASES"/*) rm -rf -- "$resolved" ;;
+    *) echo "Refusing to remove unexpected path: $resolved" >&2 ;;
+  esac
+done
+
+find "$BACKUPS" -maxdepth 1 -type f -name 'akma-*.dump' -mtime +14 -delete
+echo "Deployment succeeded: $commit"

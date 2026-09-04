@@ -617,8 +617,3 @@ export const PRODUCT_SEEDS: ProductSeed[] = [
     sortOrder: 9,
   },
 ];
-
-export const DEFAULT_ADMIN = {
-  username: "akma_admin",
-  password: "AKMA@2026#Manager!",
-};
