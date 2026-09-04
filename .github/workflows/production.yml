@@ -41,7 +41,9 @@ jobs:
         run: pnpm check:migrations
 
       - name: Validate deployment script
-        run: bash -n ops/akma-deploy
+        run: |
+          bash -n ops/akma-deploy
+          bash -n ops/akma-server
 
       - name: Lint
         run: pnpm lint

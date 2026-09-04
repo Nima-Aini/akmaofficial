@@ -7,9 +7,9 @@ RELEASES="$APP_ROOT/releases"
 CURRENT="$APP_ROOT/current"
 ENV_FILE="/etc/akma/akma.env"
 BACKUPS="/var/backups/akma"
-SERVICE="akma.service"
+PROCESS_NAME="akmaofficial"
 LOCK_FILE="/run/lock/akma-deploy.lock"
-HEALTH_URL="http://127.0.0.1:3000/api/health"
+HEALTH_URL="http://127.0.0.1:3010/api/health"
 
 commit="${1:-}"
 if [[ ! "$commit" =~ ^[0-9a-f]{40}$ ]]; then
@@ -22,7 +22,42 @@ flock -n 9 || { echo "Another deployment is already running." >&2; exit 3; }
 
 test -d "$REPOSITORY/.git"
 test -f "$ENV_FILE"
+test -x /usr/local/sbin/akma-server
 mkdir -p "$RELEASES" "$BACKUPS"
+
+export NVM_DIR="/root/.nvm"
+# shellcheck disable=SC1091
+source "$NVM_DIR/nvm.sh"
+nvm use default --silent >/dev/null
+command -v node >/dev/null
+command -v npm >/dev/null
+command -v pm2 >/dev/null
+
+restart_app() {
+  local current_script
+  current_script="$(
+    pm2 jlist | PROCESS_NAME="$PROCESS_NAME" node -e '
+      let input = "";
+      process.stdin.on("data", chunk => { input += chunk; });
+      process.stdin.on("end", () => {
+        const processInfo = JSON.parse(input).find(item => item.name === process.env.PROCESS_NAME);
+        process.stdout.write(processInfo?.pm2_env?.pm_exec_path ?? "");
+      });
+    '
+  )"
+
+  if [[ "$current_script" == "/usr/local/sbin/akma-server" ]]; then
+    pm2 restart "$PROCESS_NAME" --update-env
+    return
+  fi
+
+  if [[ -n "$current_script" ]]; then
+    pm2 delete "$PROCESS_NAME"
+  fi
+  pm2 start /usr/local/sbin/akma-server \
+    --name "$PROCESS_NAME" \
+    --interpreter bash
+}
 
 git -C "$REPOSITORY" fetch --prune origin main
 git -C "$REPOSITORY" merge-base --is-ancestor "$commit" origin/main
@@ -52,8 +87,12 @@ pg_dump --format=custom --file="$backup" "$DATABASE_URL"
 
 pnpm db:migrate
 
-mkdir -p .next/standalone/.next
-cp -a .next/static .next/standalone/.next/static
+mkdir -p .next/standalone/.next/static
+cp -a .next/static/. .next/standalone/.next/static/
+if [[ -d public ]]; then
+  mkdir -p .next/standalone/public
+  cp -a public/. .next/standalone/public/
+fi
 
 previous=""
 if [[ -L "$CURRENT" ]]; then
@@ -62,7 +101,7 @@ fi
 
 ln -sfn "$release" "$CURRENT.next"
 mv -Tf "$CURRENT.next" "$CURRENT"
-systemctl restart "$SERVICE"
+restart_app
 
 healthy=false
 for _ in {1..20}; do
@@ -78,10 +117,12 @@ if [[ "$healthy" != true ]]; then
   if [[ -n "$previous" && -d "$previous" ]]; then
     ln -sfn "$previous" "$CURRENT.next"
     mv -Tf "$CURRENT.next" "$CURRENT"
-    systemctl restart "$SERVICE"
+    restart_app
   fi
   exit 1
 fi
+
+pm2 save --force >/dev/null
 
 mapfile -t old_releases < <(find "$RELEASES" -mindepth 1 -maxdepth 1 -type d -print | sort -r | tail -n +6)
 for old_release in "${old_releases[@]}"; do
