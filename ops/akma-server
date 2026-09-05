@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+export NVM_DIR="/root/.nvm"
+# shellcheck disable=SC1091
+source "$NVM_DIR/nvm.sh"
+nvm use default --silent >/dev/null
+
+export NODE_ENV="production"
+export HOSTNAME="127.0.0.1"
+export PORT="3010"
+
+cd /srv/akma/current/.next/standalone
+exec node server.js

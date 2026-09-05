@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { adminUsers, orders, products, settings, type OrderItem, type OrderRow, type ProductRow } from "@/db/schema";
 import { asc, desc, eq, or } from "drizzle-orm";
-import { DEFAULT_ADMIN, DEFAULT_SETTINGS, PRODUCT_SEEDS } from "./defaults";
+import { DEFAULT_SETTINGS, PRODUCT_SEEDS } from "./defaults";
 import { hashPassword } from "./auth";
 import { toEnDigits } from "./format";
 
@@ -86,13 +86,12 @@ function getMemoryStore() {
     ];
   }
   if (!globalForStore.__memoryAdmins) {
-    globalForStore.__memoryAdmins = [
-      {
-        id: 1,
-        username: DEFAULT_ADMIN.username,
-        passwordHash: hashPassword(DEFAULT_ADMIN.password),
-      },
-    ];
+    const username = process.env.ADMIN_USERNAME?.trim();
+    const password = process.env.ADMIN_PASSWORD;
+    globalForStore.__memoryAdmins =
+      username && password
+        ? [{ id: 1, username, passwordHash: hashPassword(password) }]
+        : [];
   }
   return {
     settings: globalForStore.__memorySettings,
@@ -156,10 +155,16 @@ export async function ensureSeeded() {
     // admin
     const admins = await db.select({ id: adminUsers.id }).from(adminUsers).limit(1);
     if (admins.length === 0) {
-      await db.insert(adminUsers).values({
-        username: DEFAULT_ADMIN.username,
-        passwordHash: hashPassword(DEFAULT_ADMIN.password),
-      });
+      const username = process.env.ADMIN_USERNAME?.trim();
+      const password = process.env.ADMIN_PASSWORD;
+      if (username && password) {
+        await db.insert(adminUsers).values({
+          username,
+          passwordHash: hashPassword(password),
+        });
+      } else {
+        console.warn("Admin seed skipped: ADMIN_USERNAME and ADMIN_PASSWORD are not set.");
+      }
     }
     globalForStore.__memorySeeded = true;
   } catch (e) {

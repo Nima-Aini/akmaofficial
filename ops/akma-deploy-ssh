@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+commit="${SSH_ORIGINAL_COMMAND:-}"
+if [[ ! "$commit" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "Only a full Git commit SHA may be deployed." >&2
+  exit 2
+fi
+
+exec sudo /usr/local/sbin/akma-deploy "$commit"

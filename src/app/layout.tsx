@@ -34,8 +34,10 @@ export async function generateMetadata(): Promise<Metadata> {
   const s = await getSettings();
   const site = { ...DEFAULT_SITE, ...(s.site as Partial<SiteSettings>) };
   return {
+    metadataBase: new URL(process.env.SITE_URL ?? "https://akmaofficial.ir"),
     title: site.seoTitle,
     description: site.seoDescription,
+    alternates: { canonical: "/" },
   };
 }
 

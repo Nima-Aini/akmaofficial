@@ -7,13 +7,10 @@ import { getMemoryAdmins, updateMemoryAdmin } from "./store";
 
 const SESSION_COOKIE = "akma_admin_session";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 12; // 12h
+const EPHEMERAL_SESSION_SECRET = crypto.randomBytes(32).toString("hex");
 
 function secret(): string {
-  return (
-    process.env.ADMIN_SESSION_SECRET ??
-    process.env.DATABASE_URL ??
-    "akma-fallback-secret-change-me"
-  );
+  return process.env.ADMIN_SESSION_SECRET || EPHEMERAL_SESSION_SECRET;
 }
 
 export function hashPassword(password: string): string {
@@ -66,6 +63,7 @@ export async function setSessionCookie(username: string) {
   store.set(SESSION_COOKIE, createSessionToken(username), {
     httpOnly: true,
     sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: SESSION_TTL_MS / 1000,
   });
