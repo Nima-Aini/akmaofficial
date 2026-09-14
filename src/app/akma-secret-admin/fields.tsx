@@ -2,6 +2,7 @@
 
 import { ImagePlus, Loader2, Plus, Trash2, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { IMAGE_GUIDELINES, type ImageGuidelineKey } from "@/lib/image-guidelines";
 
 export function Field({
   label,
@@ -210,16 +211,19 @@ export function ImageUploader({
   kind = "products",
   multiple = false,
   hint,
+  guideline = "product",
 }: {
   label: string;
   value: string | string[];
   onChange: (value: string | string[]) => void;
-  kind?: "products" | "banners" | "hero";
+  kind?: "products" | "banners" | "hero" | "blog";
   multiple?: boolean;
   hint?: string;
+  guideline?: ImageGuidelineKey;
 }) {
   const [uploading, setUploading] = useState(false);
   const items = Array.isArray(value) ? value : (value ? [value] : []);
+  const guide = IMAGE_GUIDELINES[guideline];
 
   async function upload(files: FileList | null) {
     if (!files?.length) return;
@@ -259,11 +263,17 @@ export function ImageUploader({
     <div>
       <span className="mb-1.5 block text-xs font-bold text-muted">{label}</span>
       {hint && <span className="mb-2 block text-[10px] text-muted">{hint}</span>}
+      <div className="mb-3 rounded-xl border border-accent/20 bg-accent/5 px-3 py-2 text-[10px] leading-5 text-muted">
+        <span className="font-bold text-ink">ابعاد پیشنهادی: {guide.width} × {guide.height} پیکسل</span>
+        <span className="mx-2 text-accent">•</span>
+        <span className="font-bold text-ink">نسبت تصویر: {guide.ratio}</span>
+        <span className="block">{guide.usage}</span>
+      </div>
       <div className="flex flex-wrap gap-2.5">
         {items.map((src, i) => (
           <div key={`${src}-${i}`} className="relative">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={src} alt="" className="size-20 rounded-xl border border-line object-cover" />
+            <img src={src} alt="" className={`size-20 rounded-xl border border-line ${guide.fit === "contain" ? "object-contain bg-surface p-1" : "object-cover"}`} />
             <button
               type="button"
               onClick={() => removeItem(i)}

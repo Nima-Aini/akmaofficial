@@ -268,6 +268,7 @@ export function ProductsSection({
                 onChange={(v) => patch({ images: Array.isArray(v) ? v : v ? [v] : [] })}
                 kind="products"
                 multiple
+                guideline="product"
                 hint="تصویر را مستقیم از کامپیوتر انتخاب کنید؛ حداکثر ۸ تصویر، هر تصویر تا 10MB."
               />
 

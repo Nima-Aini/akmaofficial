@@ -19,6 +19,7 @@ import { ProductCard } from "@/components/product-card";
 import { AddToCartButton } from "@/components/add-to-cart-button";
 import { Reveal } from "@/components/effects";
 import { formatPrice, telHref, toFa } from "@/lib/format";
+import { ProductGallery } from "@/components/product-gallery";
 
 type ProductPageProps = {
   params: Promise<{ slug: string }>;
@@ -108,34 +109,7 @@ export default async function ProductPage({
       <div className="mt-8 grid gap-10 lg:grid-cols-2 lg:gap-14">
         {/* gallery */}
         <Reveal className="relative">
-          <div className="card overflow-hidden !rounded-[2rem] bg-card">
-            {product.badge && (
-              <span className="absolute top-5 right-5 z-10 rounded-full bg-gradient-to-l from-accent2 to-accent px-4 py-2 text-xs font-extrabold text-on-accent shadow-lg shadow-accent/25">
-                {product.badge}
-              </span>
-            )}
-            <div className="relative aspect-square w-full bg-surface/30 p-6 flex items-center justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={product.images[0] ?? "/images/products/foam-bottle.png"}
-                alt={product.name}
-                className="max-h-full max-w-full object-contain transition-transform duration-300 hover:scale-105"
-              />
-            </div>
-            {product.images.length > 1 && (
-              <div className="flex gap-3 border-t border-line bg-surface p-4 overflow-x-auto">
-                {product.images.map((im, i) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={i}
-                    src={im}
-                    alt={`${product.name} — تصویر ${toFa(i + 1)}`}
-                    className="size-16 rounded-xl border border-line object-contain bg-card p-1 shrink-0"
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+          <ProductGallery images={product.images} productName={product.name} badge={product.badge} />
         </Reveal>
 
         {/* info */}

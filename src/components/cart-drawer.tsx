@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft, Minus, Plus, ShoppingBag, Trash2, X, ShieldCheck } from "lucide-react";
 import { useCart } from "@/context/cart-context";
 import { formatPrice, toFa } from "@/lib/format";
+import { CartSuggestions } from "@/components/cart-suggestions";
 
 export function CartDrawer() {
   const { items, isOpen, closeCart, updateQuantity, removeItem, totalAmount, totalCount } = useCart();
@@ -125,6 +126,7 @@ export function CartDrawer() {
                     </div>
                   </div>
                 ))}
+                <CartSuggestions />
               </div>
             )}
           </div>

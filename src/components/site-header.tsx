@@ -5,10 +5,12 @@ import { useEffect, useState } from "react";
 import { Menu, Phone, X, Sparkle, ShoppingBag, SearchCheck } from "lucide-react";
 import { telHref, toFa } from "@/lib/format";
 import { useCart } from "@/context/cart-context";
+import { SectionLink } from "@/components/section-link";
 
 const NAV = [
   { label: "خانه", href: "/" },
   { label: "محصولات", href: "/products" },
+  { label: "وبلاگ", href: "/blog" },
   { label: "قیمت واحد", href: "/#price-table" },
   { label: "راهنمای سفارش", href: "/#how-to-order" },
   { label: "پیگیری سفارش", href: "/track" },
@@ -59,15 +61,15 @@ export function SiteHeader({
             </Link>
 
             <nav className="hidden items-center gap-6 lg:flex">
-              {NAV.map((n) => (
-                <Link
+              {NAV.map((n) => n.href.startsWith("/#") ? (
+                <SectionLink
                   key={n.href}
-                  href={n.href}
+                  href={n.href as `/#${string}`}
                   className="link-underline text-sm font-medium text-muted transition-colors hover:text-ink"
                 >
                   {n.label}
-                </Link>
-              ))}
+                </SectionLink>
+              ) : <Link key={n.href} href={n.href} className="link-underline text-sm font-medium text-muted transition-colors hover:text-ink">{n.label}</Link>)}
             </nav>
 
             <div className="flex items-center gap-2.5">
@@ -111,16 +113,16 @@ export function SiteHeader({
           }`}
         >
           <nav className="flex flex-col gap-1 px-5 py-4">
-            {NAV.map((n) => (
-              <Link
+            {NAV.map((n) => n.href.startsWith("/#") ? (
+              <SectionLink
                 key={n.href}
-                href={n.href}
-                onClick={() => setOpen(false)}
+                href={n.href as `/#${string}`}
+                onNavigate={() => setOpen(false)}
                 className="rounded-xl px-4 py-3 text-sm font-semibold text-muted transition-colors hover:bg-card hover:text-ink"
               >
                 {n.label}
-              </Link>
-            ))}
+              </SectionLink>
+            ) : <Link key={n.href} href={n.href} onClick={() => setOpen(false)} className="rounded-xl px-4 py-3 text-sm font-semibold text-muted transition-colors hover:bg-card hover:text-ink">{n.label}</Link>)}
             <div className="mt-2 flex gap-2">
               <button
                 onClick={() => {

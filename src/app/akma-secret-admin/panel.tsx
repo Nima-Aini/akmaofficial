@@ -13,6 +13,8 @@ import {
   PhoneCall,
   ShieldCheck,
   ShoppingBag,
+  Lightbulb,
+  Newspaper,
 } from "lucide-react";
 import {
   ContactSection,
@@ -24,11 +26,15 @@ import {
 } from "./sections";
 import { ProductsSection, type AdminProduct } from "./products-section";
 import { OrdersSection } from "./orders-section";
+import { CartSuggestionsSection } from "./cart-suggestions-section";
+import { BlogSection } from "./blog-section";
 
 const TABS = [
   { key: "dashboard", label: "داشبورد", icon: Gauge },
   { key: "orders", label: "سفارش‌ها", icon: ShoppingBag },
   { key: "products", label: "محصولات", icon: Boxes },
+  { key: "suggestions", label: "پیشنهادات سبد", icon: Lightbulb },
+  { key: "blog", label: "وبلاگ", icon: Newspaper },
   { key: "hero", label: "هیرو و بنرها", icon: ImageIcon },
   { key: "theme", label: "تم و ظاهر", icon: Paintbrush },
   { key: "contact", label: "تماس با ما", icon: PhoneCall },
@@ -153,6 +159,8 @@ export function AdminPanel() {
           {tab === "products" && (
             <ProductsSection products={products} setProducts={setProducts} toast={toast} />
           )}
+          {tab === "suggestions" && <CartSuggestionsSection products={products} toast={toast} />}
+          {tab === "blog" && <BlogSection toast={toast} />}
           {tab === "hero" && (
             <HeroBannersSection settings={settings} setKey={setKey} saveKey={saveKey} saving={saving} />
           )}

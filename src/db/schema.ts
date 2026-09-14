@@ -7,6 +7,7 @@ import {
   integer,
   jsonb,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 export const products = pgTable("products", {
@@ -72,5 +73,60 @@ export const orders = pgTable("orders", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+export const cartProductSuggestions = pgTable(
+  "cart_product_suggestions",
+  {
+    id: serial("id").primaryKey(),
+    triggerProductId: integer("trigger_product_id").references(() => products.id, {
+      onDelete: "set null",
+    }),
+    suggestedProductId: integer("suggested_product_id").references(() => products.id, {
+      onDelete: "set null",
+    }),
+    message: text("message").notNull().default(""),
+    active: boolean("active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("cart_product_suggestions_pair_unique_idx").on(
+      table.triggerProductId,
+      table.suggestedProductId,
+    ),
+  ],
+);
+
+export type BlogContentBlock = {
+  id: string;
+  type: "paragraph" | "h2" | "h3" | "bulletList" | "numberedList" | "quote" | "image" | "divider";
+  text?: string;
+  items?: string[];
+  url?: string;
+  alt?: string;
+  caption?: string;
+};
+
+export const blogPosts = pgTable("blog_posts", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  slug: text("slug").notNull().unique(),
+  excerpt: text("excerpt").notNull().default(""),
+  coverImage: text("cover_image").notNull().default(""),
+  coverImageAlt: text("cover_image_alt").notNull().default(""),
+  content: jsonb("content").$type<BlogContentBlock[]>().notNull().default([]),
+  seoTitle: text("seo_title").notNull().default(""),
+  metaDescription: text("meta_description").notNull().default(""),
+  status: text("status").notNull().default("draft"),
+  author: text("author").notNull().default(""),
+  featured: boolean("featured").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+  publishedAt: timestamp("published_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 export type ProductRow = typeof products.$inferSelect;
 export type OrderRow = typeof orders.$inferSelect;
+export type CartProductSuggestionRow = typeof cartProductSuggestions.$inferSelect;
+export type BlogPostRow = typeof blogPosts.$inferSelect;

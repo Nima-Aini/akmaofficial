@@ -286,3 +286,20 @@ select.field option {
 .img-fade {
   mask-image: radial-gradient(120% 120% at 50% 35%, black 55%, transparent 100%);
 }
+
+/* ---------- blog typography ---------- */
+.blog-content { font-size: 0.94rem; line-height: 2.15; color: var(--muted); overflow-wrap: anywhere; }
+.blog-content > * + * { margin-top: 1.35rem; }
+.blog-content h2 { margin-top: 2.8rem; font-size: 1.55rem; line-height: 1.6; font-weight: 900; color: var(--text); }
+.blog-content h3 { margin-top: 2.2rem; font-size: 1.2rem; line-height: 1.7; font-weight: 900; color: var(--text); }
+.blog-content strong { color: var(--text); font-weight: 900; }
+.blog-content ul, .blog-content ol { padding-right: 1.4rem; }
+.blog-content ul { list-style: disc; }
+.blog-content ol { list-style: decimal; }
+.blog-content li + li { margin-top: 0.45rem; }
+.blog-content blockquote { border-right: 4px solid var(--accent); border-radius: 0.75rem; background: color-mix(in srgb, var(--accent) 7%, transparent); padding: 1.1rem 1.25rem; color: var(--text); }
+.blog-content figure { overflow: hidden; border-radius: 1.25rem; border: 1px solid var(--line); background: var(--surface); }
+.blog-content figure img { display: block; width: 100%; height: auto; max-height: 720px; object-fit: contain; }
+.blog-content figcaption { padding: 0.65rem 1rem; text-align: center; font-size: 0.72rem; color: var(--muted); }
+.blog-content hr { border: 0; border-top: 1px solid var(--line); margin-block: 2.5rem; }
+@media (max-width: 430px) { .blog-content { font-size: 0.88rem; line-height: 2; } .blog-content h2 { font-size: 1.3rem; } }
