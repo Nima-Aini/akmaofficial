@@ -234,6 +234,7 @@ export function HeroBannersSection({
             value={hero.image}
             onChange={(v) => setHero({ image: typeof v === "string" ? v : (v[0] ?? "") })}
             kind="hero"
+            guideline="hero"
             hint="تصویر را مستقیم از کامپیوتر انتخاب کنید؛ حداکثر 10MB."
           />
         </div>
@@ -376,6 +377,7 @@ export function HeroBannersSection({
                   value={b.image}
                   onChange={(v) => setBanner(i, { image: typeof v === "string" ? v : (v[0] ?? "") })}
                   kind="banners"
+                  guideline="banner"
                   hint="تصویر را مستقیم از کامپیوتر انتخاب کنید؛ حداکثر 10MB."
                 />
               </div>
@@ -471,6 +473,7 @@ export function HeroBannersSection({
                     )
                   }
                   kind="banners"
+                  guideline="banner"
                   hint="تصویر با کیفیت و بدون متن اضافی آپلود کنید."
                 />
                 <div className="space-y-4">

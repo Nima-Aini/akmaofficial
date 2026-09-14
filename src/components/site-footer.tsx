@@ -3,6 +3,7 @@ import { Clock, AtSign, Mail, MapPin, Phone, Send, Sparkle, MessageCircle } from
 import { telHref, toFa } from "@/lib/format";
 import type { ContactSettings, SiteSettings } from "@/lib/defaults";
 import { CATEGORIES } from "@/lib/defaults";
+import { SectionLink } from "@/components/section-link";
 
 export function SiteFooter({
   site,
@@ -73,8 +74,9 @@ export function SiteFooter({
             <ul className="mt-5 space-y-3 text-sm text-muted">
               <li><Link className="transition-colors hover:text-accent" href="/">خانه</Link></li>
               <li><Link className="transition-colors hover:text-accent" href="/products">محصولات</Link></li>
-              <li><Link className="transition-colors hover:text-accent" href="/#price-table">قیمت واحد</Link></li>
-              <li><Link className="transition-colors hover:text-accent" href="/#how-to-order">راهنمای سفارش</Link></li>
+              <li><Link className="transition-colors hover:text-accent" href="/blog">وبلاگ</Link></li>
+              <li><SectionLink className="transition-colors hover:text-accent" href="/#price-table">قیمت واحد</SectionLink></li>
+              <li><SectionLink className="transition-colors hover:text-accent" href="/#how-to-order">راهنمای سفارش</SectionLink></li>
               <li><Link className="transition-colors hover:text-accent" href="/contact">تماس با ما</Link></li>
             </ul>
           </div>
@@ -85,7 +87,7 @@ export function SiteFooter({
               <li><Link className="transition-colors hover:text-accent" href="/products">کاتالوگ و ثبت سفارش آنلاین</Link></li>
               <li><Link className="transition-colors hover:text-accent" href="/track">پیگیری وضعیت سفارش</Link></li>
               <li><Link className="transition-colors hover:text-accent" href="/checkout">سبد خرید و تسویه‌حساب</Link></li>
-              <li><Link className="transition-colors hover:text-accent" href="/#price-table">شفافیت قیمت واحد</Link></li>
+              <li><SectionLink className="transition-colors hover:text-accent" href="/#price-table">شفافیت قیمت واحد</SectionLink></li>
             </ul>
           </div>
 
