@@ -163,7 +163,13 @@ export function sanitizeBlogPost(body: Record<string, unknown>): BlogPostInput {
   const text = (value: unknown, max: number) => typeof value === "string" ? value.trim().slice(0, max) : "";
   const title = text(body.title, 300);
   if (!title) throw new Error("عنوان مقاله الزامی است");
-  const rawDate = typeof body.publishedAt === "string" && body.publishedAt ? new Date(body.publishedAt) : null;
+  const hasPublishedAt = body.publishedAt !== null && body.publishedAt !== undefined && body.publishedAt !== "";
+  if (hasPublishedAt && typeof body.publishedAt !== "string") throw new Error("تاریخ انتشار نامعتبر است");
+  if (hasPublishedAt && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(body.publishedAt as string)) {
+    throw new Error("تاریخ انتشار باید همراه منطقه زمانی ارسال شود");
+  }
+  const rawDate = hasPublishedAt ? new Date(body.publishedAt as string) : null;
+  if (rawDate && Number.isNaN(rawDate.getTime())) throw new Error("تاریخ انتشار نامعتبر است");
   const status = body.status === "published" ? "published" : "draft";
   return {
     title,
@@ -178,7 +184,7 @@ export function sanitizeBlogPost(body: Record<string, unknown>): BlogPostInput {
     author: text(body.author, 200),
     featured: body.featured === true,
     sortOrder: Number.isFinite(Number(body.sortOrder)) ? Math.trunc(Number(body.sortOrder)) : 0,
-    publishedAt: rawDate && !Number.isNaN(rawDate.getTime()) ? rawDate : status === "published" ? new Date() : null,
+    publishedAt: rawDate ?? (status === "published" ? new Date() : null),
   };
 }
 
