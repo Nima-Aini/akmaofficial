@@ -5,6 +5,9 @@ import type { ContactSettings, SiteSettings } from "@/lib/defaults";
 import { CATEGORIES } from "@/lib/defaults";
 import { SectionLink } from "@/components/section-link";
 
+const ENAMAD_SEAL_HTML =
+  "<a referrerpolicy='origin' target='_blank' href='https://trustseal.enamad.ir/?id=7454940&Code=YlXUOhdwgVFdAzl3LZsrgoLDjJkhOpDo'><img referrerpolicy='origin' src='https://trustseal.enamad.ir/logo.aspx?id=7454940&Code=YlXUOhdwgVFdAzl3LZsrgoLDjJkhOpDo' alt='' style='cursor:pointer' code='YlXUOhdwgVFdAzl3LZsrgoLDjJkhOpDo'></a>";
+
 export function SiteFooter({
   site,
   contact,
@@ -67,6 +70,11 @@ export function SiteFooter({
                 )}
               </div>
             )}
+            <div
+              aria-label="نماد اعتماد الکترونیکی"
+              className="mt-6 inline-flex min-h-28 items-center justify-center overflow-hidden rounded-2xl border border-line bg-card p-2 [&_img]:h-24 [&_img]:w-auto"
+              dangerouslySetInnerHTML={{ __html: ENAMAD_SEAL_HTML }}
+            />
           </div>
 
           <div>
