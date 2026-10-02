@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+ENV_FILE="/etc/akma/akma.env"
+if [[ ! -r "$ENV_FILE" ]]; then
+  echo "Production environment file is not readable: $ENV_FILE" >&2
+  exit 1
+fi
+
+set -a
+# shellcheck disable=SC1090
+source "$ENV_FILE"
+set +a
+
 export NVM_DIR="/root/.nvm"
 # shellcheck disable=SC1091
 source "$NVM_DIR/nvm.sh"
@@ -11,4 +22,5 @@ export HOSTNAME="127.0.0.1"
 export PORT="3010"
 
 cd /srv/akma/current/.next/standalone
+test -f server.js
 exec node server.js
