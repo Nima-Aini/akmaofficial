@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { chmod, copyFile, realpath } from "node:fs/promises";
+import { chmod, copyFile, realpath, rename } from "node:fs/promises";
 import process from "node:process";
 
 const releaseRoot = "/srv/akma/releases/";
@@ -19,8 +19,13 @@ const launchers = [
 ];
 
 for (const [source, destination] of launchers) {
-  await copyFile(source, destination);
-  await chmod(destination, 0o755);
+  // Never truncate the deployment script while Bash is executing it. An
+  // atomic rename leaves the running process on the old inode and publishes
+  // the complete replacement for the next invocation.
+  const temporary = `${destination}.${process.pid}.tmp`;
+  await copyFile(source, temporary);
+  await chmod(temporary, 0o755);
+  await rename(temporary, destination);
   console.log(`Installed production launcher: ${destination}`);
 }
 
