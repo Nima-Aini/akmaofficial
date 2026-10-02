@@ -34,24 +34,7 @@ command -v npm >/dev/null
 command -v pm2 >/dev/null
 
 restart_app() {
-  local current_script
-  current_script="$(
-    pm2 jlist | PROCESS_NAME="$PROCESS_NAME" node -e '
-      let input = "";
-      process.stdin.on("data", chunk => { input += chunk; });
-      process.stdin.on("end", () => {
-        const processInfo = JSON.parse(input).find(item => item.name === process.env.PROCESS_NAME);
-        process.stdout.write(processInfo?.pm2_env?.pm_exec_path ?? "");
-      });
-    '
-  )"
-
-  if [[ "$current_script" == "/usr/local/sbin/akma-server" ]]; then
-    pm2 restart "$PROCESS_NAME" --update-env
-    return
-  fi
-
-  if [[ -n "$current_script" ]]; then
+  if pm2 describe "$PROCESS_NAME" >/dev/null 2>&1; then
     pm2 delete "$PROCESS_NAME"
   fi
   pm2 start /usr/local/sbin/akma-server \
@@ -119,6 +102,7 @@ for _ in {1..20}; do
 done
 
 if [[ "$healthy" != true ]]; then
+  pm2 logs "$PROCESS_NAME" --lines 100 --nostream >&2 || true
   echo "New release failed its health check; restoring the previous release." >&2
   if [[ -n "$previous" && -d "$previous" ]]; then
     ln -sfn "$previous" "$CURRENT.next"

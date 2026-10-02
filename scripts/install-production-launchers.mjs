@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { chmod, copyFile, realpath } from "node:fs/promises";
 import process from "node:process";
 
@@ -21,4 +22,38 @@ for (const [source, destination] of launchers) {
   await copyFile(source, destination);
   await chmod(destination, 0o755);
   console.log(`Installed production launcher: ${destination}`);
+}
+
+const processName = "akmaofficial";
+const processes = JSON.parse(execFileSync("pm2", ["jlist"], { encoding: "utf8" }));
+const application = processes.find((item) => item.name === processName);
+
+if (!application?.pid) {
+  console.log("Recovering the unhealthy akmaofficial PM2 entry.");
+  if (application) {
+    execFileSync("pm2", ["logs", processName, "--lines", "100", "--nostream"], {
+      stdio: "inherit",
+    });
+    execFileSync("pm2", ["delete", processName], { stdio: "inherit" });
+  }
+  execFileSync(
+    "pm2",
+    ["start", "/usr/local/sbin/akma-server", "--name", processName, "--interpreter", "bash"],
+    { stdio: "inherit" },
+  );
+
+  await new Promise((resolve) => setTimeout(resolve, 2_000));
+  try {
+    const response = await fetch("http://127.0.0.1:3010/api/health");
+    const body = await response.text();
+    if (!response.ok || !body.includes('"database":"connected"')) {
+      throw new Error(`health status ${response.status}`);
+    }
+    console.log(`Recovered production health: ${body}`);
+  } catch (error) {
+    execFileSync("pm2", ["logs", processName, "--lines", "100", "--nostream"], {
+      stdio: "inherit",
+    });
+    throw new Error("Unable to recover akmaofficial before deployment", { cause: error });
+  }
 }
