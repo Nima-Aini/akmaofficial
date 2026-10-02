@@ -54,29 +54,38 @@ const STORAGE_KEY = "akma_cart_v2";
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cartMode, setCartMode] = useState<"retail" | "wholesale">("retail");
-  const [items, setItems] = useState<CartItem[]>(() => {
-    if (typeof window !== "undefined") {
+  // Keep the server render and the browser's first render identical. Reading
+  // localStorage in the state initializer makes a persisted cart appear only
+  // on the client and causes a hydration mismatch on checkout.
+  const [items, setItems] = useState<CartItem[]>([]);
+  const [storageHydrated, setStorageHydrated] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) return parsed;
+          if (Array.isArray(parsed)) setItems(parsed);
         }
       } catch {
-        // ignore
+        // Ignore malformed or unavailable browser storage.
+      } finally {
+        setStorageHydrated(true);
       }
-    }
-    return [];
-  });
-  const [isOpen, setIsOpen] = useState(false);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
+    if (!storageHydrated) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
     } catch {
       // ignore
     }
-  }, [items]);
+  }, [items, storageHydrated]);
 
   const recalculateItem = (item: CartItem, newQty: number, newMode?: "retail" | "wholesale"): CartItem => {
     const mode = newMode || item.mode || cartMode;
