@@ -15,12 +15,14 @@ import {
   ShoppingBag,
   Lightbulb,
   Newspaper,
+  LayoutGrid,
 } from "lucide-react";
 import {
   ContactSection,
   ContentSection,
   DashboardSection,
   HeroBannersSection,
+  HomePageCardsSection,
   SecuritySection,
   ThemeSection,
 } from "./sections";
@@ -33,12 +35,13 @@ const TABS = [
   { key: "dashboard", label: "داشبورد", icon: Gauge },
   { key: "orders", label: "سفارش‌ها", icon: ShoppingBag },
   { key: "products", label: "محصولات", icon: Boxes },
+  { key: "homepage", label: "کارت‌ها و دسته‌ها (صفحه اول)", icon: LayoutGrid },
   { key: "suggestions", label: "پیشنهادات سبد", icon: Lightbulb },
   { key: "blog", label: "وبلاگ", icon: Newspaper },
   { key: "hero", label: "هیرو و بنرها", icon: ImageIcon },
   { key: "theme", label: "تم و ظاهر", icon: Paintbrush },
   { key: "contact", label: "تماس با ما", icon: PhoneCall },
-  { key: "content", label: "محتوای سایت", icon: MessageSquareText },
+  { key: "content", label: "محتوای متنی", icon: MessageSquareText },
   { key: "security", label: "امنیت", icon: ShieldCheck },
 ] as const;
 
@@ -158,6 +161,9 @@ export function AdminPanel() {
           {tab === "orders" && <OrdersSection toast={toast} />}
           {tab === "products" && (
             <ProductsSection products={products} setProducts={setProducts} toast={toast} />
+          )}
+          {tab === "homepage" && (
+            <HomePageCardsSection settings={settings} setKey={setKey} saveKey={saveKey} saving={saving} />
           )}
           {tab === "suggestions" && <CartSuggestionsSection products={products} toast={toast} />}
           {tab === "blog" && <BlogSection toast={toast} />}

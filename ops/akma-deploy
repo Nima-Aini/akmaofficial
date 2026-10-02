@@ -82,8 +82,14 @@ pnpm lint
 pnpm build
 
 test -n "${DATABASE_URL:-}"
-backup="$BACKUPS/akma-$(date -u +%Y%m%d%H%M%S)-${commit:0:12}.dump"
+backup="$BACKUPS/akmaofficial_predeploy_${commit}_$(date -u +%Y%m%d%H%M%S).dump"
 pg_dump --format=custom --file="$backup" "$DATABASE_URL"
+test -s "$backup"
+sha256sum "$backup" > "$backup.sha256"
+test -s "$backup.sha256"
+sha256sum --check "$backup.sha256"
+echo "Database backup verified: $backup"
+echo "Database backup checksum: $(cut -d ' ' -f 1 "$backup.sha256")"
 
 pnpm db:migrate
 
@@ -123,6 +129,23 @@ if [[ "$healthy" != true ]]; then
 fi
 
 pm2 save --force >/dev/null
+health_response="$(curl --fail --silent --show-error --max-time 3 "$HEALTH_URL")"
+echo "Production health: $health_response"
+pm2 jlist | PROCESS_NAME="$PROCESS_NAME" node -e '
+  let input = "";
+  process.stdin.on("data", chunk => { input += chunk; });
+  process.stdin.on("end", () => {
+    const item = JSON.parse(input).find(entry => entry.name === process.env.PROCESS_NAME);
+    if (!item) process.exit(1);
+    console.log("PM2 status:", JSON.stringify({
+      name: item.name,
+      status: item.pm2_env?.status,
+      pid: item.pid,
+      restarts: item.pm2_env?.restart_time,
+      script: item.pm2_env?.pm_exec_path,
+    }));
+  });
+'
 
 mapfile -t old_releases < <(find "$RELEASES" -mindepth 1 -maxdepth 1 -type d -print | sort -r | tail -n +6)
 for old_release in "${old_releases[@]}"; do
@@ -133,5 +156,4 @@ for old_release in "${old_releases[@]}"; do
   esac
 done
 
-find "$BACKUPS" -maxdepth 1 -type f -name 'akma-*.dump' -mtime +14 -delete
 echo "Deployment succeeded: $commit"

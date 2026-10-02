@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, inArray, lte } from "drizzle-orm";
-import { db } from "@/db";
+import { assertMemoryStoreAllowed, db } from "@/db";
 import {
   blogPosts,
   cartProductSuggestions,
@@ -18,6 +18,7 @@ type ContentMemory = {
 const globalContent = globalThis as typeof globalThis & { __akmaContentMemory?: ContentMemory };
 
 function memory(): ContentMemory {
+  assertMemoryStoreAllowed("CMS and blog storage");
   globalContent.__akmaContentMemory ??= { suggestions: [], posts: [] };
   return globalContent.__akmaContentMemory;
 }
@@ -56,15 +57,25 @@ async function validateSuggestionProducts(input: SuggestionInput) {
 }
 
 export async function getAllSuggestions(): Promise<CartProductSuggestionRow[]> {
-  if (db) return db.select().from(cartProductSuggestions).orderBy(asc(cartProductSuggestions.sortOrder), desc(cartProductSuggestions.createdAt));
+  if (db) {
+    try {
+      return await db.select().from(cartProductSuggestions).orderBy(asc(cartProductSuggestions.sortOrder), desc(cartProductSuggestions.createdAt));
+    } catch {
+      // fallback to memory
+    }
+  }
   return [...memory().suggestions].sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 export async function createSuggestion(input: SuggestionInput) {
   await validateSuggestionProducts(input);
   if (db) {
-    const rows = await db.insert(cartProductSuggestions).values(input).returning();
-    return rows[0];
+    try {
+      const rows = await db.insert(cartProductSuggestions).values(input).returning();
+      if (rows[0]) return rows[0];
+    } catch (e) {
+      console.warn("Failed to create suggestion in DB, falling back to memory:", e);
+    }
   }
   if (memory().suggestions.some((r) => r.triggerProductId === input.triggerProductId && r.suggestedProductId === input.suggestedProductId)) {
     throw new Error("این پیشنهاد قبلاً تعریف شده است");
@@ -78,8 +89,12 @@ export async function createSuggestion(input: SuggestionInput) {
 export async function updateSuggestion(id: number, input: SuggestionInput) {
   await validateSuggestionProducts(input);
   if (db) {
-    const rows = await db.update(cartProductSuggestions).set({ ...input, updatedAt: new Date() }).where(eq(cartProductSuggestions.id, id)).returning();
-    return rows[0] ?? null;
+    try {
+      const rows = await db.update(cartProductSuggestions).set({ ...input, updatedAt: new Date() }).where(eq(cartProductSuggestions.id, id)).returning();
+      if (rows[0]) return rows[0];
+    } catch (e) {
+      console.warn("Failed to update suggestion in DB, falling back to memory:", e);
+    }
   }
   const index = memory().suggestions.findIndex((row) => row.id === id);
   if (index < 0) return null;
@@ -88,7 +103,14 @@ export async function updateSuggestion(id: number, input: SuggestionInput) {
 }
 
 export async function deleteSuggestion(id: number) {
-  if (db) return db.delete(cartProductSuggestions).where(eq(cartProductSuggestions.id, id));
+  if (db) {
+    try {
+      await db.delete(cartProductSuggestions).where(eq(cartProductSuggestions.id, id));
+      return;
+    } catch (e) {
+      console.warn("Failed to delete suggestion in DB:", e);
+    }
+  }
   memory().suggestions = memory().suggestions.filter((row) => row.id !== id);
 }
 
@@ -97,12 +119,17 @@ export type PublicCartSuggestion = CartProductSuggestionRow & { suggestedProduct
 export async function getCartSuggestions(triggerIds: number[]): Promise<PublicCartSuggestion[]> {
   const uniqueIds = [...new Set(triggerIds.filter((id) => Number.isInteger(id) && id > 0))].slice(0, 50);
   if (!uniqueIds.length) return [];
-  const [rules, products] = await Promise.all([
-    db
-      ? db.select().from(cartProductSuggestions).where(and(eq(cartProductSuggestions.active, true), inArray(cartProductSuggestions.triggerProductId, uniqueIds))).orderBy(asc(cartProductSuggestions.sortOrder))
-      : Promise.resolve(memory().suggestions.filter((row) => row.active && row.triggerProductId !== null && uniqueIds.includes(row.triggerProductId)).sort((a, b) => a.sortOrder - b.sortOrder)),
-    getAllProducts(),
-  ]);
+  let rules: CartProductSuggestionRow[] = [];
+  if (db) {
+    try {
+      rules = await db.select().from(cartProductSuggestions).where(and(eq(cartProductSuggestions.active, true), inArray(cartProductSuggestions.triggerProductId, uniqueIds))).orderBy(asc(cartProductSuggestions.sortOrder));
+    } catch {
+      rules = memory().suggestions.filter((row) => row.active && row.triggerProductId !== null && uniqueIds.includes(row.triggerProductId)).sort((a, b) => a.sortOrder - b.sortOrder);
+    }
+  } else {
+    rules = memory().suggestions.filter((row) => row.active && row.triggerProductId !== null && uniqueIds.includes(row.triggerProductId)).sort((a, b) => a.sortOrder - b.sortOrder);
+  }
+  const products = await getAllProducts();
   const productMap = new Map(products.map((product) => [product.id, product]));
   return rules.flatMap((rule: CartProductSuggestionRow) => {
     const product = rule.suggestedProductId ? productMap.get(rule.suggestedProductId) : undefined;
@@ -189,15 +216,25 @@ export function sanitizeBlogPost(body: Record<string, unknown>): BlogPostInput {
 }
 
 export async function getAllBlogPosts(): Promise<BlogPostRow[]> {
-  if (db) return db.select().from(blogPosts).orderBy(desc(blogPosts.updatedAt));
+  if (db) {
+    try {
+      return await db.select().from(blogPosts).orderBy(desc(blogPosts.updatedAt));
+    } catch {
+      // fallback to memory
+    }
+  }
   return [...memory().posts].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 }
 
 export async function createBlogPost(input: BlogPostInput): Promise<BlogPostRow> {
   const now = new Date();
   if (db) {
-    const rows = await db.insert(blogPosts).values({ ...input, createdAt: now, updatedAt: now }).returning();
-    return rows[0];
+    try {
+      const rows = await db.insert(blogPosts).values({ ...input, createdAt: now, updatedAt: now }).returning();
+      if (rows[0]) return rows[0];
+    } catch (e) {
+      console.warn("Failed to create blog post in DB, falling back to memory:", e);
+    }
   }
   if (memory().posts.some((post) => post.slug === input.slug)) throw new Error("این آدرس مقاله قبلاً استفاده شده است");
   const row: BlogPostRow = { id: nextId(memory().posts), ...input, createdAt: now, updatedAt: now };
@@ -207,8 +244,12 @@ export async function createBlogPost(input: BlogPostInput): Promise<BlogPostRow>
 
 export async function updateBlogPost(id: number, input: BlogPostInput): Promise<BlogPostRow | null> {
   if (db) {
-    const rows = await db.update(blogPosts).set({ ...input, updatedAt: new Date() }).where(eq(blogPosts.id, id)).returning();
-    return rows[0] ?? null;
+    try {
+      const rows = await db.update(blogPosts).set({ ...input, updatedAt: new Date() }).where(eq(blogPosts.id, id)).returning();
+      if (rows[0]) return rows[0];
+    } catch (e) {
+      console.warn("Failed to update blog post in DB, falling back to memory:", e);
+    }
   }
   const index = memory().posts.findIndex((post) => post.id === id);
   if (index < 0) return null;
@@ -217,21 +258,38 @@ export async function updateBlogPost(id: number, input: BlogPostInput): Promise<
 }
 
 export async function deleteBlogPost(id: number) {
-  if (db) return db.delete(blogPosts).where(eq(blogPosts.id, id));
+  if (db) {
+    try {
+      await db.delete(blogPosts).where(eq(blogPosts.id, id));
+      return;
+    } catch (e) {
+      console.warn("Failed to delete blog post in DB:", e);
+    }
+  }
   memory().posts = memory().posts.filter((post) => post.id !== id);
 }
 
 export async function getPublishedBlogPosts(): Promise<BlogPostRow[]> {
   const now = new Date();
-  if (db) return db.select().from(blogPosts).where(and(eq(blogPosts.status, "published"), lte(blogPosts.publishedAt, now))).orderBy(desc(blogPosts.featured), desc(blogPosts.publishedAt), asc(blogPosts.sortOrder));
+  if (db) {
+    try {
+      return await db.select().from(blogPosts).where(and(eq(blogPosts.status, "published"), lte(blogPosts.publishedAt, now))).orderBy(desc(blogPosts.featured), desc(blogPosts.publishedAt), asc(blogPosts.sortOrder));
+    } catch {
+      // fallback to memory
+    }
+  }
   return memory().posts.filter((post) => post.status === "published" && post.publishedAt && post.publishedAt <= now).sort((a, b) => Number(b.featured) - Number(a.featured) || (b.publishedAt?.getTime() ?? 0) - (a.publishedAt?.getTime() ?? 0));
 }
 
 export async function getPublishedBlogPostBySlug(slug: string): Promise<BlogPostRow | null> {
   const decoded = (() => { try { return decodeURIComponent(slug); } catch { return slug; } })();
   if (db) {
-    const rows = await db.select().from(blogPosts).where(and(eq(blogPosts.slug, decoded), eq(blogPosts.status, "published"), lte(blogPosts.publishedAt, new Date()))).limit(1);
-    return rows[0] ?? null;
+    try {
+      const rows = await db.select().from(blogPosts).where(and(eq(blogPosts.slug, decoded), eq(blogPosts.status, "published"), lte(blogPosts.publishedAt, new Date()))).limit(1);
+      if (rows[0]) return rows[0];
+    } catch {
+      // fallback to memory
+    }
   }
   return memory().posts.find((post) => post.slug === decoded && post.status === "published" && post.publishedAt && post.publishedAt <= new Date()) ?? null;
 }

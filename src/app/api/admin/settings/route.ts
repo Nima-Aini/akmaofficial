@@ -7,6 +7,9 @@ export const dynamic = "force-dynamic";
 const ALLOWED_KEYS = new Set([
   "theme",
   "hero",
+  "dualCards",
+  "categories",
+  "wholesalePromo",
   "marquee",
   "banners",
   "bottomBanners",
@@ -29,7 +32,8 @@ export async function PUT(req: Request) {
     }
     await saveSetting(key, value);
     return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ ok: false, error: "خطای سرور" }, { status: 500 });
+  } catch (err: unknown) {
+    console.error("Failed to save setting:", err);
+    return NextResponse.json({ ok: false, error: "خطای سرور در ذخیره تنظیمات" }, { status: 500 });
   }
 }

@@ -18,6 +18,22 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: akma_test
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: akma_test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Check out source
         uses: actions/checkout@v5
@@ -51,6 +67,17 @@ jobs:
 
       - name: Type-check
         run: pnpm typecheck
+
+      - name: Run isolated unit tests
+        run: pnpm test:unit
+
+      - name: Run genuine PostgreSQL database integration tests
+        env:
+          TEST_DATABASE_URL: postgresql://akma_test:test_password@127.0.0.1:5432/akma_test_db
+          AKMA_INTEGRATION_TEST: "1"
+          AKMA_TEST_TRANSPORT: mock
+          ADMIN_SESSION_SECRET: deterministic-ci-session-secret-not-for-production
+        run: pnpm test:integration
 
       - name: Build production application
         run: pnpm build

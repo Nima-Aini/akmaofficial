@@ -85,10 +85,45 @@ export type SiteSettings = {
   seoDescription: string;
 };
 
+export type DualCardsSettings = {
+  retail: {
+    title: string;
+    subtitle: string;
+    checklist: string[];
+    buttonText: string;
+    buttonHref: string;
+    image: string;
+  };
+  wholesale: {
+    title: string;
+    subtitle: string;
+    checklist: string[];
+    buttonText: string;
+    buttonHref: string;
+    image: string;
+  };
+};
+
+export type CategoryItem = {
+  key: string;
+  label: string;
+  image: string;
+  href?: string;
+};
+
+export type WholesalePromoSettings = {
+  title: string;
+  subtitle: string;
+  tags: string[];
+  buttonText: string;
+  buttonHref: string;
+  image: string;
+};
+
 export const DEFAULT_THEME: ThemeSettings = {
-  mode: "dark",
-  accent: "#e8132c",
-  accent2: "#ff6b78",
+  mode: "light",
+  accent: "#9e1626",
+  accent2: "#c51b2e",
   contrast: "#ffffff",
   radius: "lg",
   buttonShape: "pill",
@@ -96,28 +131,97 @@ export const DEFAULT_THEME: ThemeSettings = {
 
 export const DEFAULT_HERO: HeroSettings = {
   badge: "تولیدکننده و پخش عمده محصولات مراقبت از کفش",
-  title: "مراقبت حرفه‌ای از کفش،",
-  highlight: "به سبک آکما",
-  subtitle:
-    "فوم تمیزکننده، خوشبوکننده و پولیش کفش آکما با قیمت همکاری و کیفیت برتر. ثبت سفارش آنلاین سریع با صدور آنی کد رهگیری و ارسال به سراسر کشور.",
-  primaryCta: { label: "ثبت سفارش آنلاین", href: "/products" },
-  secondaryCta: { label: "پیگیری سفارشات", href: "/tracking" },
-  image: "/images/hero.png",
+  title: "مراقبت حرفه‌ای از کفش",
+  highlight: "با محصولات آکما",
+  subtitle: "تمیزی، دوام و زیبایی در هر قدم — فرمولاسیون اختصاصی بدون نیاز به شست‌وشو با آب و محافظت از چرم و بافت انواع کفش.",
+  primaryCta: { label: "مشاهده محصولات", href: "/products" },
+  secondaryCta: { label: "خرید عمده و همکاری", href: "/products?mode=wholesale" },
+  image: "/images/redesign/hero.jpg",
   stats: [
-    { value: "+۹", label: "محصول عمده" },
-    { value: "۶", label: "رایحه خوشبوکننده" },
-    { value: "آنلاین", label: "ثبت سریع سفارش" },
-    { value: "سراسری", label: "ارسال به کل کشور" },
+    { value: "+۱۵", label: "محصول تخصصی" },
+    { value: "تک و عمده", label: "فروش مستقیم" },
+    { value: "آنلاین", label: "ثبت فوری سفارش" },
+    { value: "سراسری", label: "ارسال سریع تیپاکس" },
   ],
 };
 
+export const DEFAULT_DUAL_CARDS: DualCardsSettings = {
+  retail: {
+    title: "خرید تکی",
+    subtitle: "برای مصرف شخصی",
+    checklist: [
+      "سفارش از ۱ عدد",
+      "پرداخت سریع و امن",
+      "ارسال به سراسر کشور",
+      "مشاهده از اینستاگرام و ثبت سفارش",
+    ],
+    buttonText: "مشاهده محصولات تکی",
+    buttonHref: "/products?mode=retail",
+    image: "/images/redesign/retail-card.jpg",
+  },
+  wholesale: {
+    title: "خرید عمده",
+    subtitle: "ویژه فروشگاه‌ها و همکاران",
+    checklist: [
+      "قیمت همکاری و تخفیف عمده",
+      "مناسب برای فروشگاه‌ها و عمده‌فروشان",
+      "تضمین کیفیت و تأمین پایدار",
+    ],
+    buttonText: "ورود به بخش خرید عمده",
+    buttonHref: "/products?mode=wholesale",
+    image: "/images/redesign/wholesale-boxes.jpg",
+  },
+};
+
+export const DEFAULT_CATEGORIES: CategoryItem[] = [
+  {
+    key: "foam",
+    label: "تمیزکننده کفش",
+    image: "/images/redesign/cat-foam.jpg",
+    href: "/products?cat=foam",
+  },
+  {
+    key: "wax",
+    label: "واکس و براق کننده",
+    image: "/images/redesign/cat-wax.jpg",
+    href: "/products?cat=wax",
+  },
+  {
+    key: "freshener",
+    label: "بوگیر کفش",
+    image: "/images/redesign/cat-spray.jpg",
+    href: "/products?cat=freshener",
+  },
+  {
+    key: "tools",
+    label: "ابزار و لوازم جانبی",
+    image: "/images/redesign/cat-tools.jpg",
+    href: "/products?cat=tools",
+  },
+  {
+    key: "bundle",
+    label: "پک‌های ویژه",
+    image: "/images/redesign/cat-packs.jpg",
+    href: "/products?cat=bundle",
+  },
+];
+
+export const DEFAULT_WHOLESALE_PROMO: WholesalePromoSettings = {
+  title: "خرید عمده با قیمت همکاری",
+  subtitle: "مناسب فروشگاه‌ها، عمده‌فروشان و همکاران گرامی با صدور فاکتور رسمی و ارسال مستقیم از کارخانه",
+  tags: ["قیمت ویژه همکاری", "مشاوره تخصصی", "تأمین پایدار و فوری"],
+  buttonText: "ورود به کاتالوگ عمده",
+  buttonHref: "/products?mode=wholesale",
+  image: "/images/redesign/wholesale-banner.jpg",
+};
+
 export const DEFAULT_MARQUEE: string[] = [
-  "ثبت سفارش آنلاین سریع و آسان",
-  "قیمت همکاری ویژه عمده‌فروشان",
-  "صدور آنی کد رهگیری مرسوله",
-  "ارسال سریع به سراسر کشور با تیپاکس",
-  "بسته‌بندی شکیل و آماده عرضه",
-  "پشتیبانی و مشاوره تلفنی",
+  "ثبت سفارش آنلاین سریع با تسویه‌حساب بانکی",
+  "خرید تکی و مصرف شخصی با ارسال سراسری",
+  "تخفیف‌های پلکانی ویژه خریدهای عمده و کارتنی",
+  "ارسال سریع و مطمئن با تیپاکس و پست به سراسر ایران",
+  "تولیدکننده رسمی محصولات تخصصی مراقبت از کفش آکما",
+  "پشتیبانی و مشاوره تلفنی: ۰۹۰۳۳۲۵۳۰۶۵",
 ];
 
 export const DEFAULT_BANNERS: Banner[] = [
@@ -128,32 +232,31 @@ export const DEFAULT_BANNERS: Banner[] = [
       "ویترین حرفه‌ای + پرفروش‌ترین محصولات آکما در یک پکیج کامل؛ مناسب فروشگاه‌های کفش، کتانی و کیف و چرم.",
     cta: "مشاهده استند",
     href: "/products/stand-3",
-    image: "/images/products/stand.png",
+    image: "/images/redesign/cat-packs.jpg",
     enabled: true,
   },
-
 ];
 
 export const DEFAULT_FEATURES: Feature[] = [
   {
+    icon: "CreditCard",
+    title: "پرداخت امن",
+    desc: "درگاه معتبر بانکی و تسویه‌حساب سریع",
+  },
+  {
+    icon: "Headphones",
+    title: "پشتیبانی تخصصی",
+    desc: "قبل و بعد از خرید در تمام روزهای هفته",
+  },
+  {
+    icon: "ShieldCheck",
+    title: "ضمانت اصالت",
+    desc: "محصولات اصلی با فرمولاسیون اختصاصی آکما",
+  },
+  {
     icon: "Truck",
-    title: "ارسال به سراسر کشور",
-    desc: "سفارش‌های عمده به تمام نقاط ایران ارسال می‌شود.",
-  },
-  {
-    icon: "Handshake",
-    title: "قیمت همکاری",
-    desc: "شرایط ویژه خرید عمده برای فروشگاه‌ها و پخش‌کنندگان.",
-  },
-  {
-    icon: "BadgeCheck",
-    title: "کیفیت تضمین‌شده",
-    desc: "کیفیت بالا، استفاده آسان و بسته‌بندی شکیل آماده عرضه.",
-  },
-  {
-    icon: "TrendingUp",
-    title: "حاشیه سود مناسب",
-    desc: "محصولات پرفروش با سود مناسب برای فروشندگان.",
+    title: "ارسال سریع",
+    desc: "ارسال به سراسر کشور با بسته‌بندی مقاوم",
   },
 ];
 
@@ -257,6 +360,9 @@ export const DEFAULT_SECTION_TITLES: SectionTitles = {
 export const DEFAULT_SETTINGS: Record<string, unknown> = {
   theme: DEFAULT_THEME,
   hero: DEFAULT_HERO,
+  dualCards: DEFAULT_DUAL_CARDS,
+  categories: DEFAULT_CATEGORIES,
+  wholesalePromo: DEFAULT_WHOLESALE_PROMO,
   marquee: DEFAULT_MARQUEE,
   banners: DEFAULT_BANNERS,
   bottomBanners: DEFAULT_BOTTOM_BANNERS,
@@ -276,6 +382,12 @@ export type ProductSeed = {
   features: string[];
   contents: string[];
   price: number;
+  retailPrice?: number;
+  wholesalePrice?: number;
+  wholesaleMinQty?: number;
+  wholesaleTiers?: { minQty: number; price: number; label?: string }[];
+  isRetail?: boolean;
+  isWholesale?: boolean;
   unitPrice: string;
   category: string;
   categoryLabel: string;
@@ -287,13 +399,155 @@ export type ProductSeed = {
 
 export const CATEGORIES = [
   { key: "all", label: "همه محصولات" },
-  { key: "foam", label: "فوم تمیزکننده" },
-  { key: "freshener", label: "خوشبوکننده" },
-  { key: "polish", label: "پولیش و احیا" },
-  { key: "bundle", label: "استند و پک فروشگاهی" },
+  { key: "foam", label: "تمیزکننده کفش" },
+  { key: "wax", label: "واکس و براق کننده" },
+  { key: "freshener", label: "بوگیر کفش" },
+  { key: "tools", label: "ابزار و لوازم جانبی" },
+  { key: "bundle", label: "پک‌های ویژه و استند" },
 ];
 
 export const PRODUCT_SEEDS: ProductSeed[] = [
+  {
+    name: "فوم تمیزکننده کفش آکما",
+    slug: "foam-cleaner-retail",
+    subtitle: "فرمولاسیون اختصاصی بدون نیاز به آب — همراه فرچه و دستمال میکروفایبر",
+    description: `فوم تمیزکننده تخصصی کفش آکما، راهکاری نوین، سریع و بدون نیاز به شست‌وشو با آب برای تمیزی و احیای انواع کفش‌های کتانی، ورزشی، چرمی، پارچه‌ای و جیر است. با قدرت پاک‌کنندگی عمیق، جرم‌ها و آلودگی‌ها را بدون آسیب به بافت کفش از بین می‌برد.
+
+• مناسب مصرف شخصی و روزمره
+• بدون نیاز به آبکشی و شست‌وشو
+• حفظ رنگ، نرمی و بافت کفش
+• همراه با فرچه تخصصی و دستمال میکروفایبر
+• امکان خرید تکی با تحویل سریع سراسری و همچنین خرید عمده کارتنی با قیمت همکاری`,
+    features: [
+      "قدرت پاک‌کنندگی فوق‌العاده بدون نیاز به آب",
+      "مناسب انواع کفش کتانی، اسپرت، چرمی و پارچه‌ای",
+      "همراه با فرچه تخصصی و دستمال میکروفایبر",
+      "افزایش دوام و تازگی کفش در کمترین زمان",
+    ],
+    contents: ["فوم تمیزکننده آکما (۲۵۰ میلی‌لیتر)", "فرچه مخصوص", "دستمال میکروفایبر"],
+    price: 298000,
+    retailPrice: 298000,
+    wholesalePrice: 195000,
+    wholesaleMinQty: 6,
+    wholesaleTiers: [
+      { minQty: 6, price: 195000, label: "۶ تا ۱۱ عدد (همکاری)" },
+      { minQty: 12, price: 185000, label: "۱۲ تا ۲۳ عدد (بسته کامل)" },
+      { minQty: 24, price: 175000, label: "۲۴ عدد به بالا (کارتن عمده)" },
+    ],
+    isRetail: true,
+    isWholesale: true,
+    unitPrice: "۲۹۸٬۰۰۰ تومان",
+    category: "foam",
+    categoryLabel: "تمیزکننده کفش",
+    images: ["/images/redesign/cat-foam.jpg", "/images/redesign/hero.jpg"],
+    badge: "پرفروش",
+    featured: true,
+    sortOrder: 1,
+  },
+  {
+    name: "اسپری بوگیر کفش آکما",
+    slug: "shoe-deodorant-spray",
+    subtitle: "از بین برنده قطعی بوی نامطبوع و باکتری با رایحه ماندگار",
+    description: `اسپری خوشبوکننده و ضدعفونی‌کننده کفش آکما با فرمولاسیون آنتی‌باکتریال، بوی نامطبوع ناشی از تعریق را کاملاً خنثی کرده و رایحه‌ای ملایم و باطراوت ایجاد می‌کند.
+
+• خنثی‌سازی باکتری‌ها و عوامل بوی بد
+• ماندگاری بالا در کفش‌های روزمره و ورزشی
+• قابل استفاده برای انواع کفش، کتانی و کمد کفش
+• امکان خرید تکی برای مصرف شخصی یا سفارش عمده کارتنی ۳۰ عددی`,
+    features: [
+      "آنتی‌باکتریال و ضدعفونی‌کننده فضای داخلی کفش",
+      "رایحه مطبوع و بسیار ماندگار",
+      "استفاده آسان با اسپری ۳۶۰ درجه",
+    ],
+    contents: ["اسپری خوشبوکننده کفش آکما (۱۵۰ میلی‌لیتر)"],
+    price: 218000,
+    retailPrice: 218000,
+    wholesalePrice: 80000,
+    wholesaleMinQty: 6,
+    wholesaleTiers: [
+      { minQty: 6, price: 85000, label: "۶ تا ۲۹ عدد (همکاری)" },
+      { minQty: 30, price: 80000, label: "۳۰ عدد (کارتن کامل)" },
+      { minQty: 60, price: 75000, label: "۶۰ عدد به بالا (عمده پخش)" },
+    ],
+    isRetail: true,
+    isWholesale: true,
+    unitPrice: "۲۱۸٬۰۰۰ تومان",
+    category: "freshener",
+    categoryLabel: "بوگیر کفش",
+    images: ["/images/redesign/cat-spray.jpg"],
+    badge: "پرفروش",
+    featured: true,
+    sortOrder: 2,
+  },
+  {
+    name: "واکس سفید کننده لژ آکما",
+    slug: "sole-whitener-polish",
+    subtitle: "احیای سریع لژهای زرد و کدر شده انواع کتانی و کفش اسپرت",
+    description: `واکس و پولیش تخصصی سفیدکننده لژ آکما برای بازگرداندن رنگ سفید خالص به زیره‌ها و لژهای کدر، زرد شده و اکسید شده کتانی‌ها تولید شده است.
+
+• اپلیکاتور اسفنجی سرخود برای استفاده بدون کثیف‌کاری
+• پوشانندگی فوق‌العاده لکه‌ها و خط‌وخش‌های لژ
+• خشک‌شدن سریع و بدون ایجاد ترک
+• مناسب برای تمام کتانی‌ها و کفش‌های با زیره سفید`,
+    features: [
+      "سفیدکنندگی فوری و با دوام بالا",
+      "دارای سر اسفنجی آماده استفاده",
+      "مقاوم در برابر سایش و آلودگی مجدد",
+    ],
+    contents: ["پولیش سفیدکننده لژ با پد اسفنجی"],
+    price: 248000,
+    retailPrice: 248000,
+    wholesalePrice: 160000,
+    wholesaleMinQty: 6,
+    wholesaleTiers: [
+      { minQty: 6, price: 160000, label: "۶ تا ۱۱ عدد (همکاری)" },
+      { minQty: 12, price: 150000, label: "۱۲ تا ۲۳ عدد (بسته)" },
+      { minQty: 24, price: 140000, label: "۲۴ عدد به بالا (کارتن)" },
+    ],
+    isRetail: true,
+    isWholesale: true,
+    unitPrice: "۲۴۸٬۰۰۰ تومان",
+    category: "wax",
+    categoryLabel: "واکس و براق کننده",
+    images: ["/images/redesign/cat-wax.jpg"],
+    badge: "پرفروش",
+    featured: true,
+    sortOrder: 3,
+  },
+  {
+    name: "برس تمیزکننده کفش آکما",
+    slug: "shoe-cleaning-brush",
+    subtitle: "فرچه چوبی با موهای متراکم برای پاک‌سازی دقیق چرم و کتانی",
+    description: `برس ارگونومیک چوبی آکما با تراکم موی استاندارد، بدون ایجاد کوچک‌ترین خراشیدگی روی سطوح چرمی، کتانی یا پارچه‌ای، فوم را در تمام شیارها و بافت‌های کفش پخش کرده و لکه‌ها را پاکسازی می‌کند.
+
+• بدنه چوب طبیعی ارگونومیک با دستگیره خوش‌دست
+• موهای مقاوم و منعطف ضد ریزش
+• مناسب استفاده مداوم در منزل یا کارگاه‌های کفش`,
+    features: [
+      "دسته چوبی ضد آب و خوش‌دست",
+      "تراکم بالای موها برای تولید کف فراوان",
+      "مناسب برای چرم، جیر، نوبوک و مش",
+    ],
+    contents: ["برس مخصوص چوبی آکما"],
+    price: 298000,
+    retailPrice: 298000,
+    wholesalePrice: 180000,
+    wholesaleMinQty: 6,
+    wholesaleTiers: [
+      { minQty: 6, price: 180000, label: "۶ تا ۱۱ عدد (همکاری)" },
+      { minQty: 12, price: 165000, label: "۱۲ تا ۲۳ عدد (بسته)" },
+      { minQty: 24, price: 150000, label: "۲۴ عدد به بالا (عمده)" },
+    ],
+    isRetail: true,
+    isWholesale: true,
+    unitPrice: "۲۹۸٬۰۰۰ تومان",
+    category: "tools",
+    categoryLabel: "ابزار و لوازم جانبی",
+    images: ["/images/redesign/cat-tools.jpg"],
+    badge: "پرفروش",
+    featured: true,
+    sortOrder: 4,
+  },
   {
     name: "استند سه طبقه آکما",
     slug: "stand-3",

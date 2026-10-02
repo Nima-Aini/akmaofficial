@@ -38,6 +38,14 @@ export async function generateMetadata(): Promise<Metadata> {
     title: site.seoTitle,
     description: site.seoDescription,
     alternates: { canonical: "/" },
+    openGraph: {
+      title: site.seoTitle,
+      description: site.seoDescription,
+      url: "/",
+      siteName: site.name,
+      locale: "fa_IR",
+      type: "website",
+    },
   };
 }
 

@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, ChevronUp, ChevronDown, Layers, Sparkles } from "lucide-react";
 import {
   DEFAULT_BANNERS,
   DEFAULT_BOTTOM_BANNERS,
+  DEFAULT_CATEGORIES,
   DEFAULT_CONTACT,
+  DEFAULT_DUAL_CARDS,
   DEFAULT_FEATURES,
   DEFAULT_HERO,
   DEFAULT_MARQUEE,
@@ -15,9 +17,12 @@ import {
   DEFAULT_SITE,
   DEFAULT_STEPS,
   DEFAULT_THEME,
+  DEFAULT_WHOLESALE_PROMO,
   type Banner,
   type BottomBanner,
+  type CategoryItem,
   type ContactSettings,
+  type DualCardsSettings,
   type Feature,
   type HeroSettings,
   type PriceRow,
@@ -25,6 +30,7 @@ import {
   type SiteSettings,
   type Step,
   type ThemeSettings,
+  type WholesalePromoSettings,
 } from "@/lib/defaults";
 import { ICON_CHOICES, DynIcon } from "@/components/icon";
 import { SectionCard, Field, ImageUploader, Textarea, Toggle, Select, ColorField, ListEditor } from "./fields";
@@ -522,6 +528,336 @@ export function HeroBannersSection({
             <Plus size={14} /> افزودن بنر انتهای صفحه
           </button>
         </div>
+      </SectionCard>
+    </div>
+  );
+}
+
+/* ---------------- بخش‌های اختصاصی صفحه اصلی (کارت‌های دوگانه، دسته‌بندی‌ها و پروموی عمده) ---------------- */
+export function HomePageCardsSection({
+  settings,
+  setKey,
+  saveKey,
+  saving,
+}: {
+  settings: Settings;
+  setKey: SetKey;
+  saveKey: SaveKey;
+  saving: boolean;
+}) {
+  const dualCards: DualCardsSettings = {
+    retail: { ...DEFAULT_DUAL_CARDS.retail, ...(settings.dualCards as Partial<DualCardsSettings>)?.retail },
+    wholesale: { ...DEFAULT_DUAL_CARDS.wholesale, ...(settings.dualCards as Partial<DualCardsSettings>)?.wholesale },
+  };
+
+  const categories: CategoryItem[] = (settings.categories as CategoryItem[]) || DEFAULT_CATEGORIES;
+
+  const wholesalePromo: WholesalePromoSettings = {
+    ...DEFAULT_WHOLESALE_PROMO,
+    ...(settings.wholesalePromo as Partial<WholesalePromoSettings>),
+  };
+
+  const setDualRetail = (patch: Partial<DualCardsSettings["retail"]>) => {
+    setKey("dualCards", {
+      ...dualCards,
+      retail: { ...dualCards.retail, ...patch },
+    });
+  };
+
+  const setDualWholesale = (patch: Partial<DualCardsSettings["wholesale"]>) => {
+    setKey("dualCards", {
+      ...dualCards,
+      wholesale: { ...dualCards.wholesale, ...patch },
+    });
+  };
+
+  const setCategoryItem = (idx: number, patch: Partial<CategoryItem>) => {
+    const next = categories.map((c, i) => (i === idx ? { ...c, ...patch } : c));
+    setKey("categories", next);
+  };
+
+  const moveCategory = (fromIdx: number, toIdx: number) => {
+    if (toIdx < 0 || toIdx >= categories.length) return;
+    const next = [...categories];
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved);
+    setKey("categories", next);
+  };
+
+  const removeCategory = (idx: number) => {
+    setKey(
+      "categories",
+      categories.filter((_, i) => i !== idx),
+    );
+  };
+
+  const addCategory = () => {
+    setKey("categories", [
+      ...categories,
+      {
+        key: `cat-${Date.now()}`,
+        label: "دسته‌بندی جدید",
+        image: "/images/redesign/cat-foam.jpg",
+        href: "/products",
+      },
+    ]);
+  };
+
+  const setPromo = (patch: Partial<WholesalePromoSettings>) => {
+    setKey("wholesalePromo", {
+      ...wholesalePromo,
+      ...patch,
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* 1. Dual Cards Section */}
+      <SectionCard
+        title="کارت‌های دوگانه صفحه اصلی (خرید تکی و خرید عمده)"
+        desc="متن‌ها، تصاویر، مزایا و لینک‌های کارت‌های تکی و همکاری در صفحه اصلی را مستقیماً مدیریت کنید."
+        onSave={() => saveKey("dualCards")}
+        saving={saving}
+      >
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Retail Card */}
+          <div className="rounded-2xl border border-line bg-surface p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-line pb-3">
+              <span className="text-xs font-black text-accent">کارت خرید تکی (Retail)</span>
+              <span className="rounded-full bg-rose-500/10 px-3 py-1 text-[10px] font-bold text-rose-400">
+                مصرف‌کننده
+              </span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field
+                label="عنوان کارت"
+                value={dualCards.retail.title}
+                onChange={(v) => setDualRetail({ title: v })}
+              />
+              <Field
+                label="زیرعنوان کارت"
+                value={dualCards.retail.subtitle}
+                onChange={(v) => setDualRetail({ subtitle: v })}
+              />
+            </div>
+            <ImageUploader
+              label="تصویر کارت تکی"
+              value={dualCards.retail.image}
+              onChange={(v) => setDualRetail({ image: typeof v === "string" ? v : (v[0] ?? "") })}
+              kind="banners"
+              guideline="banner"
+              hint="تصویر اسنیکر / کفش شیک برای کارت تکی."
+            />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field
+                label="متن دکمه"
+                value={dualCards.retail.buttonText}
+                onChange={(v) => setDualRetail({ buttonText: v })}
+              />
+              <Field
+                label="لینک دکمه"
+                value={dualCards.retail.buttonHref}
+                onChange={(v) => setDualRetail({ buttonHref: v })}
+                dir="ltr"
+              />
+            </div>
+            <ListEditor
+              label="آیتم‌های چک‌لیست مزایا"
+              items={dualCards.retail.checklist}
+              onChange={(items) => setDualRetail({ checklist: items })}
+              placeholder="مثلاً: سفارش از ۱ عدد"
+            />
+          </div>
+
+          {/* Wholesale Card */}
+          <div className="rounded-2xl border border-line bg-surface p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-line pb-3">
+              <span className="text-xs font-black text-amber-400">کارت خرید عمده و همکاری (Wholesale)</span>
+              <span className="rounded-full bg-amber-500/10 px-3 py-1 text-[10px] font-bold text-amber-400">
+                فروشگاه‌ها و پخش
+              </span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field
+                label="عنوان کارت"
+                value={dualCards.wholesale.title}
+                onChange={(v) => setDualWholesale({ title: v })}
+              />
+              <Field
+                label="زیرعنوان کارت"
+                value={dualCards.wholesale.subtitle}
+                onChange={(v) => setDualWholesale({ subtitle: v })}
+              />
+            </div>
+            <ImageUploader
+              label="تصویر کارت عمده"
+              value={dualCards.wholesale.image}
+              onChange={(v) => setDualWholesale({ image: typeof v === "string" ? v : (v[0] ?? "") })}
+              kind="banners"
+              guideline="banner"
+              hint="تصویر کارتن‌ها و سفارشات شرکتی آکما."
+            />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field
+                label="متن دکمه"
+                value={dualCards.wholesale.buttonText}
+                onChange={(v) => setDualWholesale({ buttonText: v })}
+              />
+              <Field
+                label="لینک دکمه"
+                value={dualCards.wholesale.buttonHref}
+                onChange={(v) => setDualWholesale({ buttonHref: v })}
+                dir="ltr"
+              />
+            </div>
+            <ListEditor
+              label="آیتم‌های چک‌لیست مزایا"
+              items={dualCards.wholesale.checklist}
+              onChange={(items) => setDualWholesale({ checklist: items })}
+              placeholder="مثلاً: قیمت همکاری و تخفیف عمده"
+            />
+          </div>
+        </div>
+      </SectionCard>
+
+      {/* 2. Categories Section */}
+      <SectionCard
+        title="دسته‌بندی‌های تصویری صفحه اصلی"
+        desc="ترتیب نمایش، عنوان، تصویر و لینک دسته‌بندی‌های دایره‌ای صفحه اول را مدیریت کنید."
+        onSave={() => saveKey("categories")}
+        saving={saving}
+      >
+        <div className="space-y-4">
+          {categories.map((cat, idx) => (
+            <div
+              key={cat.key || idx}
+              className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-4 sm:flex-row sm:items-center"
+            >
+              <div className="flex items-center gap-2">
+                <span className="grid size-7 place-items-center rounded-full bg-accent/15 text-xs font-black text-accent">
+                  {idx + 1}
+                </span>
+                <div className="flex flex-col gap-1">
+                  <button
+                    type="button"
+                    disabled={idx === 0}
+                    onClick={() => moveCategory(idx, idx - 1)}
+                    className="p-1 text-muted hover:text-ink disabled:opacity-30"
+                    title="انتقال به بالا"
+                  >
+                    <ChevronUp size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={idx === categories.length - 1}
+                    onClick={() => moveCategory(idx, idx + 1)}
+                    className="p-1 text-muted hover:text-ink disabled:opacity-30"
+                    title="انتقال به پایین"
+                  >
+                    <ChevronDown size={16} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid flex-1 gap-3 sm:grid-cols-3">
+                <Field
+                  label="عنوان دسته"
+                  value={cat.label}
+                  onChange={(v) => setCategoryItem(idx, { label: v })}
+                />
+                <Field
+                  label="شناسه (Slug / Key)"
+                  value={cat.key}
+                  onChange={(v) => setCategoryItem(idx, { key: v })}
+                  dir="ltr"
+                />
+                <Field
+                  label="لینک هدایت"
+                  value={cat.href || `/products?cat=${cat.key}`}
+                  onChange={(v) => setCategoryItem(idx, { href: v })}
+                  dir="ltr"
+                />
+              </div>
+
+              <div className="w-full sm:w-48">
+                <ImageUploader
+                  label="تصویر دسته"
+                  value={cat.image}
+                  onChange={(v) =>
+                    setCategoryItem(idx, { image: typeof v === "string" ? v : (v[0] ?? "") })
+                  }
+                  kind="products"
+                  guideline="product"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => removeCategory(idx)}
+                className="grid size-10 place-items-center self-end sm:self-center rounded-xl border border-line text-rose-400 hover:border-rose-400"
+                title="حذف دسته"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={addCategory}
+            className="btn btn-ghost h-11 w-full text-xs"
+          >
+            <Plus size={15} /> افزودن دسته‌بندی جدید
+          </button>
+        </div>
+      </SectionCard>
+
+      {/* 3. Wholesale Promo Banner Section */}
+      <SectionCard
+        title="بنر عریض همکاری و عمده (انتهای صفحه اصلی)"
+        desc="تنظیمات تیتر، توضیحات، تگ‌های مزایا، تصویر و دکمه‌های بنر عریض انتهای صفحه."
+        onSave={() => saveKey("wholesalePromo")}
+        saving={saving}
+      >
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Field
+            label="عنوان بنر همکاری"
+            value={wholesalePromo.title}
+            onChange={(v) => setPromo({ title: v })}
+          />
+          <ImageUploader
+            label="تصویر بنر همکاری"
+            value={wholesalePromo.image}
+            onChange={(v) => setPromo({ image: typeof v === "string" ? v : (v[0] ?? "") })}
+            kind="banners"
+            guideline="banner"
+          />
+        </div>
+        <Textarea
+          label="توضیحات بنر همکاری"
+          value={wholesalePromo.subtitle}
+          onChange={(v) => setPromo({ subtitle: v })}
+          rows={3}
+        />
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Field
+            label="متن دکمه"
+            value={wholesalePromo.buttonText}
+            onChange={(v) => setPromo({ buttonText: v })}
+          />
+          <Field
+            label="لینک دکمه"
+            value={wholesalePromo.buttonHref}
+            onChange={(v) => setPromo({ buttonHref: v })}
+            dir="ltr"
+          />
+        </div>
+        <ListEditor
+          label="تگ‌های مزایای همکاری"
+          items={wholesalePromo.tags}
+          onChange={(tags) => setPromo({ tags })}
+          placeholder="مثلاً: قیمت ویژه همکاری"
+        />
       </SectionCard>
     </div>
   );

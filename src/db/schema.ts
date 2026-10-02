@@ -10,6 +10,12 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
+export type WholesaleTier = {
+  minQty: number;
+  price: number;
+  label?: string;
+};
+
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
@@ -19,6 +25,13 @@ export const products = pgTable("products", {
   features: jsonb("features").$type<string[]>().notNull().default([]),
   contents: jsonb("contents").$type<string[]>().notNull().default([]),
   price: bigint("price", { mode: "number" }).notNull().default(0),
+  retailPrice: bigint("retail_price", { mode: "number" }).notNull().default(0),
+  wholesalePrice: bigint("wholesale_price", { mode: "number" }).notNull().default(0),
+  wholesaleMinQty: integer("wholesale_min_qty").notNull().default(1),
+  wholesaleTiers: jsonb("wholesale_tiers").$type<WholesaleTier[]>().notNull().default([]),
+  isRetail: boolean("is_retail").notNull().default(true),
+  isWholesale: boolean("is_wholesale").notNull().default(true),
+  videoUrl: text("video_url").notNull().default(""),
   unitPrice: text("unit_price").notNull().default(""),
   category: text("category").notNull().default("foam"),
   categoryLabel: text("category_label").notNull().default(""),
@@ -44,6 +57,33 @@ export const adminUsers = pgTable("admin_users", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const customerUsers = pgTable("customer_users", {
+  id: serial("id").primaryKey(),
+  phone: text("phone").notNull().unique(),
+  name: text("name").notNull().default(""),
+  province: text("province").notNull().default(""),
+  city: text("city").notNull().default(""),
+  address: text("address").notNull().default(""),
+  postalCode: text("postal_code").notNull().default(""),
+  companyName: text("company_name").notNull().default(""),
+  isWholesale: boolean("is_wholesale").notNull().default(false),
+  passwordHash: text("password_hash"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const customerOtps = pgTable("customer_otps", {
+  phone: text("phone").primaryKey(),
+  otpHash: text("otp_hash").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  lastRequestedAt: timestamp("last_requested_at").notNull().defaultNow(),
+  hourlyRequestCount: integer("hourly_request_count").notNull().default(1),
+  hourWindowStart: timestamp("hour_window_start").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 export type OrderItem = {
   productId: number;
   productName: string;
@@ -51,11 +91,14 @@ export type OrderItem = {
   price: number;
   unitPrice?: string;
   quantity: number;
+  mode?: "retail" | "wholesale";
+  tierLabel?: string;
 };
 
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   trackingCode: text("tracking_code").notNull().unique(),
+  customerId: integer("customer_id").references(() => customerUsers.id, { onDelete: "restrict" }),
   customerName: text("customer_name").notNull(),
   customerPhone: text("customer_phone").notNull(),
   customerAddress: text("customer_address").notNull(),
@@ -65,13 +108,43 @@ export const orders = pgTable("orders", {
   notes: text("notes").notNull().default(""),
   items: jsonb("items").$type<OrderItem[]>().notNull().default([]),
   totalAmount: bigint("total_amount", { mode: "number" }).notNull().default(0),
+  orderType: text("order_type").notNull().default("retail"), // retail | wholesale
   status: text("status").notNull().default("pending"), // pending | processing | shipped | delivered | cancelled
+  paymentStatus: text("payment_status").notNull().default("pending"), // pending | paid | failed
+  paymentMethod: text("payment_method").notNull().default("online"), // online | card_to_card
+  paymentLink: text("payment_link").notNull().default(""),
+  paymentRefId: text("payment_ref_id").notNull().default(""),
+  paymentTrackId: text("payment_track_id").notNull().default(""),
+  paidAt: timestamp("paid_at"),
   shippingCode: text("shipping_code").notNull().default(""),
   trackingLink: text("tracking_link").notNull().default(""),
   adminNotes: text("admin_notes").notNull().default(""),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+export const paymentAttempts = pgTable(
+  "payment_attempts",
+  {
+    id: serial("id").primaryKey(),
+    orderId: integer("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "restrict" }),
+    provider: text("provider").notNull().default("zibal"),
+    trackId: text("track_id").notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull().default(0),
+    amountRials: bigint("amount_rials", { mode: "number" }).notNull().default(0),
+    status: text("status").notNull().default("pending"), // pending | paid | failed | superseded | duplicate_paid
+    paymentLink: text("payment_link").notNull().default(""),
+    verifiedRef: text("verified_ref").notNull().default(""),
+    rawGatewayResponse: jsonb("raw_gateway_response").$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("payment_attempts_provider_track_id_idx").on(table.provider, table.trackId),
+  ],
+);
 
 export const cartProductSuggestions = pgTable(
   "cart_product_suggestions",
@@ -127,6 +200,9 @@ export const blogPosts = pgTable("blog_posts", {
 });
 
 export type ProductRow = typeof products.$inferSelect;
+export type CustomerUserRow = typeof customerUsers.$inferSelect;
+export type CustomerOtpRow = typeof customerOtps.$inferSelect;
 export type OrderRow = typeof orders.$inferSelect;
+export type PaymentAttemptRow = typeof paymentAttempts.$inferSelect;
 export type CartProductSuggestionRow = typeof cartProductSuggestions.$inferSelect;
 export type BlogPostRow = typeof blogPosts.$inferSelect;

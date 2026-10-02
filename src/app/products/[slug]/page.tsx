@@ -130,25 +130,57 @@ export default async function ProductPage({
             <div className="card mt-7 p-6 space-y-6">
               <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
-                  <p className="text-xs text-muted">قیمت بسته (عمده)</p>
-                  <p className="mt-1.5 text-4xl font-black tracking-tight text-accent">
-                    {formatPrice(product.price)}
-                    <span className="mr-2 text-sm font-bold text-muted">تومان</span>
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <p className="text-xs text-muted">قیمت خرید تکی</p>
+                      <p className="mt-1 text-2xl font-black text-ink">
+                        {formatPrice(product.retailPrice || product.price)}
+                        <span className="mr-1.5 text-xs font-bold text-muted">تومان</span>
+                      </p>
+                    </div>
+                    {product.wholesalePrice && product.wholesalePrice > 0 && (
+                      <div className="border-r border-line pr-3">
+                        <p className="text-xs text-accent font-bold">قیمت همکاری عمده</p>
+                        <p className="mt-1 text-2xl font-black text-accent">
+                          {formatPrice(product.wholesalePrice)}
+                          <span className="mr-1.5 text-xs font-bold text-muted">تومان</span>
+                        </p>
+                      </div>
+                    )}
+                  </div>
                   {product.unitPrice && (
                     <p className="mt-2 text-xs font-bold text-muted">{product.unitPrice}</p>
                   )}
                 </div>
                 {product.inStock ? (
-                  <span className="flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-4 py-2 text-xs font-bold text-emerald-400">
-                    <PackageCheck size={15} /> موجود — آماده ارسال
+                  <span className="flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-4 py-2 text-xs font-bold text-emerald-600">
+                    <PackageCheck size={15} /> موجود — آماده ارسال فوری
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1.5 rounded-full bg-rose-400/10 px-4 py-2 text-xs font-bold text-rose-400">
-                    <PackageX size={15} /> برای موجودی تماس بگیرید
+                  <span className="flex items-center gap-1.5 rounded-full bg-rose-400/10 px-4 py-2 text-xs font-bold text-rose-500">
+                    <PackageX size={15} /> برای استعلام موجودی تماس بگیرید
                   </span>
                 )}
               </div>
+
+              {/* Wholesale Tiers Table if product has tiers */}
+              {Array.isArray(product.wholesaleTiers) && product.wholesaleTiers.length > 0 && (
+                <div className="rounded-2xl border border-line bg-surface/50 p-4 space-y-2">
+                  <p className="text-xs font-black text-ink">تخفیف‌های پلکانی سفارش عمده:</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                    {product.wholesaleTiers.map((tier, idx) => (
+                      <div key={idx} className="rounded-xl border border-line bg-card p-2 text-center">
+                        <span className="block text-[11px] text-muted">
+                          {tier.label || `${tier.minQty}+ عدد`}
+                        </span>
+                        <span className="block font-mono text-sm font-black text-accent mt-0.5">
+                          {formatPrice(tier.price)} ت
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Add to cart action with quantity selector */}
               <div className="border-t border-line pt-6">
@@ -161,7 +193,7 @@ export default async function ProductPage({
                   className="btn btn-ghost h-12 flex-1 text-xs font-bold"
                 >
                   <Phone size={16} />
-                  مشاوره و پشتیبانی تلفنی — {toFa(phone)}
+                  مشاوره و پشتیبانی سفارش عمده و تکی — {toFa(phone)}
                 </a>
               </div>
               <p className="text-center text-[11px] leading-5 text-muted">

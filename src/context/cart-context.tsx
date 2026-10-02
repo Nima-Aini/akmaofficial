@@ -1,25 +1,47 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import type { OrderItem } from "@/db/schema";
+import { calculateProductPricing, type WholesaleTierItem } from "@/lib/pricing";
+
+export type CartItem = {
+  productId: number;
+  productName: string;
+  productImage: string;
+  price: number;
+  unitPrice?: string;
+  quantity: number;
+  mode: "retail" | "wholesale";
+  tierLabel?: string;
+  retailPrice?: number;
+  wholesalePrice?: number;
+  wholesaleTiers?: WholesaleTierItem[];
+};
 
 type CartContextType = {
-  items: OrderItem[];
+  items: CartItem[];
+  cartMode: "retail" | "wholesale";
+  setCartMode: (mode: "retail" | "wholesale") => void;
   addItem: (
     product: {
       id: number;
       name: string;
       images: string[];
       price: number;
+      retailPrice?: number;
+      wholesalePrice?: number;
+      wholesaleTiers?: WholesaleTierItem[];
       unitPrice?: string;
     },
     quantity?: number,
+    mode?: "retail" | "wholesale",
   ) => void;
   removeItem: (productId: number) => void;
   updateQuantity: (productId: number, quantity: number) => void;
+  setItemMode: (productId: number, mode: "retail" | "wholesale") => void;
   clearCart: () => void;
   totalCount: number;
   totalAmount: number;
+  totalWholesaleSavings: number;
   isOpen: boolean;
   openCart: () => void;
   closeCart: () => void;
@@ -28,10 +50,11 @@ type CartContextType = {
 
 const CartContext = createContext<CartContextType | null>(null);
 
-const STORAGE_KEY = "akma_cart_v1";
+const STORAGE_KEY = "akma_cart_v2";
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [items, setItems] = useState<OrderItem[]>(() => {
+  const [cartMode, setCartMode] = useState<"retail" | "wholesale">("retail");
+  const [items, setItems] = useState<CartItem[]>(() => {
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
@@ -55,37 +78,71 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [items]);
 
+  const recalculateItem = (item: CartItem, newQty: number, newMode?: "retail" | "wholesale"): CartItem => {
+    const mode = newMode || item.mode || cartMode;
+    const pricing = calculateProductPricing(
+      {
+        price: item.price,
+        retailPrice: item.retailPrice,
+        wholesalePrice: item.wholesalePrice,
+        wholesaleTiers: item.wholesaleTiers,
+      },
+      newQty,
+      mode,
+    );
+    return {
+      ...item,
+      quantity: newQty,
+      mode,
+      price: pricing.unitPrice,
+      tierLabel: pricing.tierLabel,
+      unitPrice: pricing.tierLabel || `${pricing.unitPrice.toLocaleString("fa-IR")} تومان`,
+    };
+  };
+
   const addItem = (
     product: {
       id: number;
       name: string;
       images: string[];
       price: number;
+      retailPrice?: number;
+      wholesalePrice?: number;
+      wholesaleTiers?: WholesaleTierItem[];
       unitPrice?: string;
     },
     quantity = 1,
+    mode?: "retail" | "wholesale",
   ) => {
+    const targetMode = mode || cartMode;
+    const addQty = Math.max(1, quantity);
+
     setItems((prev) => {
       const existingIdx = prev.findIndex((it) => it.productId === product.id);
       if (existingIdx !== -1) {
+        const existing = prev[existingIdx];
+        const newQty = existing.quantity + addQty;
+        const updated = recalculateItem(existing, newQty, targetMode);
         const copy = [...prev];
-        copy[existingIdx] = {
-          ...copy[existingIdx],
-          quantity: copy[existingIdx].quantity + quantity,
-        };
+        copy[existingIdx] = updated;
         return copy;
       }
-      return [
-        ...prev,
-        {
-          productId: product.id,
-          productName: product.name,
-          productImage: product.images[0] || "/images/products/foam-bottle.png",
-          price: product.price,
-          unitPrice: product.unitPrice,
-          quantity: Math.max(1, quantity),
-        },
-      ];
+
+      const pricing = calculateProductPricing(product, addQty, targetMode);
+      const newItem: CartItem = {
+        productId: product.id,
+        productName: product.name,
+        productImage: product.images[0] || "/images/redesign/cat-foam.jpg",
+        price: pricing.unitPrice,
+        retailPrice: product.retailPrice,
+        wholesalePrice: product.wholesalePrice,
+        wholesaleTiers: product.wholesaleTiers,
+        unitPrice: pricing.tierLabel || product.unitPrice,
+        quantity: addQty,
+        mode: targetMode,
+        tierLabel: pricing.tierLabel,
+      };
+      return [...prev, newItem];
     });
     setIsOpen(true);
   };
@@ -100,7 +157,23 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     setItems((prev) =>
-      prev.map((it) => (it.productId === productId ? { ...it, quantity } : it)),
+      prev.map((it) => {
+        if (it.productId === productId) {
+          return recalculateItem(it, quantity);
+        }
+        return it;
+      }),
+    );
+  };
+
+  const setItemMode = (productId: number, mode: "retail" | "wholesale") => {
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.productId === productId) {
+          return recalculateItem(it, it.quantity, mode);
+        }
+        return it;
+      }),
     );
   };
 
@@ -118,6 +191,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     [items],
   );
 
+  const totalWholesaleSavings = useMemo(() => {
+    return items.reduce((sum, it) => {
+      const retailSingle = it.retailPrice && it.retailPrice > 0 ? it.retailPrice : it.price;
+      const nominalRetailTotal = retailSingle * it.quantity;
+      const actualTotal = it.price * it.quantity;
+      return sum + Math.max(0, nominalRetailTotal - actualTotal);
+    }, 0);
+  }, [items]);
+
   const openCart = () => setIsOpen(true);
   const closeCart = () => setIsOpen(false);
   const toggleCart = () => setIsOpen((v) => !v);
@@ -126,12 +208,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     <CartContext.Provider
       value={{
         items,
+        cartMode,
+        setCartMode,
         addItem,
         removeItem,
         updateQuantity,
+        setItemMode,
         clearCart,
         totalCount,
         totalAmount,
+        totalWholesaleSavings,
         isOpen,
         openCart,
         closeCart,

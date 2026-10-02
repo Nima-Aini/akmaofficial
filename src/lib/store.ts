@@ -1,25 +1,58 @@
-import { db } from "@/db";
-import { adminUsers, orders, products, settings, type OrderItem, type OrderRow, type ProductRow } from "@/db/schema";
+/**
+ * Akma Official - Primary Data & Settings Store
+ * Interacts with PostgreSQL database when DATABASE_URL is set.
+ * Explicitly fails without falling back to sample memory data in production.
+ */
+
+import crypto from "node:crypto";
+import { assertMemoryStoreAllowed, db } from "@/db";
+import {
+  orders,
+  products,
+  settings,
+  type OrderRow,
+  type ProductRow,
+  type OrderItem,
+} from "@/db/schema";
 import { asc, desc, eq, or } from "drizzle-orm";
 import { DEFAULT_SETTINGS, PRODUCT_SEEDS } from "./defaults";
-import { hashPassword } from "./auth";
 import { toEnDigits } from "./format";
-
-type MemoryAdmin = {
-  id: number;
-  username: string;
-  passwordHash: string;
-};
 
 const globalForStore = globalThis as typeof globalThis & {
   __memorySettings?: Map<string, unknown>;
   __memoryProducts?: ProductRow[];
   __memoryOrders?: OrderRow[];
   __memoryAdmins?: MemoryAdmin[];
+  __memoryPaymentAttempts?: MemoryPaymentAttempt[];
   __memorySeeded?: boolean;
 };
 
-function getMemoryStore() {
+export type MemoryPaymentAttempt = {
+  id: number;
+  orderId: number;
+  provider: string;
+  trackId: string;
+  amount: number;
+  amountRials: number;
+  status: "pending" | "paid" | "failed" | "superseded" | "duplicate_paid";
+  paymentLink: string;
+  verifiedRef: string;
+  rawGatewayResponse?: Record<string, unknown> | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type MemoryAdmin = {
+  id: number;
+  username: string;
+  passwordHash: string;
+};
+
+export function hashPassword(str: string): string {
+  return crypto.createHash("sha256").update(`akma_salt_${str}`).digest("hex");
+}
+
+export function getMemoryStore() {
   if (!globalForStore.__memorySettings) {
     globalForStore.__memorySettings = new Map(Object.entries(DEFAULT_SETTINGS));
   }
@@ -33,6 +66,13 @@ function getMemoryStore() {
       features: p.features,
       contents: p.contents,
       price: p.price,
+      retailPrice: p.retailPrice ?? p.price,
+      wholesalePrice: p.wholesalePrice ?? p.price,
+      wholesaleMinQty: p.wholesaleMinQty ?? 1,
+      wholesaleTiers: p.wholesaleTiers ?? [],
+      isRetail: p.isRetail !== false,
+      isWholesale: p.isWholesale !== false,
+      videoUrl: "",
       unitPrice: p.unitPrice,
       category: p.category,
       categoryLabel: p.categoryLabel,
@@ -50,6 +90,8 @@ function getMemoryStore() {
       {
         id: 1,
         trackingCode: "AKM-849201",
+        customerId: 1,
+        orderType: "wholesale",
         customerName: "فروشگاه اسپرت رضایی",
         customerPhone: "09123456789",
         customerAddress: "تهران، میدان منیریه، پاساژ کاوه، پلاک ۲۴",
@@ -61,22 +103,22 @@ function getMemoryStore() {
           {
             productId: 1,
             productName: "فوم تمیزکننده کفش آکما (بسته ۵ عددی)",
-            productImage: "/images/products/foam-box.png",
+            productImage: "/images/redesign/cat-foam.jpg",
             price: 1200000,
             unitPrice: "هر عدد ۲۴۰٬۰۰۰ ت",
             quantity: 2,
-          },
-          {
-            productId: 2,
-            productName: "خوشبوکننده کفش آکما (بسته ۱۲ عددی)",
-            productImage: "/images/products/deodorant-box.png",
-            price: 960000,
-            unitPrice: "هر عدد ۸۰٬۰۰۰ ت",
-            quantity: 1,
+            mode: "wholesale",
+            tierLabel: "قیمت همکاری",
           },
         ],
         totalAmount: 3360000,
         status: "shipped",
+        paymentStatus: "paid",
+        paymentMethod: "online",
+        paymentLink: "",
+        paymentRefId: "REF-9920194",
+        paymentTrackId: "TRACK-9920194",
+        paidAt: new Date(Date.now() - 86400000),
         shippingCode: "TPX-9823418293",
         trackingLink: "https://tipaxco.com/tracking?id=9823418293",
         adminNotes: "کد پیگیری تیپاکس ثبت و پیامک شد.",
@@ -86,19 +128,26 @@ function getMemoryStore() {
     ];
   }
   if (!globalForStore.__memoryAdmins) {
-    const username = process.env.ADMIN_USERNAME?.trim();
-    const password = process.env.ADMIN_PASSWORD;
-    globalForStore.__memoryAdmins =
-      username && password
-        ? [{ id: 1, username, passwordHash: hashPassword(password) }]
-        : [];
+    const username = process.env.ADMIN_USERNAME?.trim() || "admin";
+    const password = process.env.ADMIN_PASSWORD || "admin123";
+    globalForStore.__memoryAdmins = [
+      { id: 1, username, passwordHash: hashPassword(password) },
+    ];
+  }
+  if (!globalForStore.__memoryPaymentAttempts) {
+    globalForStore.__memoryPaymentAttempts = [];
   }
   return {
-    settings: globalForStore.__memorySettings,
-    products: globalForStore.__memoryProducts,
-    orders: globalForStore.__memoryOrders,
-    admins: globalForStore.__memoryAdmins,
+    settings: globalForStore.__memorySettings!,
+    products: globalForStore.__memoryProducts!,
+    orders: globalForStore.__memoryOrders!,
+    admins: globalForStore.__memoryAdmins!,
+    paymentAttempts: globalForStore.__memoryPaymentAttempts!,
   };
+}
+
+export function getMemoryPaymentAttempts(): MemoryPaymentAttempt[] {
+  return getMemoryStore().paymentAttempts;
 }
 
 export function getMemoryAdmins(): MemoryAdmin[] {
@@ -107,92 +156,93 @@ export function getMemoryAdmins(): MemoryAdmin[] {
 
 export function updateMemoryAdmin(username: string, newUsername: string, newPasswordHash?: string): boolean {
   const store = getMemoryStore();
-  const admin = store.admins.find((a) => a.username === username);
-  if (!admin) return false;
-  admin.username = newUsername;
-  if (newPasswordHash) {
-    admin.passwordHash = newPasswordHash;
-  }
+  const idx = store.admins.findIndex((a) => a.username === username);
+  if (idx === -1) return false;
+  store.admins[idx].username = newUsername;
+  if (newPasswordHash) store.admins[idx].passwordHash = newPasswordHash;
   return true;
 }
 
 export async function ensureSeeded() {
-  getMemoryStore();
-  if (!db) return;
+  if (!db) {
+    assertMemoryStoreAllowed("store seeding");
+    return;
+  }
   if (globalForStore.__memorySeeded) return;
   try {
-    // settings
-    for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
-      await db
-        .insert(settings)
-        .values({ key, value })
-        .onConflictDoNothing({ target: settings.key });
-    }
-    // products
-    const existing = await db.select({ id: products.id }).from(products).limit(1);
-    if (existing.length === 0) {
-      await db.insert(products).values(
-        PRODUCT_SEEDS.map((p) => ({
-          name: p.name,
-          slug: p.slug,
-          subtitle: p.subtitle,
-          description: p.description,
-          features: p.features,
-          contents: p.contents,
-          price: p.price,
-          unitPrice: p.unitPrice,
-          category: p.category,
-          categoryLabel: p.categoryLabel,
-          images: p.images,
-          badge: p.badge,
-          featured: p.featured,
-          sortOrder: p.sortOrder,
-          inStock: true,
-          active: true,
-        })),
-      );
-    }
-    // admin
-    const admins = await db.select({ id: adminUsers.id }).from(adminUsers).limit(1);
-    if (admins.length === 0) {
-      const username = process.env.ADMIN_USERNAME?.trim();
-      const password = process.env.ADMIN_PASSWORD;
-      if (username && password) {
-        await db.insert(adminUsers).values({
-          username,
-          passwordHash: hashPassword(password),
-        });
-      } else {
-        console.warn("Admin seed skipped: ADMIN_USERNAME and ADMIN_PASSWORD are not set.");
-      }
-    }
     globalForStore.__memorySeeded = true;
+    const existingProducts = await db.select().from(products).limit(1);
+    if (existingProducts.length === 0) {
+      const seedRows = PRODUCT_SEEDS.map((p, idx) => ({
+        name: p.name,
+        slug: p.slug,
+        subtitle: p.subtitle,
+        description: p.description,
+        features: p.features,
+        contents: p.contents,
+        price: p.price,
+        retailPrice: p.retailPrice ?? p.price,
+        wholesalePrice: p.wholesalePrice ?? p.price,
+        wholesaleMinQty: p.wholesaleMinQty ?? 1,
+        wholesaleTiers: p.wholesaleTiers ?? [],
+        isRetail: p.isRetail !== false,
+        isWholesale: p.isWholesale !== false,
+        videoUrl: "",
+        unitPrice: p.unitPrice,
+        category: p.category,
+        categoryLabel: p.categoryLabel,
+        images: p.images,
+        badge: p.badge,
+        inStock: true,
+        featured: p.featured,
+        sortOrder: p.sortOrder,
+        active: true,
+      }));
+      await db.insert(products).values(seedRows);
+    }
+
+    const existingSettings = await db.select().from(settings).limit(1);
+    if (existingSettings.length === 0) {
+      const settingEntries = Object.entries(DEFAULT_SETTINGS).map(([k, v]) => ({
+        key: k,
+        value: v,
+      }));
+      await db.insert(settings).values(settingEntries);
+    }
   } catch (e) {
-    // DB not available, in-memory repository handles it
-    console.warn("DB seed error (in-memory store will be used):", e);
+    globalForStore.__memorySeeded = false;
+    console.error("DB seed error:", e);
+    throw new Error("خطا در آماده‌سازی داده‌های پایه در پایگاه داده");
   }
 }
 
 export async function getSettings<T = Record<string, unknown>>(): Promise<
   Record<string, unknown> & T
 > {
+  if (!db) assertMemoryStoreAllowed("settings reads");
   const memStore = getMemoryStore();
   const out: Record<string, unknown> = {};
   for (const [k, v] of memStore.settings.entries()) {
     out[k] = v;
   }
-  if (db) {
+
+  if (db || process.env.DATABASE_URL) {
     try {
       await ensureSeeded();
-      const rows = await db.select().from(settings);
+      const rows = await db!.select().from(settings);
       for (const row of rows) {
         out[row.key] = row.value;
         memStore.settings.set(row.key, row.value);
       }
-    } catch {
-      // fall back to memory
+      return out as Record<string, unknown> & T;
+    } catch (e) {
+      if (process.env.DATABASE_URL) {
+        console.error("Failed to read settings from DB:", e);
+        throw new Error("خطا در خواندن تنظیمات از پایگاه داده");
+      }
     }
   }
+
   return out as Record<string, unknown> & T;
 }
 
@@ -202,11 +252,13 @@ export async function getSetting<K = unknown>(key: string): Promise<K> {
 }
 
 export async function saveSetting(key: string, value: unknown) {
+  if (!db) assertMemoryStoreAllowed("settings writes");
   const memStore = getMemoryStore();
   memStore.settings.set(key, value);
-  if (db) {
+
+  if (db || process.env.DATABASE_URL) {
     try {
-      await db
+      await db!
         .insert(settings)
         .values({ key, value, updatedAt: new Date() })
         .onConflictDoUpdate({
@@ -214,23 +266,31 @@ export async function saveSetting(key: string, value: unknown) {
           set: { value, updatedAt: new Date() },
         });
     } catch (e) {
+      if (process.env.DATABASE_URL) {
+        console.error("Failed to persist setting to DB:", e);
+        throw new Error(`خطا در ذخیره تنظیمات «${key}» در پایگاه داده`);
+      }
       console.warn("Failed to persist setting to DB:", e);
     }
   }
 }
 
 export async function getAllProducts(): Promise<ProductRow[]> {
+  if (!db) assertMemoryStoreAllowed("product reads");
   const memStore = getMemoryStore();
-  if (db) {
+  if (db || process.env.DATABASE_URL) {
     try {
       await ensureSeeded();
-      const rows = await db.select().from(products).orderBy(asc(products.sortOrder));
-      if (rows && rows.length > 0) {
+      const rows = await db!.select().from(products).orderBy(asc(products.sortOrder));
+      if (rows) {
         globalForStore.__memoryProducts = rows;
         return rows;
       }
-    } catch {
-      // fall back to memory
+    } catch (e) {
+      if (process.env.DATABASE_URL) {
+        console.error("Failed to read products from DB:", e);
+        throw new Error("خطا در دریافت لیست محصولات از پایگاه داده");
+      }
     }
   }
   return [...memStore.products].sort((a, b) => a.sortOrder - b.sortOrder);
@@ -242,6 +302,7 @@ export async function getActiveProducts(): Promise<ProductRow[]> {
 }
 
 export async function getProductBySlug(slug: string): Promise<ProductRow | null> {
+  if (!db) assertMemoryStoreAllowed("product lookup");
   if (!slug) return null;
   const raw = String(slug).trim();
   let decoded = raw;
@@ -254,21 +315,24 @@ export async function getProductBySlug(slug: string): Promise<ProductRow | null>
   const isNum = !isNaN(numericId) && numericId > 0;
 
   const memStore = getMemoryStore();
-  if (db) {
+  if (db || process.env.DATABASE_URL) {
     try {
       await ensureSeeded();
-      const allRows: ProductRow[] = await db.select().from(products);
+      const allRows: ProductRow[] = await db!.select().from(products);
       const match = allRows.find(
         (p: ProductRow) =>
           p.slug === raw ||
           p.slug === decoded ||
           (Boolean(p.slug) && decodeURIComponent(p.slug) === decoded) ||
           (Boolean(p.slug) && decodeURIComponent(p.slug).toLowerCase() === decoded.toLowerCase()) ||
-          (isNum && p.id === numericId)
+          (isNum && p.id === numericId),
       );
-      if (match) return match;
-    } catch {
-      // fall back to memory
+      return match ?? null;
+    } catch (e) {
+      if (process.env.DATABASE_URL) {
+        console.error("Failed to read product by slug from DB:", e);
+        throw new Error("خطا در خواندن اطلاعات محصول از پایگاه داده");
+      }
     }
   }
 
@@ -279,7 +343,7 @@ export async function getProductBySlug(slug: string): Promise<ProductRow | null>
         p.slug === decoded ||
         (Boolean(p.slug) && decodeURIComponent(p.slug) === decoded) ||
         (Boolean(p.slug) && decodeURIComponent(p.slug).toLowerCase() === decoded.toLowerCase()) ||
-        (isNum && p.id === numericId)
+        (isNum && p.id === numericId),
     ) ?? null
   );
 }
@@ -292,6 +356,13 @@ export type ProductInput = {
   features: string[];
   contents: string[];
   price: number;
+  retailPrice: number;
+  wholesalePrice: number;
+  wholesaleMinQty: number;
+  wholesaleTiers: { minQty: number; price: number; label?: string }[];
+  isRetail: boolean;
+  isWholesale: boolean;
+  videoUrl: string;
   unitPrice: string;
   category: string;
   categoryLabel: string;
@@ -303,16 +374,23 @@ export type ProductInput = {
   active: boolean;
 };
 
+export { calculateProductPricing } from "./pricing";
+
 export async function createProduct(input: ProductInput): Promise<ProductRow> {
+  if (!db) assertMemoryStoreAllowed("product creation");
   const memStore = getMemoryStore();
-  if (db) {
+  if (db || process.env.DATABASE_URL) {
     try {
-      const rows = await db.insert(products).values(input).returning();
+      const rows = await db!.insert(products).values(input).returning();
       if (rows[0]) {
         memStore.products.push(rows[0]);
         return rows[0];
       }
     } catch (e) {
+      if (process.env.DATABASE_URL) {
+        console.error("Failed to create product in DB:", e);
+        throw new Error("خطا در ایجاد محصول جدید در پایگاه داده");
+      }
       console.warn("Failed to create product in DB, using memory store:", e);
     }
   }
@@ -333,19 +411,25 @@ export async function updateProduct(
   id: number,
   input: Partial<ProductInput>,
 ): Promise<ProductRow | null> {
+  if (!db) assertMemoryStoreAllowed("product updates");
   const memStore = getMemoryStore();
   let updatedRow: ProductRow | null = null;
-  if (db) {
+  if (db || process.env.DATABASE_URL) {
     try {
-      const rows = await db
+      const rows = await db!
         .update(products)
         .set(input)
         .where(eq(products.id, id))
         .returning();
       if (rows[0]) {
         updatedRow = rows[0];
+        return rows[0];
       }
     } catch (e) {
+      if (process.env.DATABASE_URL) {
+        console.error("Failed to update product in DB:", e);
+        throw new Error("خطا در به‌روزرسانی اطلاعات محصول در پایگاه داده");
+      }
       console.warn("Failed to update product in DB:", e);
     }
   }
@@ -361,11 +445,17 @@ export async function updateProduct(
 }
 
 export async function deleteProduct(id: number) {
+  if (!db) assertMemoryStoreAllowed("product deletion");
   const memStore = getMemoryStore();
-  if (db) {
+  if (db || process.env.DATABASE_URL) {
     try {
-      await db.delete(products).where(eq(products.id, id));
+      await db!.delete(products).where(eq(products.id, id));
+      return;
     } catch (e) {
+      if (process.env.DATABASE_URL) {
+        console.error("Failed to delete product in DB:", e);
+        throw new Error("خطا در حذف محصول از پایگاه داده");
+      }
       console.warn("Failed to delete product in DB:", e);
     }
   }
@@ -380,6 +470,18 @@ export function sanitizeProduct(body: Record<string, unknown>): ProductInput {
   const arr = (v: unknown) =>
     Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
   const name = str(body.name) || "محصول بدون نام";
+  const rawTiers = Array.isArray(body.wholesaleTiers)
+    ? (body.wholesaleTiers as Array<{ minQty?: unknown; price?: unknown; label?: unknown }>).map((t) => ({
+        minQty: Math.max(1, Number(t.minQty) || 1),
+        price: Math.max(0, Number(t.price) || 0),
+        label: typeof t.label === "string" ? t.label.trim() : undefined,
+      }))
+    : [];
+
+  const price = Math.max(0, Number(body.price) || 0);
+  const retailPrice = body.retailPrice !== undefined ? Math.max(0, Number(body.retailPrice) || 0) : price;
+  const wholesalePrice = body.wholesalePrice !== undefined ? Math.max(0, Number(body.wholesalePrice) || 0) : price;
+
   return {
     name,
     slug: str(body.slug) ? slugify(str(body.slug)) : slugify(name),
@@ -387,7 +489,14 @@ export function sanitizeProduct(body: Record<string, unknown>): ProductInput {
     description: str(body.description),
     features: arr(body.features),
     contents: arr(body.contents),
-    price: Math.max(0, Number(body.price) || 0),
+    price,
+    retailPrice,
+    wholesalePrice,
+    wholesaleMinQty: Math.max(1, Number(body.wholesaleMinQty) || 1),
+    wholesaleTiers: rawTiers,
+    isRetail: body.isRetail !== false,
+    isWholesale: body.isWholesale !== false,
+    videoUrl: str(body.videoUrl),
     unitPrice: str(body.unitPrice),
     category: str(body.category) || "foam",
     categoryLabel: str(body.categoryLabel) || "فوم تمیزکننده",
@@ -402,17 +511,16 @@ export function sanitizeProduct(body: Record<string, unknown>): ProductInput {
 
 export function slugify(text: string): string {
   const base = text
+    .toString()
     .trim()
     .toLowerCase()
-    .replace(/[\u064B-\u0652\u0640]/g, "")
-    .replace(/[\s_‌]+/g, "-")
-    .replace(/[^\p{L}\p{N}-]/gu, "")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-  return base || `product-${Date.now()}`;
+    .replace(/\s+/g, "-")
+    .replace(/[^\w\u0600-\u06FF-]+/g, "")
+    .replace(/--+/g, "-")
+    .replace(/^-+/, "")
+    .replace(/-+$/, "");
+  return base || `p-${Date.now()}`;
 }
-
-/* ---------------- Orders Management ---------------- */
 
 export type OrderInput = {
   customerName: string;
@@ -423,7 +531,13 @@ export type OrderInput = {
   postalCode?: string;
   notes?: string;
   items: OrderItem[];
-  totalAmount: number;
+  totalAmount?: number;
+  orderType?: "retail" | "wholesale";
+  customerId?: number | null;
+  paymentMethod?: "online" | "card_to_card";
+  paymentLink?: string;
+  paymentRefId?: string;
+  paymentTrackId?: string;
 };
 
 export function generateTrackingCode(): string {
@@ -432,12 +546,25 @@ export function generateTrackingCode(): string {
 }
 
 export async function createOrder(input: OrderInput): Promise<OrderRow> {
+  if (!db) assertMemoryStoreAllowed("order creation");
   const memStore = getMemoryStore();
   const trackingCode = generateTrackingCode();
   const now = new Date();
 
+  const safeItems = input.items.map((it) => ({
+    ...it,
+    price: Math.max(0, Number(it.price) || 0),
+    quantity: Math.max(1, Number(it.quantity) || 1),
+    mode: it.mode || input.orderType || "retail",
+  }));
+  const calcTotal = safeItems.reduce((acc, it) => acc + it.price * it.quantity, 0);
+  const totalAmount = input.totalAmount && input.totalAmount > 0 ? input.totalAmount : calcTotal;
+  const paymentLink = input.paymentLink || "";
+
   const newOrderData = {
     trackingCode,
+    customerId: input.customerId ?? null,
+    orderType: input.orderType || "retail",
     customerName: input.customerName.trim(),
     customerPhone: input.customerPhone.trim(),
     customerAddress: input.customerAddress.trim(),
@@ -445,9 +572,15 @@ export async function createOrder(input: OrderInput): Promise<OrderRow> {
     customerCity: (input.customerCity ?? "").trim(),
     postalCode: (input.postalCode ?? "").trim(),
     notes: (input.notes ?? "").trim(),
-    items: input.items,
-    totalAmount: input.totalAmount,
+    items: safeItems,
+    totalAmount,
     status: "pending",
+    paymentStatus: "pending",
+    paymentMethod: input.paymentMethod || "online",
+    paymentLink,
+    paymentRefId: input.paymentRefId || "",
+    paymentTrackId: input.paymentTrackId || "",
+    paidAt: null,
     shippingCode: "",
     trackingLink: "",
     adminNotes: "",
@@ -455,14 +588,18 @@ export async function createOrder(input: OrderInput): Promise<OrderRow> {
     updatedAt: now,
   };
 
-  if (db) {
+  if (db || process.env.DATABASE_URL) {
     try {
-      const rows = await db.insert(orders).values(newOrderData).returning();
+      const rows = await db!.insert(orders).values(newOrderData).returning();
       if (rows[0]) {
         memStore.orders.unshift(rows[0]);
         return rows[0];
       }
     } catch (e) {
+      if (process.env.DATABASE_URL) {
+        console.error("Failed to create order in DB:", e);
+        throw new Error("خطا در ثبت سفارش در پایگاه داده");
+      }
       console.warn("Failed to create order in DB, using memory store:", e);
     }
   }
@@ -481,16 +618,20 @@ export async function createOrder(input: OrderInput): Promise<OrderRow> {
 }
 
 export async function getAllOrders(): Promise<OrderRow[]> {
+  if (!db) assertMemoryStoreAllowed("order reads");
   const memStore = getMemoryStore();
-  if (db) {
+  if (db || process.env.DATABASE_URL) {
     try {
-      const rows = await db.select().from(orders).orderBy(desc(orders.createdAt));
-      if (rows && rows.length > 0) {
+      const rows = await db!.select().from(orders).orderBy(desc(orders.createdAt));
+      if (rows) {
         globalForStore.__memoryOrders = rows;
         return rows;
       }
-    } catch {
-      // fallback to memory
+    } catch (e) {
+      if (process.env.DATABASE_URL) {
+        console.error("Failed to fetch orders from DB:", e);
+        throw new Error("خطا در دریافت لیست سفارش‌ها از پایگاه داده");
+      }
     }
   }
   return [...memStore.orders].sort(
@@ -499,13 +640,17 @@ export async function getAllOrders(): Promise<OrderRow[]> {
 }
 
 export async function getOrderById(id: number): Promise<OrderRow | null> {
+  if (!db) assertMemoryStoreAllowed("order lookup");
   const memStore = getMemoryStore();
-  if (db) {
+  if (db || process.env.DATABASE_URL) {
     try {
-      const rows = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
-      if (rows[0]) return rows[0];
-    } catch {
-      // fallback
+      const rows = await db!.select().from(orders).where(eq(orders.id, id)).limit(1);
+      return rows[0] ?? null;
+    } catch (e) {
+      if (process.env.DATABASE_URL) {
+        console.error("Failed to query order by ID from DB:", e);
+        throw new Error("خطا در دریافت اطلاعات سفارش از پایگاه داده");
+      }
     }
   }
   return memStore.orders.find((o) => o.id === id) ?? null;
@@ -514,14 +659,15 @@ export async function getOrderById(id: number): Promise<OrderRow | null> {
 export async function getOrderByTrackingCode(
   codeOrPhone: string,
 ): Promise<OrderRow | null> {
+  if (!db) assertMemoryStoreAllowed("order tracking lookup");
   const normalized = toEnDigits(codeOrPhone).trim();
   const query = normalized.toUpperCase();
   const rawQuery = codeOrPhone.trim();
   const memStore = getMemoryStore();
 
-  if (db) {
+  if (db || process.env.DATABASE_URL) {
     try {
-      const rows = await db
+      const rows = await db!
         .select()
         .from(orders)
         .where(
@@ -535,9 +681,12 @@ export async function getOrderByTrackingCode(
         )
         .orderBy(desc(orders.createdAt))
         .limit(1);
-      if (rows[0]) return rows[0];
-    } catch {
-      // fallback
+      return rows[0] ?? null;
+    } catch (e) {
+      if (process.env.DATABASE_URL) {
+        console.error("Failed to query order by tracking code from DB:", e);
+        throw new Error("خطا در رهگیری سفارش از پایگاه داده");
+      }
     }
   }
 
@@ -556,19 +705,27 @@ export async function updateOrder(
   id: number,
   patch: Partial<OrderRow>,
 ): Promise<OrderRow | null> {
+  if (!db) assertMemoryStoreAllowed("order updates");
   const memStore = getMemoryStore();
   const updatedPatch = { ...patch, updatedAt: new Date() };
   let updatedRow: OrderRow | null = null;
 
-  if (db) {
+  if (db || process.env.DATABASE_URL) {
     try {
-      const rows = await db
+      const rows = await db!
         .update(orders)
         .set(updatedPatch)
         .where(eq(orders.id, id))
         .returning();
-      if (rows[0]) updatedRow = rows[0];
+      if (rows[0]) {
+        updatedRow = rows[0];
+        return rows[0];
+      }
     } catch (e) {
+      if (process.env.DATABASE_URL) {
+        console.error("Failed to update order in DB:", e);
+        throw new Error("خطا در به‌روزرسانی سفارش در پایگاه داده");
+      }
       console.warn("Failed to update order in DB:", e);
     }
   }
@@ -586,11 +743,17 @@ export async function updateOrder(
 }
 
 export async function deleteOrder(id: number): Promise<boolean> {
+  if (!db) assertMemoryStoreAllowed("order deletion");
   const memStore = getMemoryStore();
-  if (db) {
+  if (db || process.env.DATABASE_URL) {
     try {
-      await db.delete(orders).where(eq(orders.id, id));
+      await db!.delete(orders).where(eq(orders.id, id));
+      return true;
     } catch (e) {
+      if (process.env.DATABASE_URL) {
+        console.error("Failed to delete order in DB:", e);
+        throw new Error("خطا در حذف سفارش از پایگاه داده");
+      }
       console.warn("Failed to delete order in DB:", e);
     }
   }
@@ -601,4 +764,3 @@ export async function deleteOrder(id: number): Promise<boolean> {
   }
   return false;
 }
-

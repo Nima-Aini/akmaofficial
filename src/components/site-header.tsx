@@ -1,20 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { Menu, Phone, X, Sparkle, ShoppingBag, SearchCheck } from "lucide-react";
-import { telHref, toFa } from "@/lib/format";
+import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import {
+  Menu,
+  X,
+  ShoppingBag,
+  User,
+  Heart,
+  ChevronDown,
+  Layers,
+  Sparkle,
+  Phone,
+  Search,
+} from "lucide-react";
 import { useCart } from "@/context/cart-context";
-import { SectionLink } from "@/components/section-link";
+import { toFa } from "@/lib/format";
 
-const NAV = [
-  { label: "خانه", href: "/" },
-  { label: "محصولات", href: "/products" },
-  { label: "وبلاگ", href: "/blog" },
-  { label: "قیمت واحد", href: "/#price-table" },
-  { label: "راهنمای سفارش", href: "/#how-to-order" },
-  { label: "پیگیری سفارش", href: "/track" },
-  { label: "تماس با ما", href: "/contact" },
+type CategoryNav = {
+  key: string;
+  label: string;
+  image?: string;
+  href: string;
+};
+
+const CATEGORIES_LIST: CategoryNav[] = [
+  { key: "foam", label: "تمیزکننده کفش", image: "/images/redesign/cat-foam.jpg", href: "/products?cat=foam" },
+  { key: "wax", label: "واکس و براق کننده", image: "/images/redesign/cat-wax.jpg", href: "/products?cat=wax" },
+  { key: "freshener", label: "بوگیر کفش", image: "/images/redesign/cat-spray.jpg", href: "/products?cat=freshener" },
+  { key: "tools", label: "ابزار و لوازم جانبی", image: "/images/redesign/cat-tools.jpg", href: "/products?cat=tools" },
+  { key: "bundle", label: "پک‌های ویژه و استند", image: "/images/redesign/cat-packs.jpg", href: "/products?cat=bundle" },
 ];
 
 export function SiteHeader({
@@ -26,131 +42,279 @@ export function SiteHeader({
   latin: string;
   phone: string;
 }) {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
+  const [catMenuOpen, setCatMenuOpen] = useState(false);
+  const [customer, setCustomer] = useState<{ name?: string; phone?: string } | null>(null);
+  const [wishlistCount, setWishlistCount] = useState(0);
   const { totalCount, openCart } = useCart();
+  const catMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 24);
-    fn();
-    window.addEventListener("scroll", fn, { passive: true });
-    return () => window.removeEventListener("scroll", fn);
+    // Check customer session
+    fetch("/api/customer/auth")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.authenticated && data.customer) {
+          setCustomer(data.customer);
+        }
+      })
+      .catch(() => {});
+
+    // Saved wishlist items in localStorage
+    try {
+      const saved = localStorage.getItem("akma_wishlist");
+      if (saved) {
+        const list = JSON.parse(saved);
+        if (Array.isArray(list)) {
+          queueMicrotask(() => setWishlistCount(list.length));
+        }
+      }
+    } catch {}
+
+    const handleOutside = (e: MouseEvent) => {
+      if (catMenuRef.current && !catMenuRef.current.contains(e.target as Node)) {
+        setCatMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
   }, []);
+
+  const navLinks = [
+    { label: "خانه", href: "/" },
+    { label: "محصولات", href: "/products" },
+    { label: "خرید عمده", href: "/products?mode=wholesale", highlight: true },
+    { label: "درباره ما", href: "/#about-us" },
+    { label: "مقالات", href: "/blog" },
+    { label: "تماس با ما", href: "/contact" },
+  ];
 
   return (
     <>
-      <header
-        className={`fixed top-0 right-0 left-0 z-50 transition-all duration-500 ${
-          scrolled
-            ? "backdrop-blur-xl bg-bg/80 border-b border-line"
-            : "bg-transparent border-b border-transparent"
-        }`}
-      >
-        <div className="mx-auto max-w-7xl px-5 lg:px-8">
-          <div className="flex h-[72px] items-center justify-between gap-4">
-            <Link href="/" className="group flex items-center gap-3" onClick={() => setOpen(false)}>
-              <span className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-accent2 to-accent text-on-accent shadow-lg shadow-accent/20 transition-transform duration-300 group-hover:rotate-6">
-                <Sparkle size={20} strokeWidth={2.2} />
-              </span>
-              <span className="leading-none">
-                <span className="block text-xl font-black">{name}</span>
-                <span className="block text-[10px] font-bold tracking-[0.35em] text-muted">
-                  {latin}
-                </span>
-              </span>
-            </Link>
-
-            <nav className="hidden items-center gap-6 lg:flex">
-              {NAV.map((n) => n.href.startsWith("/#") ? (
-                <SectionLink
-                  key={n.href}
-                  href={n.href as `/#${string}`}
-                  className="link-underline text-sm font-medium text-muted transition-colors hover:text-ink"
+      <header className="sticky top-0 right-0 left-0 z-50 bg-[#FAF8F5]/95 backdrop-blur-md border-b border-[#E7E3DC] transition-all">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex h-20 items-center justify-between gap-4">
+            {/* RIGHT SIDE: Category Dropdown & Navigation Links */}
+            <div className="flex items-center gap-6">
+              {/* Category Pill Button (Matching Reference) */}
+              <div className="relative" ref={catMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setCatMenuOpen(!catMenuOpen)}
+                  className="hidden md:inline-flex items-center gap-2.5 rounded-full bg-[#8E111E] hover:bg-[#780E19] text-white px-5 py-2.5 text-xs font-black shadow-md shadow-[#8E111E]/20 transition-transform active:scale-95"
                 >
-                  {n.label}
-                </SectionLink>
-              ) : <Link key={n.href} href={n.href} className="link-underline text-sm font-medium text-muted transition-colors hover:text-ink">{n.label}</Link>)}
-            </nav>
+                  <Menu size={16} strokeWidth={2.5} />
+                  <span>دسته‌بندی محصولات</span>
+                  <ChevronDown
+                    size={14}
+                    className={`transition-transform duration-200 ${catMenuOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
 
-            <div className="flex items-center gap-2.5">
-              {/* Cart Drawer Trigger Button */}
+                {/* Category Dropdown Menu */}
+                {catMenuOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-64 rounded-2xl border border-[#E7E3DC] bg-white p-3 shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <p className="px-3 py-1.5 text-[11px] font-bold text-[#8C827A]">
+                      دسته‌بندی‌های مراقبت از کفش
+                    </p>
+                    <div className="mt-1 space-y-1">
+                      {CATEGORIES_LIST.map((cat) => (
+                        <Link
+                          key={cat.key}
+                          href={cat.href}
+                          onClick={() => setCatMenuOpen(false)}
+                          className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-bold text-[#2A2421] hover:bg-[#FAF6F0] hover:text-[#8E111E] transition-colors"
+                        >
+                          {cat.image ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={cat.image}
+                              alt={cat.label}
+                              className="size-8 rounded-lg object-cover border border-[#E7E3DC]"
+                            />
+                          ) : (
+                            <span className="grid size-8 place-items-center rounded-lg bg-[#8E111E]/10 text-[#8E111E]">
+                              <Layers size={15} />
+                            </span>
+                          )}
+                          <span>{cat.label}</span>
+                        </Link>
+                      ))}
+                    </div>
+                    <div className="mt-2 border-t border-[#E7E3DC] pt-2">
+                      <Link
+                        href="/products"
+                        onClick={() => setCatMenuOpen(false)}
+                        className="flex items-center justify-between px-3 py-1.5 text-[11px] font-black text-[#8E111E] hover:underline"
+                      >
+                        <span>مشاهده کل کاتالوگ</span>
+                        <span>←</span>
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Navigation Menu */}
+              <nav className="hidden lg:flex items-center gap-5">
+                {navLinks.map((item) => {
+                  const isActive = pathname === item.href;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`relative text-xs font-extrabold transition-colors py-1 ${
+                        isActive
+                          ? "text-[#8E111E]"
+                          : item.highlight
+                            ? "text-[#8E111E] hover:text-[#6E0A15]"
+                            : "text-[#4A423D] hover:text-[#1F1916]"
+                      }`}
+                    >
+                      {item.label}
+                      {isActive && (
+                        <span className="absolute -bottom-1 right-0 left-0 h-0.5 rounded-full bg-[#8E111E]" />
+                      )}
+                    </Link>
+                  );
+                })}
+              </nav>
+            </div>
+
+            {/* CENTER: AKMA BRAND LOGO */}
+            <div className="flex-1 flex justify-center">
+              <Link href="/" className="group flex flex-col items-center gap-0.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="relative flex items-center justify-center">
+                    <span className="font-black text-2xl tracking-tighter text-[#1C1816] group-hover:text-[#8E111E] transition-colors font-sans">
+                      AKMA
+                    </span>
+                    <span className="absolute -top-1.5 -right-2 text-[#8E111E]">
+                      <svg width="18" height="12" viewBox="0 0 18 12" fill="none">
+                        <path
+                          d="M1 11C4 3 11 1 17 4C13 4 8 6 6 11H1Z"
+                          fill="currentColor"
+                        />
+                      </svg>
+                    </span>
+                  </span>
+                </div>
+                <span className="text-[9px] font-black tracking-[0.25em] text-[#8E111E] -mt-1">
+                  آکــمـا
+                </span>
+              </Link>
+            </div>
+
+            {/* LEFT SIDE: User, Wishlist, Cart & Mobile Trigger */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Account Link */}
+              <Link
+                href="/account"
+                title={customer?.name ? `حساب کاربری: ${customer.name}` : "ورود یا ثبت‌نام"}
+                className="group relative grid size-10 place-items-center rounded-full border border-[#E7E3DC] bg-white text-[#4A423D] hover:border-[#8E111E] hover:text-[#8E111E] shadow-xs transition-colors"
+                aria-label="حساب کاربری"
+              >
+                <User size={18} strokeWidth={2.2} />
+                {customer && (
+                  <span className="absolute top-1 right-1 size-2 rounded-full bg-emerald-500 ring-2 ring-white" />
+                )}
+              </Link>
+
+              {/* Wishlist Link */}
+              <Link
+                href="/products"
+                title="علاقه‌مندی‌ها"
+                className="relative hidden sm:grid size-10 place-items-center rounded-full border border-[#E7E3DC] bg-white text-[#4A423D] hover:border-[#8E111E] hover:text-[#8E111E] shadow-xs transition-colors"
+                aria-label="علاقه‌مندی‌ها"
+              >
+                <Heart size={18} strokeWidth={2.2} />
+                {wishlistCount > 0 && (
+                  <span className="absolute -top-1 -right-1 grid size-4 place-items-center rounded-full bg-[#8E111E] text-[10px] font-black text-white">
+                    {toFa(wishlistCount)}
+                  </span>
+                )}
+              </Link>
+
+              {/* Cart Drawer Trigger Button (Matching Reference with red badge) */}
               <button
+                type="button"
                 onClick={openCart}
-                className="relative grid size-11 place-items-center rounded-2xl border border-line bg-card/80 text-ink transition-colors hover:border-accent hover:text-accent"
+                className="relative grid size-10 place-items-center rounded-full border border-[#E7E3DC] bg-white text-[#4A423D] hover:border-[#8E111E] hover:text-[#8E111E] shadow-xs transition-colors"
                 aria-label="سبد خرید"
               >
-                <ShoppingBag size={19} />
+                <ShoppingBag size={18} strokeWidth={2.2} />
                 {totalCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full bg-accent text-[11px] font-black text-on-accent shadow-md shadow-accent/30 animate-pulse">
+                  <span className="absolute -top-1.5 -right-1.5 grid min-w-5 h-5 px-1 place-items-center rounded-full bg-[#8E111E] text-[11px] font-black text-white shadow-md shadow-[#8E111E]/40 animate-pulse">
                     {toFa(totalCount)}
                   </span>
                 )}
               </button>
 
-              <a
-                href={telHref(phone)}
-                className="btn btn-primary hidden h-11 px-5 text-sm sm:inline-flex"
-              >
-                <Phone size={16} />
-                <span className="font-extrabold">{toFa(phone)}</span>
-              </a>
-
+              {/* Mobile menu button */}
               <button
+                type="button"
                 onClick={() => setOpen(!open)}
-                aria-label="منو"
-                className="btn btn-ghost grid size-11 place-items-center !rounded-2xl lg:hidden"
+                aria-label="منو موبایل"
+                className="grid size-10 place-items-center rounded-full border border-[#E7E3DC] bg-white text-[#2A2421] lg:hidden"
               >
-                {open ? <X size={20} /> : <Menu size={20} />}
+                {open ? <X size={19} /> : <Menu size={19} />}
               </button>
             </div>
           </div>
         </div>
 
-        {/* mobile drawer */}
-        <div
-          className={`overflow-hidden border-b border-line bg-bg/95 backdrop-blur-xl transition-all duration-500 lg:hidden ${
-            open ? "max-h-[460px] opacity-100" : "max-h-0 opacity-0"
-          }`}
-        >
-          <nav className="flex flex-col gap-1 px-5 py-4">
-            {NAV.map((n) => n.href.startsWith("/#") ? (
-              <SectionLink
-                key={n.href}
-                href={n.href as `/#${string}`}
-                onNavigate={() => setOpen(false)}
-                className="rounded-xl px-4 py-3 text-sm font-semibold text-muted transition-colors hover:bg-card hover:text-ink"
-              >
-                {n.label}
-              </SectionLink>
-            ) : <Link key={n.href} href={n.href} onClick={() => setOpen(false)} className="rounded-xl px-4 py-3 text-sm font-semibold text-muted transition-colors hover:bg-card hover:text-ink">{n.label}</Link>)}
-            <div className="mt-2 flex gap-2">
-              <button
-                onClick={() => {
-                  setOpen(false);
-                  openCart();
-                }}
-                className="btn btn-ghost h-12 flex-1 text-sm border border-line"
-              >
-                <ShoppingBag size={16} className="text-accent" />
-                سبد خرید ({toFa(totalCount)})
-              </button>
+        {/* Mobile menu drop */}
+        {open && (
+          <div className="border-t border-[#E7E3DC] bg-white px-5 py-4 shadow-xl lg:hidden animate-in slide-in-from-top-3 duration-200">
+            {/* Quick Mode Toggle for Mobile */}
+            <div className="grid grid-cols-2 gap-2 mb-4 p-1 rounded-xl bg-[#FAF8F5] border border-[#E7E3DC]">
               <Link
-                href="/track"
+                href="/products?mode=retail"
                 onClick={() => setOpen(false)}
-                className="btn btn-ghost h-12 flex-1 text-sm border border-line"
+                className="py-2 text-center rounded-lg text-xs font-bold bg-white text-[#2A2421] shadow-xs"
               >
-                <SearchCheck size={16} className="text-accent" />
-                پیگیری
+                خرید تکی
+              </Link>
+              <Link
+                href="/products?mode=wholesale"
+                onClick={() => setOpen(false)}
+                className="py-2 text-center rounded-lg text-xs font-bold bg-[#8E111E] text-white"
+              >
+                خرید عمده
               </Link>
             </div>
-            <a href={telHref(phone)} onClick={() => setOpen(false)} className="btn btn-primary mt-2 h-12 text-sm">
-              <Phone size={16} />
-              سفارش تلفنی — {toFa(phone)}
-            </a>
-          </nav>
-        </div>
+
+            <nav className="flex flex-col gap-1">
+              {navLinks.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setOpen(false)}
+                  className="rounded-xl px-4 py-2.5 text-xs font-black text-[#4A423D] hover:bg-[#FAF8F5] hover:text-[#8E111E]"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+
+            <div className="mt-4 pt-3 border-t border-[#E7E3DC] flex items-center justify-between text-xs font-bold text-[#8C827A]">
+              <Link
+                href="/account"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-1.5 text-[#8E111E]"
+              >
+                <User size={15} />
+                {customer ? customer.name || "حساب کاربری" : "ورود یا عضویت"}
+              </Link>
+              <a href={`tel:${phone}`} className="flex items-center gap-1 text-[#2A2421]">
+                <Phone size={14} />
+                <span>{toFa(phone)}</span>
+              </a>
+            </div>
+          </div>
+        )}
       </header>
-      <div className="h-[72px]" />
     </>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Plus, Save, Star, Trash2, X } from "lucide-react";
+import { Pencil, Plus, Save, Star, Trash2, X, Building2, ShoppingBag } from "lucide-react";
 import { CATEGORIES } from "@/lib/defaults";
 import { formatPrice } from "@/lib/format";
 import { Field, ImageUploader, ListEditor, Textarea, Toggle } from "./fields";
@@ -15,6 +15,13 @@ export type AdminProduct = {
   features: string[];
   contents: string[];
   price: number;
+  retailPrice?: number;
+  wholesalePrice?: number;
+  wholesaleMinQty?: number;
+  wholesaleTiers?: { minQty: number; price: number; label?: string }[];
+  isRetail?: boolean;
+  isWholesale?: boolean;
+  videoUrl?: string;
   unitPrice: string;
   category: string;
   categoryLabel: string;
@@ -34,10 +41,17 @@ const EMPTY: Omit<AdminProduct, "id"> = {
   features: [],
   contents: [],
   price: 0,
+  retailPrice: 0,
+  wholesalePrice: 0,
+  wholesaleMinQty: 6,
+  wholesaleTiers: [],
+  isRetail: true,
+  isWholesale: true,
+  videoUrl: "",
   unitPrice: "",
   category: "foam",
-  categoryLabel: "فوم تمیزکننده",
-  images: ["/images/products/foam-bottle.png"],
+  categoryLabel: "تمیزکننده کفش",
+  images: ["/images/redesign/cat-foam.jpg"],
   badge: "",
   inStock: true,
   featured: false,
@@ -46,13 +60,15 @@ const EMPTY: Omit<AdminProduct, "id"> = {
 };
 
 const IMAGE_PRESETS = [
-  "/images/products/foam-bottle.png",
-  "/images/products/foam-box.png",
-  "/images/products/spray.png",
-  "/images/products/polish.png",
-  "/images/products/stand.png",
-  "/images/hero.png",
-  "/images/craft.png",
+  "/images/redesign/cat-foam.jpg",
+  "/images/redesign/cat-wax.jpg",
+  "/images/redesign/cat-spray.jpg",
+  "/images/redesign/cat-tools.jpg",
+  "/images/redesign/cat-packs.jpg",
+  "/images/redesign/hero.jpg",
+  "/images/redesign/retail-card.jpg",
+  "/images/redesign/wholesale-boxes.jpg",
+  "/images/redesign/wholesale-banner.jpg",
 ];
 
 export function ProductsSection({
@@ -77,7 +93,12 @@ export function ProductsSection({
     if (!editing) return;
     setSaving(true);
     try {
-      const payload = { ...editing };
+      const payload = {
+        ...editing,
+        retailPrice: Number(editing.retailPrice) || editing.price,
+        wholesalePrice: Number(editing.wholesalePrice) || editing.price,
+        wholesaleMinQty: Math.max(1, Number(editing.wholesaleMinQty) || 1),
+      };
       const res = await fetch(
         isNew ? "/api/admin/products" : `/api/admin/products/${editing.id}`,
         {
@@ -120,13 +141,30 @@ export function ProductsSection({
   const patch = (v: Partial<AdminProduct>) =>
     setEditing((e) => (e ? { ...e, ...v } : e));
 
+  const addTier = () => {
+    if (!editing) return;
+    const current = editing.wholesaleTiers || [];
+    const lastMin = current.length > 0 ? Math.max(...current.map((t) => t.minQty)) : 6;
+    const newTier = {
+      minQty: lastMin + 6,
+      price: Math.max(0, (editing.wholesalePrice || editing.price) - 10000),
+      label: `تیراژ ${lastMin + 6}+ عدد`,
+    };
+    patch({ wholesaleTiers: [...current, newTier] });
+  };
+
+  const removeTier = (idx: number) => {
+    if (!editing || !editing.wholesaleTiers) return;
+    patch({ wholesaleTiers: editing.wholesaleTiers.filter((_, i) => i !== idx) });
+  };
+
   return (
     <div className="card p-6 sm:p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-lg font-black">مدیریت محصولات</h3>
+          <h3 className="text-lg font-black">مدیریت محصولات و قیمت‌های تکی / عمده</h3>
           <p className="mt-1 text-xs text-muted">
-            نام، قیمت، توضیحات، تصاویر، موجودی و چیدمان محصولات را ویرایش کنید.
+            تعیین قیمت تکی، قیمت عمده، پله‌های تخفیف تیراژ، دسته‌بندی و تصاویر محصولات.
           </p>
         </div>
         <button onClick={openNew} className="btn btn-primary h-11 px-6 text-xs">
@@ -142,7 +180,7 @@ export function ProductsSection({
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={p.images[0] ?? "/images/products/foam-bottle.png"}
+              src={p.images[0] ?? "/images/redesign/cat-foam.jpg"}
               alt={p.name}
               className="size-14 rounded-xl border border-line object-cover"
             />
@@ -151,11 +189,13 @@ export function ProductsSection({
                 {p.name}
                 {p.featured && <Star size={13} className="mr-1.5 inline text-accent" />}
               </p>
-              <p className="mt-1 text-[11px] text-muted">
-                {p.categoryLabel} — {formatPrice(p.price)} تومان
-                {!p.active && <span className="mr-2 text-rose-400">(غیرفعال)</span>}
-                {!p.inStock && <span className="mr-2 text-amber-400">(ناموجود)</span>}
-              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-muted">
+                <span>دسته‌بندی: {p.categoryLabel}</span>
+                <span>• تکی: {formatPrice(p.retailPrice || p.price)} ت</span>
+                <span>• عمده: {formatPrice(p.wholesalePrice || p.price)} ت</span>
+                {!p.active && <span className="text-rose-400 font-bold">(غیرفعال)</span>}
+                {!p.inStock && <span className="text-amber-400 font-bold">(ناموجود)</span>}
+              </div>
             </div>
             <div className="flex gap-2">
               <button
@@ -179,11 +219,11 @@ export function ProductsSection({
         ))}
       </div>
 
-      {/* editor modal */}
+      {/* Editor Modal */}
       {editing && (
         <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm sm:p-8">
-          <div className="card my-auto w-full max-w-3xl p-6 sm:p-8">
-            <div className="flex items-center justify-between">
+          <div className="card my-auto w-full max-w-3xl p-6 sm:p-8 space-y-6">
+            <div className="flex items-center justify-between border-b border-line pb-4">
               <h4 className="text-lg font-black">
                 {isNew ? "ایجاد محصول جدید" : `ویرایش «${editing.name}»`}
               </h4>
@@ -196,7 +236,7 @@ export function ProductsSection({
               </button>
             </div>
 
-            <div className="mt-6 space-y-5">
+            <div className="space-y-5">
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field label="نام محصول" value={editing.name} onChange={(v) => patch({ name: v })} />
                 <Field
@@ -207,31 +247,112 @@ export function ProductsSection({
                   hint="خالی بماند = ساخت خودکار از نام"
                 />
               </div>
+
               <Field
-                label="زیرعنوان (مثلاً: بسته ۱۰ عددی)"
+                label="زیرعنوان (مثلاً: فرمولاسیون بدون نیاز به آب)"
                 value={editing.subtitle}
                 onChange={(v) => patch({ subtitle: v })}
               />
-              <div className="grid gap-5 sm:grid-cols-3">
-                <Field
-                  label="قیمت بسته (تومان)"
-                  type="number"
-                  value={editing.price}
-                  onChange={(v) => patch({ price: Number(v) || 0 })}
-                  dir="ltr"
-                />
-                <Field
-                  label="متن قیمت واحد"
-                  value={editing.unitPrice}
-                  onChange={(v) => patch({ unitPrice: v })}
-                  placeholder="قیمت واحد: ۲۴۰٫۰۰۰ تومان"
-                />
-                <Field
-                  label="بج (مثلاً: پرفروش)"
-                  value={editing.badge}
-                  onChange={(v) => patch({ badge: v })}
-                />
+
+              {/* Pricing Section: Retail vs Wholesale */}
+              <div className="rounded-2xl border border-line bg-surface/50 p-4 space-y-4">
+                <h5 className="text-xs font-black text-ink">قیمت‌گذاری دوگانه (تکی و عمده)</h5>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <Field
+                    label="قیمت خرید تکی (تومان)"
+                    type="number"
+                    value={editing.retailPrice ?? editing.price}
+                    onChange={(v) => patch({ retailPrice: Number(v) || 0, price: Number(v) || 0 })}
+                    dir="ltr"
+                  />
+                  <Field
+                    label="قیمت عمده پایه (تومان)"
+                    type="number"
+                    value={editing.wholesalePrice ?? editing.price}
+                    onChange={(v) => patch({ wholesalePrice: Number(v) || 0 })}
+                    dir="ltr"
+                  />
+                  <Field
+                    label="حداقل تیراژ عمده (عدد)"
+                    type="number"
+                    value={editing.wholesaleMinQty ?? 6}
+                    onChange={(v) => patch({ wholesaleMinQty: Math.max(1, Number(v) || 1) })}
+                    dir="ltr"
+                  />
+                </div>
+
+                {/* Wholesale Tiers */}
+                <div className="space-y-3 pt-2 border-t border-line">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-muted">
+                      تخفیف‌های پلکانی حجم عمده (اختیاری)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={addTier}
+                      className="btn btn-ghost h-8 px-3 text-xs"
+                    >
+                      <Plus size={13} /> افزودن پله تیراژ
+                    </button>
+                  </div>
+
+                  {editing.wholesaleTiers && editing.wholesaleTiers.length > 0 ? (
+                    <div className="space-y-2">
+                      {editing.wholesaleTiers.map((tier, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            placeholder="حداقل تیراژ"
+                            value={tier.minQty}
+                            onChange={(e) => {
+                              const updated = [...(editing.wholesaleTiers || [])];
+                              updated[idx] = { ...tier, minQty: Number(e.target.value) || 1 };
+                              patch({ wholesaleTiers: updated });
+                            }}
+                            className="field h-10 w-28 text-center text-xs"
+                            dir="ltr"
+                          />
+                          <input
+                            type="number"
+                            placeholder="قیمت هر عدد"
+                            value={tier.price}
+                            onChange={(e) => {
+                              const updated = [...(editing.wholesaleTiers || [])];
+                              updated[idx] = { ...tier, price: Number(e.target.value) || 0 };
+                              patch({ wholesaleTiers: updated });
+                            }}
+                            className="field h-10 flex-1 text-center text-xs font-mono"
+                            dir="ltr"
+                          />
+                          <input
+                            type="text"
+                            placeholder="برچسب (مثلاً: کارتن ۲۴ تایی)"
+                            value={tier.label || ""}
+                            onChange={(e) => {
+                              const updated = [...(editing.wholesaleTiers || [])];
+                              updated[idx] = { ...tier, label: e.target.value };
+                              patch({ wholesaleTiers: updated });
+                            }}
+                            className="field h-10 flex-1 text-xs"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeTier(idx)}
+                            className="text-muted hover:text-rose-400 p-2"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-muted">
+                      پله تخفیفی تعریف نشده است؛ در صورت تمایل دکمه «افزودن پله تیراژ» را بزنید.
+                    </p>
+                  )}
+                </div>
               </div>
+
               <div className="grid gap-5 sm:grid-cols-2">
                 <label className="block">
                   <span className="mb-1.5 block text-xs font-bold text-muted">دسته‌بندی</span>
@@ -262,51 +383,80 @@ export function ProductsSection({
                 />
               </div>
 
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Toggle
+                  label="فعال در فروشگاه"
+                  checked={editing.active}
+                  onChange={(v) => patch({ active: v })}
+                />
+                <Toggle
+                  label="موجود در انبار"
+                  checked={editing.inStock}
+                  onChange={(v) => patch({ inStock: v })}
+                />
+                <Toggle
+                  label="نمایش در منتخب / پرفروش"
+                  checked={editing.featured}
+                  onChange={(v) => patch({ featured: v })}
+                />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Toggle
+                  label="امکان خرید تکی (خرده‌فروشی)"
+                  checked={editing.isRetail !== false}
+                  onChange={(v) => patch({ isRetail: v })}
+                />
+                <Toggle
+                  label="امکان خرید عمده (همکاری)"
+                  checked={editing.isWholesale !== false}
+                  onChange={(v) => patch({ isWholesale: v })}
+                />
+              </div>
+
               <ImageUploader
                 label="تصاویر محصول"
                 value={editing.images}
-                onChange={(v) => patch({ images: Array.isArray(v) ? v : v ? [v] : [] })}
-                kind="products"
                 multiple
+                onChange={(images) => patch({ images: Array.isArray(images) ? images : [images] })}
+                kind="products"
                 guideline="product"
-                hint="تصویر را مستقیم از کامپیوتر انتخاب کنید؛ حداکثر ۸ تصویر، هر تصویر تا 10MB."
               />
 
-              <ListEditor
-                label="ویژگی‌های کلیدی"
-                items={editing.features}
-                onChange={(v) => patch({ features: v })}
-                placeholder="مثلاً: بدون نیاز به شست‌وشو با آب"
-              />
-              <ListEditor
-                label="محتویات بسته"
-                items={editing.contents}
-                onChange={(v) => patch({ contents: v })}
-                placeholder="مثلاً: فوم تمیزکننده (۱۰ عدد)"
-              />
               <Textarea
                 label="توضیحات کامل محصول"
                 value={editing.description}
                 onChange={(v) => patch({ description: v })}
-                rows={8}
-                hint="برای پاراگراف جدید یک خط خالی بگذارید."
+                rows={6}
               />
 
-              <div className="flex flex-wrap gap-3 border-t border-line pt-5">
-                <Toggle label="فعال (نمایش در سایت)" checked={editing.active} onChange={(v) => patch({ active: v })} />
-                <Toggle label="موجود" checked={editing.inStock} onChange={(v) => patch({ inStock: v })} />
-                <Toggle label="محصول ویژه" checked={editing.featured} onChange={(v) => patch({ featured: v })} />
-              </div>
+              <ListEditor
+                label="ویژگی‌های برجسته"
+                items={editing.features}
+                onChange={(features) => patch({ features })}
+                placeholder="ویژگی جدید…"
+              />
 
-              <div className="flex gap-3">
-                <button onClick={save} disabled={saving} className="btn btn-primary h-12 flex-1 text-sm">
-                  <Save size={16} />
-                  {saving ? "در حال ذخیره…" : "ذخیره محصول"}
-                </button>
-                <button onClick={() => setEditing(null)} className="btn btn-ghost h-12 px-8 text-sm">
-                  انصراف
-                </button>
-              </div>
+              <ListEditor
+                label="محتویات بسته"
+                items={editing.contents}
+                onChange={(contents) => patch({ contents })}
+                placeholder="آیتم جدید محتویات…"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-line pt-4">
+              <button onClick={() => setEditing(null)} className="btn btn-ghost h-11 px-5 text-xs">
+                انصراف
+              </button>
+              <button
+                onClick={save}
+                disabled={saving || !editing.name.trim()}
+                className="btn btn-primary h-11 px-8 text-xs font-bold disabled:opacity-50"
+              >
+                <Save size={15} />
+                {saving ? "در حال ذخیره…" : "ذخیره محصول"}
+              </button>
             </div>
           </div>
         </div>
