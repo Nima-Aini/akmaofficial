@@ -1,3 +1,5 @@
+import type { TextRegionPosition } from "./text-region";
+
 export type ThemeSettings = {
   mode: "dark" | "light";
   accent: string;
@@ -15,6 +17,7 @@ export type HeroSettings = {
   primaryCta: { label: string; href: string };
   secondaryCta: { label: string; href: string };
   image: string;
+  textRegionPosition?: TextRegionPosition;
   stats: { value: string; label: string }[];
 };
 
@@ -26,6 +29,7 @@ export type Banner = {
   href: string;
   image: string;
   enabled: boolean;
+  textRegionPosition?: TextRegionPosition;
 };
 
 export type BottomBanner = {
@@ -34,6 +38,7 @@ export type BottomBanner = {
   href: string;
   alt: string;
   enabled: boolean;
+  textRegionPosition?: TextRegionPosition;
 };
 
 export type SectionTitles = {
@@ -93,6 +98,7 @@ export type DualCardsSettings = {
     buttonText: string;
     buttonHref: string;
     image: string;
+    textRegionPosition?: TextRegionPosition;
   };
   wholesale: {
     title: string;
@@ -101,6 +107,7 @@ export type DualCardsSettings = {
     buttonText: string;
     buttonHref: string;
     image: string;
+    textRegionPosition?: TextRegionPosition;
   };
 };
 
@@ -109,6 +116,7 @@ export type CategoryItem = {
   label: string;
   image: string;
   href?: string;
+  textRegionPosition?: TextRegionPosition;
 };
 
 export type WholesalePromoSettings = {
@@ -118,6 +126,7 @@ export type WholesalePromoSettings = {
   buttonText: string;
   buttonHref: string;
   image: string;
+  textRegionPosition?: TextRegionPosition;
 };
 
 export const DEFAULT_THEME: ThemeSettings = {
@@ -137,6 +146,7 @@ export const DEFAULT_HERO: HeroSettings = {
   primaryCta: { label: "مشاهده محصولات", href: "/products" },
   secondaryCta: { label: "خرید عمده و همکاری", href: "/products?mode=wholesale" },
   image: "/images/redesign/hero.jpg",
+  textRegionPosition: "right",
   stats: [
     { value: "+۱۵", label: "محصول تخصصی" },
     { value: "تک و عمده", label: "فروش مستقیم" },
@@ -158,6 +168,7 @@ export const DEFAULT_DUAL_CARDS: DualCardsSettings = {
     buttonText: "مشاهده محصولات تکی",
     buttonHref: "/products?mode=retail",
     image: "/images/redesign/retail-card.jpg",
+    textRegionPosition: "right",
   },
   wholesale: {
     title: "خرید عمده",
@@ -170,6 +181,7 @@ export const DEFAULT_DUAL_CARDS: DualCardsSettings = {
     buttonText: "ورود به بخش خرید عمده",
     buttonHref: "/products?mode=wholesale",
     image: "/images/redesign/wholesale-boxes.jpg",
+    textRegionPosition: "right",
   },
 };
 
@@ -179,30 +191,35 @@ export const DEFAULT_CATEGORIES: CategoryItem[] = [
     label: "تمیزکننده کفش",
     image: "/images/redesign/cat-foam.jpg",
     href: "/products?cat=foam",
+    textRegionPosition: "bottom",
   },
   {
     key: "wax",
     label: "واکس و براق کننده",
     image: "/images/redesign/cat-wax.jpg",
     href: "/products?cat=wax",
+    textRegionPosition: "bottom",
   },
   {
     key: "freshener",
     label: "بوگیر کفش",
     image: "/images/redesign/cat-spray.jpg",
     href: "/products?cat=freshener",
+    textRegionPosition: "bottom",
   },
   {
     key: "tools",
     label: "ابزار و لوازم جانبی",
     image: "/images/redesign/cat-tools.jpg",
     href: "/products?cat=tools",
+    textRegionPosition: "bottom",
   },
   {
     key: "bundle",
     label: "پک‌های ویژه",
     image: "/images/redesign/cat-packs.jpg",
     href: "/products?cat=bundle",
+    textRegionPosition: "bottom",
   },
 ];
 
@@ -213,6 +230,7 @@ export const DEFAULT_WHOLESALE_PROMO: WholesalePromoSettings = {
   buttonText: "ورود به کاتالوگ عمده",
   buttonHref: "/products?mode=wholesale",
   image: "/images/redesign/wholesale-banner.jpg",
+  textRegionPosition: "right",
 };
 
 export const DEFAULT_MARQUEE: string[] = [
@@ -234,6 +252,7 @@ export const DEFAULT_BANNERS: Banner[] = [
     href: "/products/stand-3",
     image: "/images/redesign/cat-packs.jpg",
     enabled: true,
+    textRegionPosition: "right",
   },
 ];
 
@@ -330,6 +349,7 @@ export const DEFAULT_BOTTOM_BANNERS: BottomBanner[] = [
     href: "/products",
     alt: "محصولات مراقبت از کفش آکما",
     enabled: true,
+    textRegionPosition: "bottom",
   },
 ];
 
@@ -398,6 +418,7 @@ export type ProductSeed = {
   images: string[];
   retailImages?: string[];
   wholesaleImages?: string[];
+  cardTextRegionPosition?: TextRegionPosition;
   badge: string;
   featured: boolean;
   sortOrder: number;

@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Pencil, Plus, Save, Star, Trash2, X } from "lucide-react";
 import { CATEGORIES } from "@/lib/defaults";
 import { formatPrice } from "@/lib/format";
-import { Field, ImageUploader, ListEditor, Textarea, Toggle } from "./fields";
+import { Field, ImageUploader, ListEditor, Textarea, TextRegionControl, Toggle } from "./fields";
+import type { TextRegionPosition } from "@/lib/text-region";
 import { getProductImages } from "@/lib/product-media";
 
 export type AdminProduct = {
@@ -33,6 +34,7 @@ export type AdminProduct = {
   images: string[];
   retailImages?: string[];
   wholesaleImages?: string[];
+  cardTextRegionPosition?: TextRegionPosition;
   badge: string;
   inStock: boolean;
   featured: boolean;
@@ -65,6 +67,7 @@ const EMPTY: Omit<AdminProduct, "id"> = {
   images: ["/images/redesign/cat-foam.jpg"],
   retailImages: [],
   wholesaleImages: [],
+  cardTextRegionPosition: "bottom",
   badge: "",
   inStock: true,
   featured: false,
@@ -276,6 +279,13 @@ export function ProductsSection({
                   />
                 </div>
                 <ImageUploader label="تصاویر فروش تکی" value={editing.retailImages || []} multiple onChange={(images) => patch({ retailImages: Array.isArray(images) ? images : [images] })} kind="products" guideline="productRetail" />
+                <TextRegionControl
+                  label="محل اطلاعات روی کارت محصول"
+                  value={editing.cardTextRegionPosition || "bottom"}
+                  onChange={(cardTextRegionPosition) => patch({ cardTextRegionPosition })}
+                  image={getProductImages(editing, "retail")[0]}
+                  variant="product"
+                />
                 <div className="rounded-xl border border-line bg-card p-3 text-xs"><span className="text-muted">پیش‌نمایش مشتری: </span><b>۱ {editing.retailUnitLabel || "عدد"}</b></div>
               </div>
 
@@ -361,6 +371,9 @@ export function ProductsSection({
                   )}
                 </div>
                 <ImageUploader label="تصاویر بسته‌های عمده" value={editing.wholesaleImages || []} multiple onChange={(images) => patch({ wholesaleImages: Array.isArray(images) ? images : [images] })} kind="products" guideline="productWholesale" />
+                <p className="rounded-xl border border-accent/20 bg-accent/5 px-3 py-2 text-[10px] leading-5 text-muted">
+                  همین محل اطلاعات برای کارت تکی و عمده استفاده می‌شود. لایه شیشه‌ای نیمه‌شفاف است و تصویر زیر آن کمی نرم می‌شود؛ جزئیات مهم یا متن آماده را در آن ناحیه قرار ندهید.
+                </p>
               </div>
 
               <div className="grid gap-5 sm:grid-cols-2">

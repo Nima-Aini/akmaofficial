@@ -3,6 +3,12 @@
 import { ImagePlus, Loader2, Plus, Trash2, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { IMAGE_GUIDELINES, type ImageGuidelineKey } from "@/lib/image-guidelines";
+import {
+  TEXT_REGION_BACKDROP_CLASSES,
+  TEXT_REGION_LABELS,
+  TEXT_REGION_POSITIONS,
+  type TextRegionPosition,
+} from "@/lib/text-region";
 
 export function Field({
   label,
@@ -121,6 +127,54 @@ export function Select({
         ))}
       </select>
     </label>
+  );
+}
+
+export function TextRegionControl({
+  label = "ناحیه نمایش متن",
+  value,
+  onChange,
+  image,
+  variant = "banner",
+}: {
+  label?: string;
+  value: TextRegionPosition;
+  onChange: (value: TextRegionPosition) => void;
+  image?: string;
+  variant?: "banner" | "product";
+}) {
+  const guidance = variant === "product"
+    ? "در کارت محصول، اطلاعات داخل یک لایه شیشه‌ای نیمه‌شفاف قرار می‌گیرند و تصویر زیر آن کمی نرم می‌شود. جزئیات مهم یا متن آماده را در ناحیه انتخاب‌شده قرار ندهید."
+    : "بخشی که برای متن انتخاب می‌کنید روی خود تصویر کمی مات می‌شود و متن در همان ناحیه نمایش داده خواهد شد. هنگام طراحی یا آپلود تصویر، آن قسمت را خلوت نگه دارید.";
+
+  return (
+    <div className="space-y-3 rounded-2xl border border-accent/20 bg-accent/5 p-4">
+      <Select
+        label={label}
+        value={value}
+        onChange={(next) => onChange(next as TextRegionPosition)}
+        options={TEXT_REGION_POSITIONS.map((position) => ({
+          value: position,
+          label: TEXT_REGION_LABELS[position],
+        }))}
+      />
+      <div className="space-y-1 text-[10px] leading-5 text-muted">
+        <p>{guidance}</p>
+        <p className="font-bold text-ink">ناحیه متن این تصویر: {TEXT_REGION_LABELS[value]}</p>
+        <p>ناحیه متن قابل انتخاب است و برای بهترین نتیجه باید در فایل طراحی خلوت بماند. اگر تصویر دارای متن آماده است، آن را در این بخش قرار ندهید مگر عامدانه.</p>
+      </div>
+      <div
+        className={`relative isolate overflow-hidden rounded-xl border border-line bg-cover bg-center ${variant === "product" ? "aspect-square max-w-56" : "aspect-[16/7] w-full"}`}
+        style={{ backgroundImage: image ? `url(${image})` : "linear-gradient(135deg,#4A0811,#C86A73)" }}
+        data-text-region-preview={value}
+        aria-label={`پیش‌نمایش ناحیه متن: ${TEXT_REGION_LABELS[value]}`}
+      >
+        <span className={`absolute z-10 backdrop-blur-[3px] ${TEXT_REGION_BACKDROP_CLASSES[value]}`} />
+        <span className="absolute inset-0 z-20 grid place-items-center p-4 text-center text-[10px] font-black text-white drop-shadow-md">
+          ناحیه امن متن
+        </span>
+      </div>
+    </div>
   );
 }
 

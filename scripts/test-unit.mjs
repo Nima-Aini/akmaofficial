@@ -6,6 +6,13 @@ import assert from "node:assert";
 import { generateSecureOtp } from "../src/lib/sms.ts";
 import { calculateProductPricing, getWholesalePackConfig, isPositiveSafeInteger } from "../src/lib/pricing.ts";
 import { getProductImages } from "../src/lib/product-media.ts";
+import {
+  getTextRegionBackdropClass,
+  getTextRegionLayoutClass,
+  normalizeTextRegionPosition,
+  TEXT_REGION_BACKDROP_CLASSES,
+} from "../src/lib/text-region.ts";
+import { PRODUCT_GLASS_OVERLAY_CLASS } from "../src/components/product-card.tsx";
 
 console.log("==================================================================");
 console.log("📦 RUNNING ISOLATED UNIT TESTS");
@@ -127,6 +134,37 @@ runTest("Pricing rejects invalid quantities instead of coercing them", () => {
   for (const quantity of [0, -1, 1.5, NaN, Infinity]) {
     assert.throws(() => calculateProductPricing({ price: 10 }, quantity, "retail"));
   }
+});
+
+runTest("Legacy banners fall back to the right text region", () => {
+  assert.equal(normalizeTextRegionPosition(undefined), "right");
+  assert.equal(getTextRegionLayoutClass(undefined), getTextRegionLayoutClass("right"));
+});
+
+runTest("Product cards fall back to the bottom text region", () => {
+  assert.equal(normalizeTextRegionPosition(undefined, "bottom"), "bottom");
+  assert.equal(getTextRegionLayoutClass(undefined, "bottom"), getTextRegionLayoutClass("bottom", "bottom"));
+});
+
+runTest("All selectable text regions map to distinct frontend placement classes", () => {
+  const positions = ["right", "left", "bottom", "center"];
+  assert.equal(new Set(positions.map((position) => getTextRegionLayoutClass(position))).size, 4);
+  for (const position of positions) assert.ok(getTextRegionBackdropClass(position).includes("bg-"));
+});
+
+runTest("Invalid persisted text regions safely use the requested fallback", () => {
+  assert.equal(normalizeTextRegionPosition("top-secret", "bottom"), "bottom");
+});
+
+runTest("Admin preview selection changes the marked region", () => {
+  assert.notEqual(TEXT_REGION_BACKDROP_CLASSES.right, TEXT_REGION_BACKDROP_CLASSES.left);
+  assert.notEqual(TEXT_REGION_BACKDROP_CLASSES.bottom, TEXT_REGION_BACKDROP_CLASSES.center);
+});
+
+runTest("Product content uses frosted glass instead of a solid white box", () => {
+  assert.match(PRODUCT_GLASS_OVERLAY_CLASS, /backdrop-blur/);
+  assert.match(PRODUCT_GLASS_OVERLAY_CLASS, /bg-black\/25/);
+  assert.doesNotMatch(PRODUCT_GLASS_OVERLAY_CLASS, /bg-white(?:\/|\s|$)/);
 });
 
 runTest("Phone number masking in tracking API prevents data leaks", () => {

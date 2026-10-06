@@ -25,8 +25,32 @@ import {
   type WholesalePromoSettings,
 } from "@/lib/defaults";
 import { ProductCard } from "@/components/product-card";
+import {
+  getTextRegionBackdropClass,
+  getTextRegionContentWidthClass,
+  getTextRegionLayoutClass,
+  normalizeTextRegionPosition,
+  type TextRegionPosition,
+} from "@/lib/text-region";
 
 export const dynamic = "force-dynamic";
+
+function TextRegionBackdrop({
+  position,
+  fallback = "right",
+}: {
+  position?: TextRegionPosition;
+  fallback?: TextRegionPosition;
+}) {
+  const normalized = normalizeTextRegionPosition(position, fallback);
+  return (
+    <span
+      aria-hidden="true"
+      data-text-region={normalized}
+      className={`pointer-events-none absolute z-0 backdrop-blur-[3px] ${getTextRegionBackdropClass(normalized, fallback)}`}
+    />
+  );
+}
 
 export default async function HomePage() {
   const [s, products] = await Promise.all([getSettings(), getActiveProducts()]);
@@ -53,11 +77,11 @@ export default async function HomePage() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-12 sm:space-y-16 pt-6">
 
         {/* ================= 1. HERO SECTION (MATCHING LEFT REFERENCE PANEL) ================= */}
-        <section className="relative isolate overflow-hidden rounded-[2rem] bg-[#4A0811] bg-cover bg-center text-white shadow-xl sm:rounded-[2.5rem]" style={{ backgroundImage: `url(${hero.image || "/images/redesign/hero.jpg"})` }}>
-          <div className="absolute inset-0 -z-10 bg-gradient-to-l from-black/90 via-[#4A0811]/65 to-black/15" />
-          <div className="grid lg:grid-cols-12 items-center gap-8 p-6 sm:p-10 lg:p-14 relative z-10">
-            {/* Left Content Area (Right in RTL) */}
-            <div className="space-y-6 rounded-[1.75rem] border border-white/20 bg-black/25 p-6 text-center shadow-2xl backdrop-blur-md lg:col-span-8 lg:text-right">
+        <section className="relative isolate min-h-[460px] overflow-hidden rounded-[2rem] bg-[#4A0811] bg-cover bg-center text-white shadow-xl sm:rounded-[2.5rem]" style={{ backgroundImage: `url(${hero.image || "/images/redesign/hero.jpg"})` }}>
+          <span aria-hidden="true" className="absolute inset-0 z-0 bg-black/10" />
+          <TextRegionBackdrop position={hero.textRegionPosition} />
+          <div className={`relative z-10 flex min-h-[460px] p-6 sm:p-10 lg:p-14 ${getTextRegionLayoutClass(hero.textRegionPosition)}`}>
+            <div className={`space-y-6 drop-shadow-[0_2px_12px_rgba(0,0,0,0.55)] ${getTextRegionContentWidthClass(hero.textRegionPosition)}`}>
               <div className="inline-flex items-center gap-2 rounded-full bg-black/25 px-4 py-1.5 text-xs font-bold text-white/90 backdrop-blur-xs border border-white/10">
                 <span className="size-2 rounded-full bg-[#E53E3E] animate-pulse" />
                 {hero.badge}
@@ -70,11 +94,11 @@ export default async function HomePage() {
                 </span>
               </h1>
 
-              <p className="text-sm sm:text-base text-white/80 max-w-xl mx-auto lg:mx-0 leading-relaxed font-medium">
+              <p className="max-w-xl text-sm font-medium leading-relaxed text-white/90 sm:text-base">
                 {hero.subtitle}
               </p>
 
-              <div className="pt-2 flex flex-wrap items-center justify-center lg:justify-start gap-3">
+              <div className="flex flex-wrap items-center gap-3 pt-2">
                 <Link
                   href={hero.primaryCta.href || "/products"}
                   className="inline-flex items-center gap-3 rounded-full bg-[#8E111E] hover:bg-[#720C17] text-white border border-white/20 px-8 py-3.5 text-sm font-black shadow-lg shadow-black/25 transition-transform active:scale-95"
@@ -127,22 +151,23 @@ export default async function HomePage() {
         {/* ================= 3. DUAL ACTION CARDS (RETAIL VS. WHOLESALE) ================= */}
         <section className="grid md:grid-cols-2 gap-6 lg:gap-8">
           {/* RETAIL CARD: خرید تکی */}
-          <div className="relative isolate min-h-[360px] overflow-hidden rounded-[2rem] border border-white/60 bg-cover bg-center p-6 shadow-md transition-shadow hover:shadow-xl sm:p-8" style={{ backgroundImage: `url(${dualCards.retail.image || "/images/redesign/retail-card.jpg"})` }}>
-            <div className="absolute inset-0 -z-10 bg-gradient-to-l from-white/95 via-white/75 to-black/10" />
-              <div className="max-w-md space-y-4 rounded-2xl border border-white/70 bg-white/70 p-5 shadow-lg backdrop-blur-md">
+          <div className="relative isolate min-h-[360px] overflow-hidden rounded-[2rem] border border-white/60 bg-cover bg-center shadow-md transition-shadow hover:shadow-xl" style={{ backgroundImage: `url(${dualCards.retail.image || "/images/redesign/retail-card.jpg"})` }}>
+            <TextRegionBackdrop position={dualCards.retail.textRegionPosition} />
+            <div className={`relative z-10 flex min-h-[360px] p-6 sm:p-8 ${getTextRegionLayoutClass(dualCards.retail.textRegionPosition)}`}>
+              <div className={`space-y-4 text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.65)] ${getTextRegionContentWidthClass(dualCards.retail.textRegionPosition)}`}>
                 <div>
-                  <h2 className="text-2xl sm:text-3xl font-black text-[#8E111E]">
+                  <h2 className="text-2xl font-black sm:text-3xl">
                     {dualCards.retail.title}
                   </h2>
-                  <p className="text-xs font-bold text-[#8C827A] mt-1">
+                  <p className="mt-1 text-xs font-bold text-white/80">
                     {dualCards.retail.subtitle}
                   </p>
                 </div>
 
                 <ul className="space-y-2.5 pt-1">
                   {dualCards.retail.checklist.map((item, idx) => (
-                    <li key={idx} className="flex items-center gap-2 text-xs font-bold text-[#2A2421]">
-                      <span className="grid size-4 place-items-center rounded-full bg-[#8E111E]/10 text-[#8E111E]">
+                    <li key={idx} className="flex items-center gap-2 text-xs font-bold text-white/95">
+                      <span className="grid size-4 place-items-center rounded-full bg-white/15 text-white backdrop-blur-sm">
                         <CheckCircle2 size={13} strokeWidth={2.5} />
                       </span>
                       <span>{item}</span>
@@ -160,26 +185,28 @@ export default async function HomePage() {
                   </Link>
                 </div>
               </div>
+            </div>
 
           </div>
 
           {/* WHOLESALE CARD: خرید عمده */}
-          <div className="relative isolate min-h-[360px] overflow-hidden rounded-[2rem] border border-white/60 bg-cover bg-center p-6 shadow-md transition-shadow hover:shadow-xl sm:p-8" style={{ backgroundImage: `url(${dualCards.wholesale.image || "/images/redesign/wholesale-boxes.jpg"})` }}>
-            <div className="absolute inset-0 -z-10 bg-gradient-to-l from-white/95 via-white/75 to-black/10" />
-              <div className="max-w-md space-y-4 rounded-2xl border border-white/70 bg-white/70 p-5 shadow-lg backdrop-blur-md">
+          <div className="relative isolate min-h-[360px] overflow-hidden rounded-[2rem] border border-white/60 bg-cover bg-center shadow-md transition-shadow hover:shadow-xl" style={{ backgroundImage: `url(${dualCards.wholesale.image || "/images/redesign/wholesale-boxes.jpg"})` }}>
+            <TextRegionBackdrop position={dualCards.wholesale.textRegionPosition} />
+            <div className={`relative z-10 flex min-h-[360px] p-6 sm:p-8 ${getTextRegionLayoutClass(dualCards.wholesale.textRegionPosition)}`}>
+              <div className={`space-y-4 text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.65)] ${getTextRegionContentWidthClass(dualCards.wholesale.textRegionPosition)}`}>
                 <div>
-                  <h2 className="text-2xl sm:text-3xl font-black text-[#8E111E]">
+                  <h2 className="text-2xl font-black sm:text-3xl">
                     {dualCards.wholesale.title}
                   </h2>
-                  <p className="text-xs font-bold text-[#8C827A] mt-1">
+                  <p className="mt-1 text-xs font-bold text-white/80">
                     {dualCards.wholesale.subtitle}
                   </p>
                 </div>
 
                 <ul className="space-y-2.5 pt-1">
                   {dualCards.wholesale.checklist.map((item, idx) => (
-                    <li key={idx} className="flex items-center gap-2 text-xs font-bold text-[#2A2421]">
-                      <span className="grid size-4 place-items-center rounded-full bg-[#8E111E]/10 text-[#8E111E]">
+                    <li key={idx} className="flex items-center gap-2 text-xs font-bold text-white/95">
+                      <span className="grid size-4 place-items-center rounded-full bg-white/15 text-white backdrop-blur-sm">
                         <CheckCircle2 size={13} strokeWidth={2.5} />
                       </span>
                       <span>{item}</span>
@@ -197,6 +224,7 @@ export default async function HomePage() {
                   </Link>
                 </div>
               </div>
+            </div>
 
           </div>
         </section>
@@ -254,11 +282,11 @@ export default async function HomePage() {
               <Link
                 key={cat.key}
                 href={cat.href || `/products?cat=${cat.key}`}
-                className="group relative isolate flex aspect-square items-end overflow-hidden rounded-2xl border border-white/60 bg-cover bg-center p-3 text-center shadow-md transition-all hover:-translate-y-1 hover:shadow-xl"
+                className={`group relative isolate flex aspect-square overflow-hidden rounded-2xl border border-white/60 bg-cover bg-center p-3 text-center shadow-md transition-all hover:-translate-y-1 hover:shadow-xl ${getTextRegionLayoutClass(cat.textRegionPosition, "bottom")}`}
                 style={{ backgroundImage: `url(${cat.image})` }}
               >
-                <span className="absolute inset-0 -z-10 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                <span className="w-full rounded-xl border border-white/30 bg-white/80 px-3 py-2 text-xs font-black text-[#2A2421] shadow backdrop-blur-md group-hover:text-[#8E111E] transition-colors">
+                <TextRegionBackdrop position={cat.textRegionPosition} fallback="bottom" />
+                <span className="relative z-10 w-full px-3 py-2 text-xs font-black text-white drop-shadow-md transition-colors group-hover:text-[#FFD6DA]">
                   {cat.label}
                 </span>
               </Link>
@@ -269,9 +297,9 @@ export default async function HomePage() {
         {banners.length > 0 && (
           <section className="grid gap-6 md:grid-cols-2" aria-label="پیشنهادهای ویژه">
             {banners.map((banner) => (
-              <Link key={banner.id} href={banner.href || "/products"} className="group relative isolate flex min-h-[300px] items-end overflow-hidden rounded-[2rem] border border-white/50 bg-cover bg-center p-6 shadow-lg" style={{ backgroundImage: `url(${banner.image})` }}>
-                <span className="absolute inset-0 -z-10 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-                <span className="block w-full rounded-2xl border border-white/25 bg-black/35 p-5 text-white shadow-xl backdrop-blur-md">
+              <Link key={banner.id} href={banner.href || "/products"} className={`group relative isolate flex min-h-[300px] overflow-hidden rounded-[2rem] border border-white/50 bg-cover bg-center p-6 shadow-lg ${getTextRegionLayoutClass(banner.textRegionPosition)}`} style={{ backgroundImage: `url(${banner.image})` }}>
+                <TextRegionBackdrop position={banner.textRegionPosition} />
+                <span className={`relative z-10 block text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.65)] ${getTextRegionContentWidthClass(banner.textRegionPosition)}`}>
                   <strong className="block text-xl font-black">{banner.title}</strong>
                   <span className="mt-2 block text-xs leading-6 text-white/85">{banner.subtitle}</span>
                   <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-5 py-2 text-xs font-black text-[#8E111E]">{banner.cta}<ArrowLeft size={14} /></span>
@@ -304,10 +332,10 @@ export default async function HomePage() {
         </section>
 
         {/* ================= 7. LOWER WHOLESALE COLLABORATION BANNER ================= */}
-        <section className="relative isolate overflow-hidden rounded-[2.5rem] bg-[#4A0811] bg-cover bg-center p-8 text-white shadow-xl sm:p-12" style={{ backgroundImage: `url(${wholesalePromo.image || "/images/redesign/wholesale-banner.jpg"})` }}>
-          <div className="absolute inset-0 -z-10 bg-gradient-to-l from-[#4A0811]/95 via-black/60 to-black/15" />
-          <div className="grid lg:grid-cols-12 items-center gap-8">
-            <div className="space-y-4 rounded-[1.75rem] border border-white/20 bg-black/30 p-6 text-center shadow-xl backdrop-blur-md lg:col-span-8 lg:text-right">
+        <section className="relative isolate min-h-[360px] overflow-hidden rounded-[2.5rem] bg-[#4A0811] bg-cover bg-center text-white shadow-xl" style={{ backgroundImage: `url(${wholesalePromo.image || "/images/redesign/wholesale-banner.jpg"})` }}>
+          <TextRegionBackdrop position={wholesalePromo.textRegionPosition} />
+          <div className={`relative z-10 flex min-h-[360px] p-8 sm:p-12 ${getTextRegionLayoutClass(wholesalePromo.textRegionPosition)}`}>
+            <div className={`space-y-4 drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)] ${getTextRegionContentWidthClass(wholesalePromo.textRegionPosition)}`}>
               <h2 className="text-2xl sm:text-4xl font-black leading-tight">
                 {wholesalePromo.title}
               </h2>
@@ -345,9 +373,9 @@ export default async function HomePage() {
         {bottomBanners.length > 0 && (
           <section className="grid gap-5 sm:grid-cols-2" aria-label="بنرهای پایانی">
             {bottomBanners.map((banner) => (
-              <Link key={banner.id} href={banner.href || "/products"} aria-label={banner.alt} className="relative isolate min-h-[220px] overflow-hidden rounded-[2rem] border border-white/50 bg-cover bg-center shadow-lg" style={{ backgroundImage: `url(${banner.image})` }}>
-                <span className="absolute inset-0 -z-10 bg-gradient-to-t from-black/45 to-transparent" />
-                <span className="absolute inset-x-5 bottom-5 rounded-xl border border-white/25 bg-black/25 px-4 py-3 text-sm font-black text-white backdrop-blur-md">{banner.alt}</span>
+              <Link key={banner.id} href={banner.href || "/products"} aria-label={banner.alt} className={`relative isolate flex min-h-[220px] overflow-hidden rounded-[2rem] border border-white/50 bg-cover bg-center p-5 shadow-lg ${getTextRegionLayoutClass(banner.textRegionPosition, "bottom")}`} style={{ backgroundImage: `url(${banner.image})` }}>
+                <TextRegionBackdrop position={banner.textRegionPosition} fallback="bottom" />
+                <span className={`relative z-10 px-4 py-3 text-sm font-black text-white drop-shadow-md ${getTextRegionContentWidthClass(banner.textRegionPosition, "bottom")}`}>{banner.alt}</span>
               </Link>
             ))}
           </section>

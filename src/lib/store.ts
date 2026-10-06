@@ -83,6 +83,7 @@ export function getMemoryStore() {
       images: p.images,
       retailImages: p.retailImages ?? [],
       wholesaleImages: p.wholesaleImages ?? [],
+      cardTextRegionPosition: p.cardTextRegionPosition ?? "bottom",
       badge: p.badge,
       inStock: true,
       featured: p.featured,
@@ -212,6 +213,7 @@ export async function ensureSeeded() {
         images: p.images,
         retailImages: p.retailImages ?? [],
         wholesaleImages: p.wholesaleImages ?? [],
+        cardTextRegionPosition: p.cardTextRegionPosition ?? "bottom",
         badge: p.badge,
         inStock: true,
         featured: p.featured,
@@ -393,6 +395,7 @@ export type ProductInput = {
   images: string[];
   retailImages: string[];
   wholesaleImages: string[];
+  cardTextRegionPosition: "right" | "left" | "bottom" | "center";
   badge: string;
   inStock: boolean;
   featured: boolean;
@@ -539,6 +542,10 @@ export function sanitizeProduct(body: Record<string, unknown>): ProductInput {
     images: arr(body.images),
     retailImages: arr(body.retailImages),
     wholesaleImages: arr(body.wholesaleImages),
+    cardTextRegionPosition: (() => {
+      const value = str(body.cardTextRegionPosition);
+      return value === "right" || value === "left" || value === "center" ? value : "bottom";
+    })(),
     badge: str(body.badge),
     inStock: body.inStock !== false,
     featured: body.featured === true,

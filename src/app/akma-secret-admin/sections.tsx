@@ -33,7 +33,7 @@ import {
   type WholesalePromoSettings,
 } from "@/lib/defaults";
 import { ICON_CHOICES, DynIcon } from "@/components/icon";
-import { SectionCard, Field, ImageUploader, Textarea, Toggle, Select, ColorField, ListEditor } from "./fields";
+import { SectionCard, Field, ImageUploader, Textarea, Toggle, Select, ColorField, ListEditor, TextRegionControl } from "./fields";
 
 type Settings = Record<string, unknown>;
 export type SetKey = (key: string, value: unknown) => void;
@@ -244,6 +244,11 @@ export function HeroBannersSection({
             hint="تصویر را مستقیم از کامپیوتر انتخاب کنید؛ حداکثر 10MB."
           />
         </div>
+        <TextRegionControl
+          value={hero.textRegionPosition || "right"}
+          onChange={(textRegionPosition) => setHero({ textRegionPosition })}
+          image={hero.image}
+        />
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label="تیتر (بخش اول)" value={hero.title} onChange={(v) => setHero({ title: v })} />
           <Field
@@ -388,6 +393,13 @@ export function HeroBannersSection({
                 />
               </div>
               <div className="mt-4">
+                <TextRegionControl
+                  value={b.textRegionPosition || "right"}
+                  onChange={(textRegionPosition) => setBanner(i, { textRegionPosition })}
+                  image={b.image}
+                />
+              </div>
+              <div className="mt-4">
                 <Textarea
                   label="متن"
                   value={b.subtitle}
@@ -419,6 +431,7 @@ export function HeroBannersSection({
                   href: "/products",
                   image: "/images/hero.png",
                   enabled: true,
+                  textRegionPosition: "right",
                 },
               ])
             }
@@ -507,6 +520,18 @@ export function HeroBannersSection({
                   />
                 </div>
               </div>
+              <div className="mt-4">
+                <TextRegionControl
+                  value={bb.textRegionPosition || "bottom"}
+                  onChange={(textRegionPosition) =>
+                    setKey(
+                      "bottomBanners",
+                      bottomBanners.map((x, j) => (j === i ? { ...x, textRegionPosition } : x)),
+                    )
+                  }
+                  image={bb.image}
+                />
+              </div>
             </div>
           ))}
           <button
@@ -520,6 +545,7 @@ export function HeroBannersSection({
                   href: "/products",
                   alt: "محصولات آکما",
                   enabled: true,
+                  textRegionPosition: "bottom",
                 },
               ])
             }
@@ -648,6 +674,11 @@ export function HomePageCardsSection({
               guideline="mediumBanner"
               hint="تصویر اسنیکر / کفش شیک برای کارت تکی."
             />
+            <TextRegionControl
+              value={dualCards.retail.textRegionPosition || "right"}
+              onChange={(textRegionPosition) => setDualRetail({ textRegionPosition })}
+              image={dualCards.retail.image}
+            />
             <div className="grid gap-3 sm:grid-cols-2">
               <Field
                 label="متن دکمه"
@@ -696,6 +727,11 @@ export function HomePageCardsSection({
               kind="banners"
               guideline="mediumBanner"
               hint="تصویر کارتن‌ها و سفارشات شرکتی آکما."
+            />
+            <TextRegionControl
+              value={dualCards.wholesale.textRegionPosition || "right"}
+              onChange={(textRegionPosition) => setDualWholesale({ textRegionPosition })}
+              image={dualCards.wholesale.image}
             />
             <div className="grid gap-3 sm:grid-cols-2">
               <Field
@@ -789,6 +825,13 @@ export function HomePageCardsSection({
                   kind="products"
                   guideline="category"
                 />
+                <div className="mt-3">
+                  <TextRegionControl
+                    value={cat.textRegionPosition || "bottom"}
+                    onChange={(textRegionPosition) => setCategoryItem(idx, { textRegionPosition })}
+                    image={cat.image}
+                  />
+                </div>
               </div>
 
               <button
@@ -833,6 +876,11 @@ export function HomePageCardsSection({
             guideline="banner"
           />
         </div>
+        <TextRegionControl
+          value={wholesalePromo.textRegionPosition || "right"}
+          onChange={(textRegionPosition) => setPromo({ textRegionPosition })}
+          image={wholesalePromo.image}
+        />
         <Textarea
           label="توضیحات بنر همکاری"
           value={wholesalePromo.subtitle}

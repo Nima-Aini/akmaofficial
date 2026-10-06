@@ -107,6 +107,21 @@ try {
   const admin = (await db.insert(adminUsers).values({ username: "ci_admin", passwordHash: hashPassword("unused-ci-password") }).returning())[0];
   await startServer();
 
+  await test("admin persists banner text-region settings in PostgreSQL", async () => {
+    const value = {
+      title: "هیرو تست",
+      image: "/uploads/banners/hero-ci.webp",
+      textRegionPosition: "left",
+    };
+    const response = await fetch(`${baseUrl}/api/admin/settings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: `akma_admin_session=${createSessionToken(admin.username)}` },
+      body: JSON.stringify({ key: "hero", value }),
+    });
+    assert.equal(response.status, 200, await response.text());
+    assert.deepEqual((await db.select().from(settings).where(eq(settings.key, "hero")))[0]?.value, value);
+  });
+
   await test("initial HTTP checkout stores trusted order and attempt", async () => {
     const response = await post("/api/orders", {
       customerName: customerA.name, customerPhone: customerA.phone, customerAddress: "تهران خیابان آزادی پلاک ۱۰۰",
@@ -127,13 +142,14 @@ try {
     const response = await fetch(`${baseUrl}/api/admin/products/${product.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json", Cookie: `akma_admin_session=${createSessionToken(admin.username)}` },
-      body: JSON.stringify({ ...product, wholesalePackSize: 12, wholesalePackLabel: "بسته ۱۲ عددی", wholesaleMinPackQty: 1, wholesalePrice: 1200000, wholesaleTiers: [{ minQty: 1, price: 1200000, label: "۱ تا ۴ بسته" }, { minQty: 5, price: 1100000, label: "۵+ بسته" }], retailUnitLabel: "عدد", retailImages: ["/uploads/products/retail-ci.webp"], wholesaleImages: ["/uploads/products/wholesale-ci.webp"] }),
+      body: JSON.stringify({ ...product, wholesalePackSize: 12, wholesalePackLabel: "بسته ۱۲ عددی", wholesaleMinPackQty: 1, wholesalePrice: 1200000, wholesaleTiers: [{ minQty: 1, price: 1200000, label: "۱ تا ۴ بسته" }, { minQty: 5, price: 1100000, label: "۵+ بسته" }], retailUnitLabel: "عدد", retailImages: ["/uploads/products/retail-ci.webp"], wholesaleImages: ["/uploads/products/wholesale-ci.webp"], cardTextRegionPosition: "left" }),
     });
     assert.equal(response.status, 200, await response.text());
     configuredProduct = (await db.select().from(products).where(eq(products.id, product.id)))[0];
     assert.equal(configuredProduct.wholesalePackSize, 12);
     assert.equal(configuredProduct.wholesaleMinPackQty, 1);
     assert.equal(configuredProduct.wholesalePackLabel, "بسته ۱۲ عددی");
+    assert.equal(configuredProduct.cardTextRegionPosition, "left");
   });
 
   await test("admin persists retail images", async () => {

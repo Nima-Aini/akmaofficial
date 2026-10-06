@@ -9,6 +9,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import type { TextRegionPosition } from "@/lib/text-region";
 
 export type WholesaleTier = {
   minQty: number;
@@ -42,6 +43,7 @@ export const products = pgTable("products", {
   images: jsonb("images").$type<string[]>().notNull().default([]),
   retailImages: jsonb("retail_images").$type<string[]>().notNull().default([]),
   wholesaleImages: jsonb("wholesale_images").$type<string[]>().notNull().default([]),
+  cardTextRegionPosition: text("card_text_region_position").$type<TextRegionPosition>().notNull().default("bottom"),
   badge: text("badge").notNull().default(""),
   inStock: boolean("in_stock").notNull().default(true),
   featured: boolean("featured").notNull().default(false),
