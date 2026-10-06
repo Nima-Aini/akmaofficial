@@ -67,8 +67,12 @@ export function getMemoryStore() {
       contents: p.contents,
       price: p.price,
       retailPrice: p.retailPrice ?? p.price,
+      retailUnitLabel: p.retailUnitLabel ?? "عدد",
       wholesalePrice: p.wholesalePrice ?? p.price,
       wholesaleMinQty: p.wholesaleMinQty ?? 1,
+      wholesalePackSize: p.wholesalePackSize ?? null,
+      wholesalePackLabel: p.wholesalePackLabel ?? "",
+      wholesaleMinPackQty: p.wholesaleMinPackQty ?? null,
       wholesaleTiers: p.wholesaleTiers ?? [],
       isRetail: p.isRetail !== false,
       isWholesale: p.isWholesale !== false,
@@ -77,6 +81,8 @@ export function getMemoryStore() {
       category: p.category,
       categoryLabel: p.categoryLabel,
       images: p.images,
+      retailImages: p.retailImages ?? [],
+      wholesaleImages: p.wholesaleImages ?? [],
       badge: p.badge,
       inStock: true,
       featured: p.featured,
@@ -109,6 +115,14 @@ export function getMemoryStore() {
             quantity: 2,
             mode: "wholesale",
             tierLabel: "قیمت همکاری",
+            selectedQuantity: 2,
+            unitOrPackPrice: 1200000,
+            packCount: 2,
+            unitsPerPack: 1,
+            totalUnits: 2,
+            wholesalePackLabel: "بسته",
+            appliedPricingTier: "قیمت همکاری",
+            lineTotal: 2400000,
           },
         ],
         totalAmount: 3360000,
@@ -182,8 +196,12 @@ export async function ensureSeeded() {
         contents: p.contents,
         price: p.price,
         retailPrice: p.retailPrice ?? p.price,
+        retailUnitLabel: p.retailUnitLabel ?? "عدد",
         wholesalePrice: p.wholesalePrice ?? p.price,
         wholesaleMinQty: p.wholesaleMinQty ?? 1,
+        wholesalePackSize: p.wholesalePackSize ?? null,
+        wholesalePackLabel: p.wholesalePackLabel ?? "",
+        wholesaleMinPackQty: p.wholesaleMinPackQty ?? null,
         wholesaleTiers: p.wholesaleTiers ?? [],
         isRetail: p.isRetail !== false,
         isWholesale: p.isWholesale !== false,
@@ -192,6 +210,8 @@ export async function ensureSeeded() {
         category: p.category,
         categoryLabel: p.categoryLabel,
         images: p.images,
+        retailImages: p.retailImages ?? [],
+        wholesaleImages: p.wholesaleImages ?? [],
         badge: p.badge,
         inStock: true,
         featured: p.featured,
@@ -357,8 +377,12 @@ export type ProductInput = {
   contents: string[];
   price: number;
   retailPrice: number;
+  retailUnitLabel: string;
   wholesalePrice: number;
   wholesaleMinQty: number;
+  wholesalePackSize: number | null;
+  wholesalePackLabel: string;
+  wholesaleMinPackQty: number | null;
   wholesaleTiers: { minQty: number; price: number; label?: string }[];
   isRetail: boolean;
   isWholesale: boolean;
@@ -367,6 +391,8 @@ export type ProductInput = {
   category: string;
   categoryLabel: string;
   images: string[];
+  retailImages: string[];
+  wholesaleImages: string[];
   badge: string;
   inStock: boolean;
   featured: boolean;
@@ -470,9 +496,15 @@ export function sanitizeProduct(body: Record<string, unknown>): ProductInput {
   const arr = (v: unknown) =>
     Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
   const name = str(body.name) || "محصول بدون نام";
+  const positiveIntOrNull = (value: unknown) => {
+    if (value === null || value === undefined || value === "") return null;
+    const number = Number(value);
+    if (!Number.isSafeInteger(number) || number <= 0) throw new Error("مقدار بسته باید یک عدد صحیح مثبت باشد");
+    return number;
+  };
   const rawTiers = Array.isArray(body.wholesaleTiers)
     ? (body.wholesaleTiers as Array<{ minQty?: unknown; price?: unknown; label?: unknown }>).map((t) => ({
-        minQty: Math.max(1, Number(t.minQty) || 1),
+        minQty: positiveIntOrNull(t.minQty) ?? 1,
         price: Math.max(0, Number(t.price) || 0),
         label: typeof t.label === "string" ? t.label.trim() : undefined,
       }))
@@ -491,8 +523,12 @@ export function sanitizeProduct(body: Record<string, unknown>): ProductInput {
     contents: arr(body.contents),
     price,
     retailPrice,
+    retailUnitLabel: str(body.retailUnitLabel) || "عدد",
     wholesalePrice,
     wholesaleMinQty: Math.max(1, Number(body.wholesaleMinQty) || 1),
+    wholesalePackSize: positiveIntOrNull(body.wholesalePackSize),
+    wholesalePackLabel: str(body.wholesalePackLabel),
+    wholesaleMinPackQty: positiveIntOrNull(body.wholesaleMinPackQty),
     wholesaleTiers: rawTiers,
     isRetail: body.isRetail !== false,
     isWholesale: body.isWholesale !== false,
@@ -501,6 +537,8 @@ export function sanitizeProduct(body: Record<string, unknown>): ProductInput {
     category: str(body.category) || "foam",
     categoryLabel: str(body.categoryLabel) || "فوم تمیزکننده",
     images: arr(body.images),
+    retailImages: arr(body.retailImages),
+    wholesaleImages: arr(body.wholesaleImages),
     badge: str(body.badge),
     inStock: body.inStock !== false,
     featured: body.featured === true,

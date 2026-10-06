@@ -122,6 +122,73 @@ try {
     assert.equal(attempts.length, 1); assert.equal(attempts[0].status, "pending");
   });
 
+  let configuredProduct;
+  await test("admin persists wholesale pack settings", async () => {
+    const response = await fetch(`${baseUrl}/api/admin/products/${product.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: `akma_admin_session=${createSessionToken(admin.username)}` },
+      body: JSON.stringify({ ...product, wholesalePackSize: 12, wholesalePackLabel: "بسته ۱۲ عددی", wholesaleMinPackQty: 1, wholesalePrice: 1200000, wholesaleTiers: [{ minQty: 1, price: 1200000, label: "۱ تا ۴ بسته" }, { minQty: 5, price: 1100000, label: "۵+ بسته" }], retailUnitLabel: "عدد", retailImages: ["/uploads/products/retail-ci.webp"], wholesaleImages: ["/uploads/products/wholesale-ci.webp"] }),
+    });
+    assert.equal(response.status, 200, await response.text());
+    configuredProduct = (await db.select().from(products).where(eq(products.id, product.id)))[0];
+    assert.equal(configuredProduct.wholesalePackSize, 12);
+    assert.equal(configuredProduct.wholesaleMinPackQty, 1);
+    assert.equal(configuredProduct.wholesalePackLabel, "بسته ۱۲ عددی");
+  });
+
+  await test("admin persists retail images", async () => {
+    assert.deepEqual(configuredProduct.retailImages, ["/uploads/products/retail-ci.webp"]);
+  });
+
+  await test("admin persists wholesale images", async () => {
+    assert.deepEqual(configuredProduct.wholesaleImages, ["/uploads/products/wholesale-ci.webp"]);
+  });
+
+  let wholesaleOrder;
+  await test("wholesale checkout persists trusted pack snapshot and rejects price tampering", async () => {
+    const response = await post("/api/orders", {
+      orderType: "wholesale", customerName: customerA.name, customerPhone: customerA.phone, customerAddress: "تهران خیابان آزادی پلاک ۱۰۰",
+      customerProvince: "تهران", customerCity: "تهران", postalCode: "1234567890", paymentMethod: "card_to_card",
+      items: [{ productId: product.id, quantity: 3, price: 1, wholesalePackSize: 999, tierLabel: "جعلی" }],
+    }, `akma_customer_session=${createCustomerToken(customerA.phone)}`);
+    const body = await response.json();
+    assert.equal(response.status, 200, JSON.stringify(body));
+    wholesaleOrder = (await db.select().from(orders).where(eq(orders.trackingCode, body.trackingCode)))[0];
+    const item = wholesaleOrder.items[0];
+    assert.equal(wholesaleOrder.totalAmount, 3600000);
+    assert.equal(item.mode, "wholesale");
+    assert.equal(item.packCount, 3);
+    assert.equal(item.unitsPerPack, 12);
+    assert.equal(item.totalUnits, 36);
+    assert.equal(item.unitOrPackPrice, 1200000);
+    assert.equal(item.lineTotal, 3600000);
+    assert.equal(item.productImage, "/uploads/products/wholesale-ci.webp");
+  });
+
+  await test("wholesale checkout enforces minimum pack count", async () => {
+    await db.update(products).set({ wholesaleMinPackQty: 2 }).where(eq(products.id, product.id));
+    const response = await post("/api/orders", { orderType: "wholesale", customerName: customerA.name, customerPhone: customerA.phone, customerAddress: "تهران خیابان آزادی پلاک ۱۰۰", paymentMethod: "card_to_card", items: [{ productId: product.id, quantity: 1 }] }, `akma_customer_session=${createCustomerToken(customerA.phone)}`);
+    assert.equal(response.status, 400);
+    await db.update(products).set({ wholesaleMinPackQty: 1 }).where(eq(products.id, product.id));
+  });
+
+  await test("historical order snapshot survives later product changes", async () => {
+    await db.update(products).set({ wholesalePackSize: 24, wholesalePrice: 999999 }).where(eq(products.id, product.id));
+    const stored = (await db.select().from(orders).where(eq(orders.id, wholesaleOrder.id)))[0].items[0];
+    assert.equal(stored.unitsPerPack, 12);
+    assert.equal(stored.unitOrPackPrice, 1200000);
+    assert.equal(stored.lineTotal, 3600000);
+  });
+
+  await test("checkout rejects invalid retail and wholesale quantities", async () => {
+    for (const mode of ["retail", "wholesale"]) {
+      for (const quantity of [0, -1, 1.5, "NaN", Number.MAX_SAFE_INTEGER + 1]) {
+        const response = await post("/api/orders", { orderType: mode, customerName: customerA.name, customerPhone: customerA.phone, customerAddress: "تهران خیابان آزادی پلاک ۱۰۰", paymentMethod: "card_to_card", items: [{ productId: product.id, quantity, mode }] }, `akma_customer_session=${createCustomerToken(customerA.phone)}`);
+        assert.equal(response.status, 400, `mode=${mode} quantity=${quantity}`);
+      }
+    }
+  });
+
   await test("canceled callback records failed attempt", async () => {
     const order = (await db.insert(orders).values(orderValues(customerA, "AKM-CANCELED", { paymentTrackId: "TRACK-CANCELED" })).returning())[0];
     await db.insert(paymentAttempts).values({ orderId: order.id, trackId: "TRACK-CANCELED", amount: 100000, amountRials: 1000000 });

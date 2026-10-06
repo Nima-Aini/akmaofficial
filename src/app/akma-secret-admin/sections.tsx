@@ -645,7 +645,7 @@ export function HomePageCardsSection({
               value={dualCards.retail.image}
               onChange={(v) => setDualRetail({ image: typeof v === "string" ? v : (v[0] ?? "") })}
               kind="banners"
-              guideline="banner"
+              guideline="mediumBanner"
               hint="تصویر اسنیکر / کفش شیک برای کارت تکی."
             />
             <div className="grid gap-3 sm:grid-cols-2">
@@ -694,7 +694,7 @@ export function HomePageCardsSection({
               value={dualCards.wholesale.image}
               onChange={(v) => setDualWholesale({ image: typeof v === "string" ? v : (v[0] ?? "") })}
               kind="banners"
-              guideline="banner"
+              guideline="mediumBanner"
               hint="تصویر کارتن‌ها و سفارشات شرکتی آکما."
             />
             <div className="grid gap-3 sm:grid-cols-2">
@@ -787,7 +787,7 @@ export function HomePageCardsSection({
                     setCategoryItem(idx, { image: typeof v === "string" ? v : (v[0] ?? "") })
                   }
                   kind="products"
-                  guideline="product"
+                  guideline="category"
                 />
               </div>
 

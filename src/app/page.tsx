@@ -7,28 +7,21 @@ import {
   Headphones,
   ShieldCheck,
   Truck,
-  Sparkle,
-  Phone,
-  Layers,
   ChevronLeft,
 } from "lucide-react";
 import { getActiveProducts, getSettings } from "@/lib/store";
 import {
   DEFAULT_CATEGORIES,
-  DEFAULT_CONTACT,
+  DEFAULT_BANNERS,
+  DEFAULT_BOTTOM_BANNERS,
   DEFAULT_DUAL_CARDS,
-  DEFAULT_FEATURES,
   DEFAULT_HERO,
-  DEFAULT_SECTION_TITLES,
-  DEFAULT_SITE,
   DEFAULT_WHOLESALE_PROMO,
   type CategoryItem,
-  type ContactSettings,
+  type Banner,
+  type BottomBanner,
   type DualCardsSettings,
-  type Feature,
   type HeroSettings,
-  type SectionTitles,
-  type SiteSettings,
   type WholesalePromoSettings,
 } from "@/lib/defaults";
 import { ProductCard } from "@/components/product-card";
@@ -44,12 +37,12 @@ export default async function HomePage() {
     wholesale: { ...DEFAULT_DUAL_CARDS.wholesale, ...(s.dualCards as Partial<DualCardsSettings>)?.wholesale },
   };
   const categories: CategoryItem[] = (s.categories as CategoryItem[]) || DEFAULT_CATEGORIES;
+  const banners: Banner[] = ((s.banners as Banner[]) || DEFAULT_BANNERS).filter((banner) => banner.enabled);
+  const bottomBanners: BottomBanner[] = ((s.bottomBanners as BottomBanner[]) || DEFAULT_BOTTOM_BANNERS).filter((banner) => banner.enabled);
   const wholesalePromo: WholesalePromoSettings = {
     ...DEFAULT_WHOLESALE_PROMO,
     ...(s.wholesalePromo as Partial<WholesalePromoSettings>),
   };
-  const contact = { ...DEFAULT_CONTACT, ...(s.contact as Partial<ContactSettings>) };
-  const phone = contact.phones[0] ?? "09033253065";
 
   // Showcase 4 featured bestseller items matching reference panel
   const featured = products.filter((p) => p.featured);
@@ -60,10 +53,11 @@ export default async function HomePage() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-12 sm:space-y-16 pt-6">
 
         {/* ================= 1. HERO SECTION (MATCHING LEFT REFERENCE PANEL) ================= */}
-        <section className="relative overflow-hidden rounded-[2rem] sm:rounded-[2.5rem] bg-gradient-to-r from-[#4A0811] via-[#750E1B] to-[#991424] text-white shadow-xl">
+        <section className="relative isolate overflow-hidden rounded-[2rem] bg-[#4A0811] bg-cover bg-center text-white shadow-xl sm:rounded-[2.5rem]" style={{ backgroundImage: `url(${hero.image || "/images/redesign/hero.jpg"})` }}>
+          <div className="absolute inset-0 -z-10 bg-gradient-to-l from-black/90 via-[#4A0811]/65 to-black/15" />
           <div className="grid lg:grid-cols-12 items-center gap-8 p-6 sm:p-10 lg:p-14 relative z-10">
             {/* Left Content Area (Right in RTL) */}
-            <div className="lg:col-span-7 space-y-6 text-center lg:text-right">
+            <div className="space-y-6 rounded-[1.75rem] border border-white/20 bg-black/25 p-6 text-center shadow-2xl backdrop-blur-md lg:col-span-8 lg:text-right">
               <div className="inline-flex items-center gap-2 rounded-full bg-black/25 px-4 py-1.5 text-xs font-bold text-white/90 backdrop-blur-xs border border-white/10">
                 <span className="size-2 rounded-full bg-[#E53E3E] animate-pulse" />
                 {hero.badge}
@@ -98,18 +92,6 @@ export default async function HomePage() {
               </div>
             </div>
 
-            {/* Right Image Composition (Left in RTL) */}
-            <div className="lg:col-span-5 relative flex justify-center">
-              <div className="relative w-full max-w-md aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl border border-white/15">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={hero.image || "/images/redesign/hero.jpg"}
-                  alt="مراقبت از کفش آکما"
-                  className="size-full object-cover transition-transform duration-700 hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
-              </div>
-            </div>
           </div>
 
           {/* Dots Indicator in bottom corner */}
@@ -145,9 +127,9 @@ export default async function HomePage() {
         {/* ================= 3. DUAL ACTION CARDS (RETAIL VS. WHOLESALE) ================= */}
         <section className="grid md:grid-cols-2 gap-6 lg:gap-8">
           {/* RETAIL CARD: خرید تکی */}
-          <div className="relative overflow-hidden rounded-[2rem] border border-[#E7E3DC] bg-white p-6 sm:p-8 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between">
-            <div className="grid sm:grid-cols-12 gap-6 items-center">
-              <div className="sm:col-span-7 space-y-4">
+          <div className="relative isolate min-h-[360px] overflow-hidden rounded-[2rem] border border-white/60 bg-cover bg-center p-6 shadow-md transition-shadow hover:shadow-xl sm:p-8" style={{ backgroundImage: `url(${dualCards.retail.image || "/images/redesign/retail-card.jpg"})` }}>
+            <div className="absolute inset-0 -z-10 bg-gradient-to-l from-white/95 via-white/75 to-black/10" />
+              <div className="max-w-md space-y-4 rounded-2xl border border-white/70 bg-white/70 p-5 shadow-lg backdrop-blur-md">
                 <div>
                   <h2 className="text-2xl sm:text-3xl font-black text-[#8E111E]">
                     {dualCards.retail.title}
@@ -179,23 +161,12 @@ export default async function HomePage() {
                 </div>
               </div>
 
-              <div className="sm:col-span-5 flex justify-center">
-                <div className="relative aspect-square w-full max-w-[200px] rounded-2xl overflow-hidden bg-[#FAF8F5] border border-[#E7E3DC] p-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={dualCards.retail.image || "/images/redesign/retail-card.jpg"}
-                    alt="خرید تکی آکما"
-                    className="size-full object-cover rounded-xl"
-                  />
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* WHOLESALE CARD: خرید عمده */}
-          <div className="relative overflow-hidden rounded-[2rem] border border-[#E7E3DC] bg-white p-6 sm:p-8 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between">
-            <div className="grid sm:grid-cols-12 gap-6 items-center">
-              <div className="sm:col-span-7 space-y-4">
+          <div className="relative isolate min-h-[360px] overflow-hidden rounded-[2rem] border border-white/60 bg-cover bg-center p-6 shadow-md transition-shadow hover:shadow-xl sm:p-8" style={{ backgroundImage: `url(${dualCards.wholesale.image || "/images/redesign/wholesale-boxes.jpg"})` }}>
+            <div className="absolute inset-0 -z-10 bg-gradient-to-l from-white/95 via-white/75 to-black/10" />
+              <div className="max-w-md space-y-4 rounded-2xl border border-white/70 bg-white/70 p-5 shadow-lg backdrop-blur-md">
                 <div>
                   <h2 className="text-2xl sm:text-3xl font-black text-[#8E111E]">
                     {dualCards.wholesale.title}
@@ -227,17 +198,6 @@ export default async function HomePage() {
                 </div>
               </div>
 
-              <div className="sm:col-span-5 flex justify-center">
-                <div className="relative aspect-square w-full max-w-[200px] rounded-2xl overflow-hidden bg-[#FAF8F5] border border-[#E7E3DC] p-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={dualCards.wholesale.image || "/images/redesign/wholesale-boxes.jpg"}
-                    alt="خرید عمده آکما"
-                    className="size-full object-cover rounded-xl"
-                  />
-                </div>
-              </div>
-            </div>
           </div>
         </section>
 
@@ -294,23 +254,32 @@ export default async function HomePage() {
               <Link
                 key={cat.key}
                 href={cat.href || `/products?cat=${cat.key}`}
-                className="group flex flex-col items-center rounded-2xl border border-[#E7E3DC] bg-white p-4 text-center shadow-xs transition-all hover:-translate-y-1 hover:border-[#8E111E]/40 hover:shadow-md"
+                className="group relative isolate flex aspect-square items-end overflow-hidden rounded-2xl border border-white/60 bg-cover bg-center p-3 text-center shadow-md transition-all hover:-translate-y-1 hover:shadow-xl"
+                style={{ backgroundImage: `url(${cat.image})` }}
               >
-                <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-[#FAF8F5] p-3 mb-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={cat.image}
-                    alt={cat.label}
-                    className="size-full object-contain transition-transform duration-500 group-hover:scale-110"
-                  />
-                </div>
-                <span className="text-xs font-black text-[#2A2421] group-hover:text-[#8E111E] transition-colors">
+                <span className="absolute inset-0 -z-10 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                <span className="w-full rounded-xl border border-white/30 bg-white/80 px-3 py-2 text-xs font-black text-[#2A2421] shadow backdrop-blur-md group-hover:text-[#8E111E] transition-colors">
                   {cat.label}
                 </span>
               </Link>
             ))}
           </div>
         </section>
+
+        {banners.length > 0 && (
+          <section className="grid gap-6 md:grid-cols-2" aria-label="پیشنهادهای ویژه">
+            {banners.map((banner) => (
+              <Link key={banner.id} href={banner.href || "/products"} className="group relative isolate flex min-h-[300px] items-end overflow-hidden rounded-[2rem] border border-white/50 bg-cover bg-center p-6 shadow-lg" style={{ backgroundImage: `url(${banner.image})` }}>
+                <span className="absolute inset-0 -z-10 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+                <span className="block w-full rounded-2xl border border-white/25 bg-black/35 p-5 text-white shadow-xl backdrop-blur-md">
+                  <strong className="block text-xl font-black">{banner.title}</strong>
+                  <span className="mt-2 block text-xs leading-6 text-white/85">{banner.subtitle}</span>
+                  <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-5 py-2 text-xs font-black text-[#8E111E]">{banner.cta}<ArrowLeft size={14} /></span>
+                </span>
+              </Link>
+            ))}
+          </section>
+        )}
 
         {/* ================= 6. FEATURED BESTSELLERS SECTION ================= */}
         <section className="space-y-6">
@@ -335,9 +304,10 @@ export default async function HomePage() {
         </section>
 
         {/* ================= 7. LOWER WHOLESALE COLLABORATION BANNER ================= */}
-        <section className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-r from-[#4A0811] via-[#6B0C17] to-[#8E111E] text-white p-8 sm:p-12 shadow-xl">
+        <section className="relative isolate overflow-hidden rounded-[2.5rem] bg-[#4A0811] bg-cover bg-center p-8 text-white shadow-xl sm:p-12" style={{ backgroundImage: `url(${wholesalePromo.image || "/images/redesign/wholesale-banner.jpg"})` }}>
+          <div className="absolute inset-0 -z-10 bg-gradient-to-l from-[#4A0811]/95 via-black/60 to-black/15" />
           <div className="grid lg:grid-cols-12 items-center gap-8">
-            <div className="lg:col-span-8 space-y-4 text-center lg:text-right">
+            <div className="space-y-4 rounded-[1.75rem] border border-white/20 bg-black/30 p-6 text-center shadow-xl backdrop-blur-md lg:col-span-8 lg:text-right">
               <h2 className="text-2xl sm:text-4xl font-black leading-tight">
                 {wholesalePromo.title}
               </h2>
@@ -369,18 +339,19 @@ export default async function HomePage() {
               </div>
             </div>
 
-            <div className="lg:col-span-4 flex justify-center">
-              <div className="relative aspect-[4/3] w-full max-w-sm rounded-2xl overflow-hidden border border-white/20 shadow-2xl">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={wholesalePromo.image || "/images/redesign/wholesale-banner.jpg"}
-                  alt="همکاری عمده با آکما"
-                  className="size-full object-cover"
-                />
-              </div>
-            </div>
           </div>
         </section>
+
+        {bottomBanners.length > 0 && (
+          <section className="grid gap-5 sm:grid-cols-2" aria-label="بنرهای پایانی">
+            {bottomBanners.map((banner) => (
+              <Link key={banner.id} href={banner.href || "/products"} aria-label={banner.alt} className="relative isolate min-h-[220px] overflow-hidden rounded-[2rem] border border-white/50 bg-cover bg-center shadow-lg" style={{ backgroundImage: `url(${banner.image})` }}>
+                <span className="absolute inset-0 -z-10 bg-gradient-to-t from-black/45 to-transparent" />
+                <span className="absolute inset-x-5 bottom-5 rounded-xl border border-white/25 bg-black/25 px-4 py-3 text-sm font-black text-white backdrop-blur-md">{banner.alt}</span>
+              </Link>
+            ))}
+          </section>
+        )}
 
       </div>
     </div>

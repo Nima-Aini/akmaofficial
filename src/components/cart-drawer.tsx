@@ -96,6 +96,11 @@ export function CartDrawer() {
                       {item.unitPrice && (
                         <p className="text-[10px] text-muted">{item.unitPrice}</p>
                       )}
+                      {item.mode === "wholesale" && (
+                        <p className="text-[10px] font-bold text-accent">
+                          {toFa(item.quantity)} {item.wholesalePackLabel || "بسته"} × {toFa(item.wholesalePackSize || 1)} عدد = {toFa(item.totalUnits ?? item.quantity)} عدد
+                        </p>
+                      )}
 
                       <div className="mt-2 flex items-center justify-between">
                         <div className="flex items-center gap-1.5 rounded-lg border border-line bg-card p-1">
@@ -108,6 +113,7 @@ export function CartDrawer() {
                           </button>
                           <span className="min-w-6 text-center text-xs font-extrabold text-ink">
                             {toFa(item.quantity)}
+                            <span className="mr-1 text-[9px] text-muted">{item.mode === "wholesale" ? "بسته" : (item.retailUnitLabel || "عدد")}</span>
                           </span>
                           <button
                             onClick={() => updateQuantity(item.productId, item.quantity + 1)}

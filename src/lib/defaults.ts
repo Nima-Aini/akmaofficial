@@ -383,8 +383,12 @@ export type ProductSeed = {
   contents: string[];
   price: number;
   retailPrice?: number;
+  retailUnitLabel?: string;
   wholesalePrice?: number;
   wholesaleMinQty?: number;
+  wholesalePackSize?: number | null;
+  wholesalePackLabel?: string;
+  wholesaleMinPackQty?: number | null;
   wholesaleTiers?: { minQty: number; price: number; label?: string }[];
   isRetail?: boolean;
   isWholesale?: boolean;
@@ -392,6 +396,8 @@ export type ProductSeed = {
   category: string;
   categoryLabel: string;
   images: string[];
+  retailImages?: string[];
+  wholesaleImages?: string[];
   badge: string;
   featured: boolean;
   sortOrder: number;

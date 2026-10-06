@@ -3,11 +3,16 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { toFa } from "@/lib/format";
+import { useProductMode } from "@/context/product-mode-context";
+import { getProductImages } from "@/lib/product-media";
 
 const FALLBACK = "/images/products/foam-bottle.png";
 
-export function ProductGallery({ images, productName, badge }: { images: string[]; productName: string; badge?: string }) {
-  const validImages = useMemo(() => images.filter((image): image is string => typeof image === "string" && image.trim().length > 0), [images]);
+export function ProductGallery({ images, retailImages = [], wholesaleImages = [], productName, badge }: { images: string[]; retailImages?: string[]; wholesaleImages?: string[]; productName: string; badge?: string }) {
+  const productMode = useProductMode();
+  const mode = productMode?.mode ?? "retail";
+  const modeImages = useMemo(() => getProductImages({ images, retailImages, wholesaleImages }, mode), [images, retailImages, wholesaleImages, mode]);
+  const validImages = useMemo(() => modeImages.filter((image): image is string => typeof image === "string" && image.trim().length > 0), [modeImages]);
   const gallery = validImages.length ? validImages : [FALLBACK];
   const [selectedIndex, setSelectedIndex] = useState(0);
   const selected = gallery[selectedIndex] ?? gallery[0];

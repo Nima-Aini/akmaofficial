@@ -20,6 +20,8 @@ import { AddToCartButton } from "@/components/add-to-cart-button";
 import { Reveal } from "@/components/effects";
 import { formatPrice, telHref, toFa } from "@/lib/format";
 import { ProductGallery } from "@/components/product-gallery";
+import { ProductModeProvider } from "@/context/product-mode-context";
+import { getProductImages } from "@/lib/product-media";
 
 type ProductPageProps = {
   params: Promise<{ slug: string }>;
@@ -36,7 +38,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   const product = await getProductBySlug(slug);
   if (!product || !product.active) return {};
 
-  const image = absoluteUrl(product.images[0] ?? "/favicon.ico");
+  const image = absoluteUrl(getProductImages(product, "retail")[0] ?? "/favicon.ico");
   const canonical = `/products/${encodeURIComponent(product.slug)}`;
 
   return {
@@ -106,10 +108,11 @@ export default async function ProductPage({
         <span className="font-bold text-ink">{product.name}</span>
       </nav>
 
+      <ProductModeProvider>
       <div className="mt-8 grid gap-10 lg:grid-cols-2 lg:gap-14">
         {/* gallery */}
         <Reveal className="relative">
-          <ProductGallery images={product.images} productName={product.name} badge={product.badge} />
+          <ProductGallery images={product.images} retailImages={product.retailImages} wholesaleImages={product.wholesaleImages} productName={product.name} badge={product.badge} />
         </Reveal>
 
         {/* info */}
@@ -171,7 +174,7 @@ export default async function ProductPage({
                     {product.wholesaleTiers.map((tier, idx) => (
                       <div key={idx} className="rounded-xl border border-line bg-card p-2 text-center">
                         <span className="block text-[11px] text-muted">
-                          {tier.label || `${tier.minQty}+ عدد`}
+                          {tier.label || `${tier.minQty}+ بسته`}
                         </span>
                         <span className="block font-mono text-sm font-black text-accent mt-0.5">
                           {formatPrice(tier.price)} ت
@@ -248,6 +251,7 @@ export default async function ProductPage({
           )}
         </div>
       </div>
+      </ProductModeProvider>
 
       {/* description */}
       {paragraphs.length > 0 && (

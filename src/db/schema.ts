@@ -26,8 +26,12 @@ export const products = pgTable("products", {
   contents: jsonb("contents").$type<string[]>().notNull().default([]),
   price: bigint("price", { mode: "number" }).notNull().default(0),
   retailPrice: bigint("retail_price", { mode: "number" }).notNull().default(0),
+  retailUnitLabel: text("retail_unit_label").notNull().default("عدد"),
   wholesalePrice: bigint("wholesale_price", { mode: "number" }).notNull().default(0),
   wholesaleMinQty: integer("wholesale_min_qty").notNull().default(1),
+  wholesalePackSize: integer("wholesale_pack_size"),
+  wholesalePackLabel: text("wholesale_pack_label").notNull().default(""),
+  wholesaleMinPackQty: integer("wholesale_min_pack_qty"),
   wholesaleTiers: jsonb("wholesale_tiers").$type<WholesaleTier[]>().notNull().default([]),
   isRetail: boolean("is_retail").notNull().default(true),
   isWholesale: boolean("is_wholesale").notNull().default(true),
@@ -36,6 +40,8 @@ export const products = pgTable("products", {
   category: text("category").notNull().default("foam"),
   categoryLabel: text("category_label").notNull().default(""),
   images: jsonb("images").$type<string[]>().notNull().default([]),
+  retailImages: jsonb("retail_images").$type<string[]>().notNull().default([]),
+  wholesaleImages: jsonb("wholesale_images").$type<string[]>().notNull().default([]),
   badge: text("badge").notNull().default(""),
   inStock: boolean("in_stock").notNull().default(true),
   featured: boolean("featured").notNull().default(false),
@@ -93,6 +99,15 @@ export type OrderItem = {
   quantity: number;
   mode?: "retail" | "wholesale";
   tierLabel?: string;
+  selectedQuantity?: number;
+  unitOrPackPrice?: number;
+  packCount?: number;
+  unitsPerPack?: number;
+  totalUnits?: number;
+  retailUnitLabel?: string;
+  wholesalePackLabel?: string;
+  appliedPricingTier?: string;
+  lineTotal?: number;
 };
 
 export const orders = pgTable("orders", {

@@ -6,6 +6,8 @@ import { formatPrice } from "@/lib/format";
 import { useCart } from "@/context/cart-context";
 import { calculateProductPricing } from "@/lib/pricing";
 import type { ProductRow } from "@/db/schema";
+import { getProductImages } from "@/lib/product-media";
+import { getWholesalePackConfig } from "@/lib/pricing";
 
 export function ProductCard({
   product,
@@ -17,10 +19,11 @@ export function ProductCard({
   mode?: "retail" | "wholesale";
 }) {
   const { addItem } = useCart();
-  const img = product.images[0] ?? "/images/redesign/cat-foam.jpg";
+  const img = getProductImages(product, mode)[0];
+  const pack = getWholesalePackConfig(product);
 
   // Calculate pricing based on current active mode
-  const pricing = calculateProductPricing(product, mode === "wholesale" ? (product.wholesaleMinQty || 6) : 1, mode);
+  const pricing = calculateProductPricing(product, mode === "wholesale" ? pack.minimumPackCount : 1, mode);
   const displayPrice = pricing.unitPrice;
 
   const handleQuickAdd = (e: React.MouseEvent) => {
@@ -35,15 +38,26 @@ export function ProductCard({
         retailPrice: product.retailPrice,
         wholesalePrice: product.wholesalePrice,
         wholesaleTiers: product.wholesaleTiers,
+        retailUnitLabel: product.retailUnitLabel,
+        wholesalePackSize: product.wholesalePackSize,
+        wholesalePackLabel: product.wholesalePackLabel,
+        wholesaleMinPackQty: product.wholesaleMinPackQty,
+        wholesaleMinQty: product.wholesaleMinQty,
+        retailImages: product.retailImages,
+        wholesaleImages: product.wholesaleImages,
         unitPrice: product.unitPrice,
       },
-      mode === "wholesale" ? (product.wholesaleMinQty || 6) : 1,
+      mode === "wholesale" ? pack.minimumPackCount : 1,
       mode,
     );
   };
 
   return (
-    <article className="group relative flex flex-col rounded-2xl border border-[#EBE7DF] bg-white p-4 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-[#8E111E]/40 hover:shadow-lg">
+    <article className="group relative isolate flex min-h-[390px] overflow-hidden rounded-2xl border border-white/50 bg-[#eee7dd] shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={img} alt="" loading="lazy" className="absolute inset-0 -z-20 size-full object-cover transition-transform duration-700 group-hover:scale-105" />
+      <div className="absolute inset-0 -z-10 bg-gradient-to-t from-black/80 via-black/15 to-black/10" />
+      <div className="flex w-full flex-col justify-between p-4">
       {/* Top Badge: e.g. "پرفروش" or category */}
       <div className="flex items-center justify-between gap-2 mb-2">
         {product.badge ? (
@@ -51,38 +65,26 @@ export function ProductCard({
             {product.badge}
           </span>
         ) : (
-          <span className="text-[10px] font-bold text-[#8C827A]">
+          <span className="rounded-full bg-black/40 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-sm">
             {product.categoryLabel}
           </span>
         )}
 
         {mode === "wholesale" ? (
-          <span className="text-[10px] font-bold text-[#8E111E] bg-[#8E111E]/10 px-2 py-0.5 rounded-md">
-            عمده ({product.wholesaleMinQty || 6}+)
+          <span className="rounded-full bg-white/85 px-2.5 py-1 text-[10px] font-bold text-[#8E111E] backdrop-blur-sm">
+            {pack.packLabel} ({pack.minimumPackCount}+)
           </span>
         ) : (
-          <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
+          <span className="flex items-center gap-1 rounded-full bg-white/85 px-2.5 py-1 text-[10px] font-bold text-emerald-700 backdrop-blur-sm">
             <PackageCheck size={12} /> خرید تکی
           </span>
         )}
       </div>
 
-      {/* Product Image */}
-      <Link
-        href={`/products/${product.slug}`}
-        className="relative block aspect-square w-full overflow-hidden rounded-xl bg-[#FAF8F5] p-3 transition-colors group-hover:bg-[#F5F2EB]"
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={img}
-          alt={product.name}
-          loading="lazy"
-          className="size-full object-contain transition-transform duration-500 ease-out group-hover:scale-108"
-        />
-      </Link>
+      <Link href={`/products/${product.slug}`} className="absolute inset-0" aria-label={`مشاهده ${product.name}`} />
 
       {/* Product Info */}
-      <div className="flex grow flex-col justify-between pt-3">
+      <div className="relative mt-auto rounded-2xl border border-white/35 bg-white/82 p-4 shadow-lg backdrop-blur-md">
         <div>
           <Link href={`/products/${product.slug}`}>
             <h3 className="line-clamp-2 text-xs font-black leading-5 text-[#2A2421] transition-colors group-hover:text-[#8E111E]">
@@ -97,7 +99,7 @@ export function ProductCard({
         </div>
 
         {/* Price & Action Button Bar */}
-        <div className="mt-4 flex items-center justify-between border-t border-[#F0ECE4] pt-3">
+        <div className="mt-4 flex items-center justify-between border-t border-black/10 pt-3">
           <div>
             <span className="block font-mono text-base font-black text-[#8E111E]">
               {formatPrice(displayPrice)}
@@ -113,7 +115,7 @@ export function ProductCard({
           <div className="flex items-center gap-1.5">
             <Link
               href={`/products/${product.slug}`}
-              className="grid size-9 place-items-center rounded-xl border border-[#E7E3DC] text-[#4A423D] hover:bg-[#FAF8F5] hover:text-[#8E111E] transition-colors"
+              className="relative grid size-9 place-items-center rounded-xl border border-black/10 bg-white/60 text-[#4A423D] hover:bg-white hover:text-[#8E111E] transition-colors"
               title="مشاهده جزئیات"
             >
               <Eye size={16} />
@@ -121,13 +123,14 @@ export function ProductCard({
             <button
               type="button"
               onClick={handleQuickAdd}
-              className="grid size-9 place-items-center rounded-xl bg-[#8E111E] text-white hover:bg-[#740D18] shadow-xs active:scale-95 transition-all"
+              className="relative grid size-9 place-items-center rounded-xl bg-[#8E111E] text-white hover:bg-[#740D18] shadow-xs active:scale-95 transition-all"
               title="افزودن به سبد خرید"
             >
               <ShoppingCart size={16} />
             </button>
           </div>
         </div>
+      </div>
       </div>
     </article>
   );

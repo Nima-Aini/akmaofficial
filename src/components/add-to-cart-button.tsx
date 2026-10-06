@@ -4,8 +4,9 @@ import { useState } from "react";
 import { Check, Minus, Plus, ShoppingBag, Building2, User } from "lucide-react";
 import { useCart } from "@/context/cart-context";
 import { formatPrice, toFa } from "@/lib/format";
-import { calculateProductPricing } from "@/lib/pricing";
+import { calculateProductPricing, getWholesalePackConfig } from "@/lib/pricing";
 import type { ProductRow } from "@/db/schema";
+import { useProductMode } from "@/context/product-mode-context";
 
 export function AddToCartButton({
   product,
@@ -19,8 +20,12 @@ export function AddToCartButton({
   initialMode?: "retail" | "wholesale";
 }) {
   const { addItem, cartMode } = useCart();
-  const [mode, setMode] = useState<"retail" | "wholesale">(initialMode || cartMode || "retail");
-  const [qty, setQty] = useState(mode === "wholesale" ? (product.wholesaleMinQty || 6) : 1);
+  const sharedMode = useProductMode();
+  const initial = initialMode || sharedMode?.mode || cartMode || "retail";
+  const pack = getWholesalePackConfig(product);
+  const [localMode, setLocalMode] = useState<"retail" | "wholesale">(initial);
+  const mode = sharedMode?.mode ?? localMode;
+  const [qty, setQty] = useState(mode === "wholesale" ? pack.minimumPackCount : 1);
   const [added, setAdded] = useState(false);
 
   const pricing = calculateProductPricing(product, qty, mode);
@@ -35,6 +40,13 @@ export function AddToCartButton({
         retailPrice: product.retailPrice,
         wholesalePrice: product.wholesalePrice,
         wholesaleTiers: product.wholesaleTiers,
+        retailUnitLabel: product.retailUnitLabel,
+        wholesalePackSize: product.wholesalePackSize,
+        wholesalePackLabel: product.wholesalePackLabel,
+        wholesaleMinPackQty: product.wholesaleMinPackQty,
+        wholesaleMinQty: product.wholesaleMinQty,
+        retailImages: product.retailImages,
+        wholesaleImages: product.wholesaleImages,
         unitPrice: product.unitPrice,
       },
       qty,
@@ -45,12 +57,9 @@ export function AddToCartButton({
   };
 
   const handleSwitchMode = (newMode: "retail" | "wholesale") => {
-    setMode(newMode);
-    if (newMode === "wholesale" && qty < (product.wholesaleMinQty || 6)) {
-      setQty(product.wholesaleMinQty || 6);
-    } else if (newMode === "retail" && qty > 5) {
-      setQty(1);
-    }
+    setLocalMode(newMode);
+    sharedMode?.setMode(newMode);
+    setQty(newMode === "wholesale" ? pack.minimumPackCount : 1);
   };
 
   const btnClasses = {
@@ -86,7 +95,7 @@ export function AddToCartButton({
             }`}
           >
             <Building2 size={13} />
-            <span>خرید عمده ({product.wholesaleMinQty || 6}+)</span>
+            <span>خرید عمده ({pack.minimumPackCount}+ بسته)</span>
           </button>
         </div>
       )}
@@ -94,8 +103,15 @@ export function AddToCartButton({
       {/* Tier Label info */}
       {showQty && pricing.tierLabel && (
         <p className="text-center text-xs font-bold text-[#8E111E]">
-          {pricing.tierLabel}: {formatPrice(pricing.unitPrice)} تومان به ازای هر عدد
+          {pricing.tierLabel}: {formatPrice(pricing.unitPrice)} تومان برای هر {pack.packLabel}
         </p>
+      )}
+
+      {showQty && mode === "wholesale" && (
+        <div className="grid grid-cols-2 gap-2 rounded-2xl border border-[#8E111E]/15 bg-[#8E111E]/5 p-3 text-center text-xs">
+          <p><span className="block text-[10px] text-[#78716C]">هر بسته</span><b>{toFa(pack.unitsPerPack)} عدد</b></p>
+          <p><span className="block text-[10px] text-[#78716C]">مجموع کالا</span><b>{toFa(pricing.totalUnits ?? qty)} عدد</b></p>
+        </div>
       )}
 
       <div className="flex items-center gap-2">
@@ -103,7 +119,7 @@ export function AddToCartButton({
           <div className="flex h-13 items-center gap-2 rounded-full border border-[#E7E3DC] bg-[#FAF8F5] px-3">
             <button
               type="button"
-              onClick={() => setQty((q) => Math.max(mode === "wholesale" ? (product.wholesaleMinQty || 6) : 1, q - 1))}
+              onClick={() => setQty((q) => Math.max(mode === "wholesale" ? pack.minimumPackCount : 1, q - 1))}
               className="grid size-8 place-items-center rounded-full border border-[#E7E3DC] bg-white text-[#4A423D] hover:text-[#1C1816]"
               aria-label="کاهش تعداد"
             >
@@ -111,6 +127,7 @@ export function AddToCartButton({
             </button>
             <span className="min-w-8 text-center text-sm font-black text-[#1C1816]">
               {toFa(qty)}
+              <span className="mr-1 text-[10px] text-[#78716C]">{mode === "wholesale" ? "بسته" : (product.retailUnitLabel || "عدد")}</span>
             </span>
             <button
               type="button"
@@ -138,7 +155,7 @@ export function AddToCartButton({
             <>
               <ShoppingBag size={16} />
               {showQty
-                ? `افزودن به سبد (${formatPrice(pricing.unitPrice * qty)} تومان)`
+                ? `افزودن به سبد (${formatPrice(pricing.lineTotal)} تومان)`
                 : "افزودن به سبد"}
             </>
           ) : (

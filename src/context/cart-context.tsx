@@ -1,7 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { calculateProductPricing, type WholesaleTierItem } from "@/lib/pricing";
+import { calculateProductPricing, getWholesalePackConfig, type WholesaleTierItem } from "@/lib/pricing";
+import { getProductImages } from "@/lib/product-media";
 
 export type CartItem = {
   productId: number;
@@ -15,6 +16,12 @@ export type CartItem = {
   retailPrice?: number;
   wholesalePrice?: number;
   wholesaleTiers?: WholesaleTierItem[];
+  retailUnitLabel?: string;
+  wholesalePackSize?: number | null;
+  wholesalePackLabel?: string;
+  wholesaleMinPackQty?: number | null;
+  wholesaleMinQty?: number;
+  totalUnits?: number;
 };
 
 type CartContextType = {
@@ -30,6 +37,13 @@ type CartContextType = {
       retailPrice?: number;
       wholesalePrice?: number;
       wholesaleTiers?: WholesaleTierItem[];
+      retailUnitLabel?: string;
+      wholesalePackSize?: number | null;
+      wholesalePackLabel?: string;
+      wholesaleMinPackQty?: number | null;
+      wholesaleMinQty?: number;
+      retailImages?: string[];
+      wholesaleImages?: string[];
       unitPrice?: string;
     },
     quantity?: number,
@@ -50,7 +64,9 @@ type CartContextType = {
 
 const CartContext = createContext<CartContextType | null>(null);
 
-const STORAGE_KEY = "akma_cart_v2";
+// A new storage namespace avoids interpreting pre-pack-model wholesale unit
+// quantities as pack counts after deployment.
+const STORAGE_KEY = "akma_cart_v3";
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cartMode, setCartMode] = useState<"retail" | "wholesale">("retail");
@@ -95,6 +111,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         retailPrice: item.retailPrice,
         wholesalePrice: item.wholesalePrice,
         wholesaleTiers: item.wholesaleTiers,
+        wholesalePackSize: item.wholesalePackSize,
+        wholesalePackLabel: item.wholesalePackLabel,
+        wholesaleMinPackQty: item.wholesaleMinPackQty,
+        wholesaleMinQty: item.wholesaleMinQty,
       },
       newQty,
       mode,
@@ -106,6 +126,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       price: pricing.unitPrice,
       tierLabel: pricing.tierLabel,
       unitPrice: pricing.tierLabel || `${pricing.unitPrice.toLocaleString("fa-IR")} تومان`,
+      totalUnits: pricing.totalUnits,
     };
   };
 
@@ -118,13 +139,23 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       retailPrice?: number;
       wholesalePrice?: number;
       wholesaleTiers?: WholesaleTierItem[];
+      retailUnitLabel?: string;
+      wholesalePackSize?: number | null;
+      wholesalePackLabel?: string;
+      wholesaleMinPackQty?: number | null;
+      wholesaleMinQty?: number;
+      retailImages?: string[];
+      wholesaleImages?: string[];
       unitPrice?: string;
     },
     quantity = 1,
     mode?: "retail" | "wholesale",
   ) => {
     const targetMode = mode || cartMode;
-    const addQty = Math.max(1, quantity);
+    const pack = getWholesalePackConfig(product);
+    const addQty = Number.isSafeInteger(quantity) && quantity > 0
+      ? quantity
+      : targetMode === "wholesale" ? pack.minimumPackCount : 1;
 
     setItems((prev) => {
       const existingIdx = prev.findIndex((it) => it.productId === product.id);
@@ -141,11 +172,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const newItem: CartItem = {
         productId: product.id,
         productName: product.name,
-        productImage: product.images[0] || "/images/redesign/cat-foam.jpg",
+        productImage: getProductImages(product, targetMode)[0],
         price: pricing.unitPrice,
         retailPrice: product.retailPrice,
         wholesalePrice: product.wholesalePrice,
         wholesaleTiers: product.wholesaleTiers,
+        retailUnitLabel: product.retailUnitLabel || "عدد",
+        wholesalePackSize: product.wholesalePackSize,
+        wholesalePackLabel: product.wholesalePackLabel,
+        wholesaleMinPackQty: product.wholesaleMinPackQty,
+        wholesaleMinQty: product.wholesaleMinQty,
+        totalUnits: pricing.totalUnits,
         unitPrice: pricing.tierLabel || product.unitPrice,
         quantity: addQty,
         mode: targetMode,
@@ -203,7 +240,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const totalWholesaleSavings = useMemo(() => {
     return items.reduce((sum, it) => {
       const retailSingle = it.retailPrice && it.retailPrice > 0 ? it.retailPrice : it.price;
-      const nominalRetailTotal = retailSingle * it.quantity;
+      const nominalRetailTotal = retailSingle * (it.totalUnits ?? it.quantity);
       const actualTotal = it.price * it.quantity;
       return sum + Math.max(0, nominalRetailTotal - actualTotal);
     }, 0);

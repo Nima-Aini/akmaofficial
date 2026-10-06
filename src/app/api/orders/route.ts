@@ -5,6 +5,8 @@ import { normalizePhone, toEnDigits } from "@/lib/format";
 import { getCurrentCustomer } from "@/lib/customer-auth";
 import { atomicUpdateOrderPaymentRetry, createZibalPayment, recordPaymentAttempt } from "@/lib/payment";
 import type { OrderItem } from "@/db/schema";
+import { getWholesalePackConfig, isPositiveSafeInteger } from "@/lib/pricing";
+import { getProductImages } from "@/lib/product-media";
 
 export const dynamic = "force-dynamic";
 
@@ -71,8 +73,19 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const qty = Math.max(1, Number(raw.quantity) || 1);
-      const itemMode = raw.mode === "wholesale" || orderType === "wholesale" ? "wholesale" : "retail";
+      const qty = Number(raw.quantity);
+      const itemMode = raw.mode === "wholesale"
+        ? "wholesale"
+        : raw.mode === "retail"
+          ? "retail"
+          : orderType;
+
+      if (!isPositiveSafeInteger(qty)) {
+        return NextResponse.json(
+          { error: `تعداد انتخاب‌شده برای «${product.name}» باید یک عدد صحیح مثبت و معتبر باشد.` },
+          { status: 400 },
+        );
+      }
 
       // Validate wholesale / retail permissions
       if (itemMode === "wholesale") {
@@ -83,11 +96,17 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        const minQty = product.wholesaleMinQty && product.wholesaleMinQty > 0 ? product.wholesaleMinQty : 1;
-        if (qty < minQty) {
+        if (product.wholesalePackSize !== null && !isPositiveSafeInteger(product.wholesalePackSize)) {
+          return NextResponse.json(
+            { error: `تنظیم تعداد محصول در بسته برای «${product.name}» نامعتبر است؛ لطفاً با پشتیبانی تماس بگیرید.` },
+            { status: 409 },
+          );
+        }
+        const pack = getWholesalePackConfig(product);
+        if (qty < pack.minimumPackCount) {
           return NextResponse.json(
             {
-              error: `حداقل تیراژ سفارش عمده برای «${product.name}»، ${minQty} عدد می‌باشد (تعداد درخواستی شما: ${qty}).`,
+              error: `حداقل سفارش عمده برای «${product.name}»، ${pack.minimumPackCount} بسته است (تعداد درخواستی: ${qty} بسته).`,
             },
             { status: 400 },
           );
@@ -111,21 +130,34 @@ export async function POST(req: NextRequest) {
 
       // Compute trusted unit price strictly server-side
       const pricing = calculateProductPricing(product, qty, itemMode);
+      const pack = getWholesalePackConfig(product);
+      const productImages = getProductImages(product, itemMode);
+      const retailUnitLabel = product.retailUnitLabel?.trim() || "عدد";
+      const isWholesale = itemMode === "wholesale";
 
       validatedItems.push({
         productId: product.id,
         productName: product.name,
-        productImage: product.images[0] || "/images/redesign/cat-foam.jpg",
+        productImage: productImages[0],
         price: pricing.unitPrice,
-        unitPrice: pricing.tierLabel || `${pricing.unitPrice.toLocaleString("fa-IR")} تومان`,
+        unitPrice: `${pricing.unitPrice.toLocaleString("fa-IR")} تومان / ${isWholesale ? pack.packLabel : retailUnitLabel}`,
         quantity: qty,
         mode: itemMode,
         tierLabel: pricing.tierLabel,
+        selectedQuantity: qty,
+        unitOrPackPrice: pricing.unitPrice,
+        packCount: isWholesale ? qty : undefined,
+        unitsPerPack: isWholesale ? pack.unitsPerPack : undefined,
+        totalUnits: pricing.totalUnits,
+        retailUnitLabel,
+        wholesalePackLabel: isWholesale ? pack.packLabel : undefined,
+        appliedPricingTier: pricing.tierLabel,
+        lineTotal: pricing.lineTotal,
       });
     }
 
     // Strictly compute total amount server-side (do NOT trust client totalPrice)
-    const totalAmount = validatedItems.reduce((sum, it) => sum + it.price * it.quantity, 0);
+    const totalAmount = validatedItems.reduce((sum, it) => sum + (it.lineTotal ?? it.price * it.quantity), 0);
 
     const input: OrderInput = {
       customerId: customer.id,

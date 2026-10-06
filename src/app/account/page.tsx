@@ -513,13 +513,15 @@ export default function AccountPage() {
                             <div className="min-w-0">
                               <p className="font-black text-[#1C1816] line-clamp-1">{item.productName}</p>
                               <span className="text-[11px] text-[#78716C]">
-                                تعداد: {toFa(item.quantity)} عدد
+                                {item.mode === "wholesale"
+                                  ? `${toFa(item.packCount ?? item.quantity)} ${item.wholesalePackLabel || "بسته"} × ${toFa(item.unitsPerPack ?? 1)} عدد = ${toFa(item.totalUnits ?? item.quantity)} عدد`
+                                  : `تعداد: ${toFa(item.selectedQuantity ?? item.quantity)} ${item.retailUnitLabel || "عدد"}`}
                                 {item.tierLabel && ` (${item.tierLabel})`}
                               </span>
                             </div>
                           </div>
                           <span className="font-mono font-bold text-[#8E111E]">
-                            {formatPrice(item.price * item.quantity)} تومان
+                            {formatPrice(item.lineTotal ?? item.price * item.quantity)} تومان
                           </span>
                         </div>
                       ))}

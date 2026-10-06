@@ -222,6 +222,7 @@ export function ImageUploader({
   guideline?: ImageGuidelineKey;
 }) {
   const [uploading, setUploading] = useState(false);
+  const [dimensionWarning, setDimensionWarning] = useState("");
   const items = Array.isArray(value) ? value : (value ? [value] : []);
   const guide = IMAGE_GUIDELINES[guideline];
 
@@ -231,6 +232,22 @@ export function ImageUploader({
     try {
       const next: string[] = [];
       for (const file of Array.from(files)) {
+        const dimensions = await new Promise<{ width: number; height: number } | null>((resolve) => {
+          const image = new Image();
+          const url = URL.createObjectURL(file);
+          image.onload = () => { resolve({ width: image.naturalWidth, height: image.naturalHeight }); URL.revokeObjectURL(url); };
+          image.onerror = () => { resolve(null); URL.revokeObjectURL(url); };
+          image.src = url;
+        });
+        if (dimensions) {
+          const expected = guide.width / guide.height;
+          const actual = dimensions.width / dimensions.height;
+          if (Math.abs(actual - expected) / expected > 0.15) {
+            setDimensionWarning(`تصویر ${dimensions.width} × ${dimensions.height} است. نسبت پیشنهادی ${guide.ratio} است و ممکن است بخشی از تصویر در قاب برش بخورد.`);
+          } else {
+            setDimensionWarning("");
+          }
+        }
         const form = new FormData();
         form.append("file", file);
         form.append("kind", kind);
@@ -267,8 +284,11 @@ export function ImageUploader({
         <span className="font-bold text-ink">ابعاد پیشنهادی: {guide.width} × {guide.height} پیکسل</span>
         <span className="mx-2 text-accent">•</span>
         <span className="font-bold text-ink">نسبت تصویر: {guide.ratio}</span>
+        <span className="mx-2 text-accent">•</span>
+        <span>فرمت: {guide.format}</span>
         <span className="block">{guide.usage}</span>
       </div>
+      {dimensionWarning && <p className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-[10px] leading-5 text-amber-800" role="status">{dimensionWarning} آپلود مجاز است.</p>}
       <div className="flex flex-wrap gap-2.5">
         {items.map((src, i) => (
           <div key={`${src}-${i}`} className="relative">

@@ -792,7 +792,7 @@ export default function CheckoutPage() {
                       {it.productName}
                     </p>
                     <div className="flex items-center justify-between text-[11px] text-[#78716C] mt-1">
-                      <span>تعداد: {toFa(it.quantity)}</span>
+                      <span>{it.mode === "wholesale" ? `${toFa(it.quantity)} بسته × ${toFa(it.wholesalePackSize || 1)} عدد` : `تعداد: ${toFa(it.quantity)} ${it.retailUnitLabel || "عدد"}`}</span>
                       <span className="font-mono text-xs font-bold text-[#8E111E]">
                         {formatPrice(it.price * it.quantity)} ت
                       </span>
@@ -802,6 +802,7 @@ export default function CheckoutPage() {
                         {it.tierLabel}
                       </span>
                     )}
+                    {it.mode === "wholesale" && <span className="block text-[9px] text-[#78716C]">مجموع: {toFa(it.totalUnits ?? it.quantity)} عدد محصول</span>}
                   </div>
                 </div>
               ))}
