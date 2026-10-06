@@ -30,8 +30,9 @@ export const TEXT_REGION_BACKDROP_CLASSES: Record<TextRegionPosition, string> = 
 };
 
 export const TEXT_REGION_LAYOUT_CLASSES: Record<TextRegionPosition, string> = {
-  right: "items-center justify-end text-right",
-  left: "items-center justify-start text-left",
+  // The storefront document is RTL, so flex-start is the physical right edge.
+  right: "items-center justify-start text-right",
+  left: "items-center justify-end text-left",
   bottom: "items-end justify-center text-center",
   center: "items-center justify-center text-center",
 };

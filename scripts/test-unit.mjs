@@ -152,6 +152,11 @@ runTest("All selectable text regions map to distinct frontend placement classes"
   for (const position of positions) assert.ok(getTextRegionBackdropClass(position).includes("bg-"));
 });
 
+runTest("Right and left text regions honor the storefront RTL flex direction", () => {
+  assert.match(getTextRegionLayoutClass("right"), /justify-start/);
+  assert.match(getTextRegionLayoutClass("left"), /justify-end/);
+});
+
 runTest("Invalid persisted text regions safely use the requested fallback", () => {
   assert.equal(normalizeTextRegionPosition("top-secret", "bottom"), "bottom");
 });
