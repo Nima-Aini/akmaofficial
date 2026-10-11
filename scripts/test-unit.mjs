@@ -18,6 +18,14 @@ import {
   PRODUCT_GLASS_OVERLAY_CLASS,
   stopProductCardNavigation,
 } from "../src/components/product-card.tsx";
+import {
+  createZarinpalPayment,
+  getConfiguredPaymentProvider,
+  tomansToRials,
+  verifyZarinpalPayment,
+  ZARINPAL_REQUEST_ENDPOINT,
+  ZARINPAL_VERIFY_ENDPOINT,
+} from "../src/lib/payment.ts";
 
 console.log("==================================================================");
 console.log("📦 RUNNING ISOLATED UNIT TESTS");
@@ -30,6 +38,18 @@ function runTest(name, fn) {
   total++;
   try {
     fn();
+    console.log(`  ✅ PASS: ${name}`);
+    passed++;
+  } catch (err) {
+    console.error(`  ❌ FAIL: ${name}`);
+    console.error(`     Error: ${err.message}`);
+  }
+}
+
+async function runAsyncTest(name, fn) {
+  total++;
+  try {
+    await fn();
     console.log(`  ✅ PASS: ${name}`);
     passed++;
   } catch (err) {
@@ -240,6 +260,90 @@ runTest("Phone number masking in tracking API prevents data leaks", () => {
   const phone = "09123456789";
   const masked = phone.replace(/(\d{4})\d{4}(\d{3})/, "$1****$2");
   assert.strictEqual(masked, "0912****789", "Phone must be properly masked");
+});
+
+runTest("Payment provider selection preserves Zibal and supports Zarinpal", () => {
+  const previous = process.env.PAYMENT_PROVIDER;
+  process.env.PAYMENT_PROVIDER = "zarinpal";
+  assert.equal(getConfiguredPaymentProvider(), "zarinpal");
+  process.env.PAYMENT_PROVIDER = "zibal";
+  assert.equal(getConfiguredPaymentProvider(), "zibal");
+  if (previous === undefined) delete process.env.PAYMENT_PROVIDER; else process.env.PAYMENT_PROVIDER = previous;
+});
+
+runTest("Payment amount conversion is centralized and exact", () => {
+  assert.equal(tomansToRials(240000), 2400000);
+  assert.throws(() => tomansToRials(0));
+  assert.throws(() => tomansToRials(1.5));
+});
+
+await runAsyncTest("Zarinpal request uses official v4 endpoint and normalizes Authority", async () => {
+  const previous = { merchant: process.env.ZARINPAL_MERCHANT_ID, nodeEnv: process.env.NODE_ENV, integration: process.env.AKMA_INTEGRATION_TEST };
+  const originalFetch = globalThis.fetch;
+  process.env.NODE_ENV = "test";
+  delete process.env.AKMA_INTEGRATION_TEST;
+  process.env.ZARINPAL_MERCHANT_ID = "00000000-0000-0000-0000-000000000000";
+  let captured;
+  globalThis.fetch = async (url, init) => {
+    captured = { url, body: JSON.parse(init.body) };
+    return { ok: true, status: 200, json: async () => ({ data: { code: 100, authority: "A000TEST" }, errors: [] }) };
+  };
+  try {
+    const result = await createZarinpalPayment({ trackingCode: "AKM-1", totalAmount: 240000, customerPhone: "09120000000" });
+    assert.equal(captured.url, ZARINPAL_REQUEST_ENDPOINT);
+    assert.equal(captured.body.amount, 2400000);
+    assert.equal(captured.body.currency, "IRR");
+    assert.equal(result.provider, "zarinpal");
+    assert.equal(result.trackId, "A000TEST");
+    assert.match(result.paymentUrl, /payment\.zarinpal\.com\/pg\/StartPay\/A000TEST$/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (previous.merchant === undefined) delete process.env.ZARINPAL_MERCHANT_ID; else process.env.ZARINPAL_MERCHANT_ID = previous.merchant;
+    if (previous.nodeEnv === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = previous.nodeEnv;
+    if (previous.integration === undefined) delete process.env.AKMA_INTEGRATION_TEST; else process.env.AKMA_INTEGRATION_TEST = previous.integration;
+  }
+});
+
+await runAsyncTest("Zarinpal verification stores RefID and rejects unsuccessful responses", async () => {
+  const originalFetch = globalThis.fetch;
+  const previousMerchant = process.env.ZARINPAL_MERCHANT_ID;
+  const previousIntegration = process.env.AKMA_INTEGRATION_TEST;
+  process.env.ZARINPAL_MERCHANT_ID = "00000000-0000-0000-0000-000000000000";
+  delete process.env.AKMA_INTEGRATION_TEST;
+  let captured;
+  globalThis.fetch = async (url, init) => {
+    captured = { url, body: JSON.parse(init.body) };
+    return { ok: true, json: async () => ({ data: { code: 101, ref_id: 987654, card_pan: "6037******1234" }, errors: [] }) };
+  };
+  try {
+    const result = await verifyZarinpalPayment("A000TEST", 100000);
+    assert.equal(captured.url, ZARINPAL_VERIFY_ENDPOINT);
+    assert.equal(captured.body.amount, 1000000);
+    assert.equal(result.success, true);
+    assert.equal(result.alreadyVerified, true);
+    assert.equal(result.refNumber, "987654");
+    assert.equal(result.rawAmountRials, 1000000);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (previousMerchant === undefined) delete process.env.ZARINPAL_MERCHANT_ID; else process.env.ZARINPAL_MERCHANT_ID = previousMerchant;
+    if (previousIntegration === undefined) delete process.env.AKMA_INTEGRATION_TEST; else process.env.AKMA_INTEGRATION_TEST = previousIntegration;
+  }
+});
+
+await runAsyncTest("Missing Zarinpal merchant ID fails closed in production", async () => {
+  const previousMerchant = process.env.ZARINPAL_MERCHANT_ID;
+  const previousNodeEnv = process.env.NODE_ENV;
+  const previousIntegration = process.env.AKMA_INTEGRATION_TEST;
+  delete process.env.ZARINPAL_MERCHANT_ID;
+  delete process.env.AKMA_INTEGRATION_TEST;
+  process.env.NODE_ENV = "production";
+  try {
+    await assert.rejects(() => createZarinpalPayment({ trackingCode: "AKM-CLOSED", totalAmount: 1000 }), /پیکربندی/);
+  } finally {
+    if (previousMerchant === undefined) delete process.env.ZARINPAL_MERCHANT_ID; else process.env.ZARINPAL_MERCHANT_ID = previousMerchant;
+    if (previousNodeEnv === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = previousNodeEnv;
+    if (previousIntegration === undefined) delete process.env.AKMA_INTEGRATION_TEST; else process.env.AKMA_INTEGRATION_TEST = previousIntegration;
+  }
 });
 
 console.log("\n==================================================================");

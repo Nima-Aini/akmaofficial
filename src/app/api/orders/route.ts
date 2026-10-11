@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import { createOrder, updateOrder, getAllProducts, calculateProductPricing, type OrderInput } from "@/lib/store";
 import { normalizePhone, toEnDigits } from "@/lib/format";
 import { getCurrentCustomer } from "@/lib/customer-auth";
-import { atomicUpdateOrderPaymentRetry, createZibalPayment, recordPaymentAttempt } from "@/lib/payment";
+import { atomicUpdateOrderPaymentRetry, createPayment, recordPaymentAttempt } from "@/lib/payment";
 import type { OrderItem } from "@/db/schema";
 import { getWholesalePackConfig, isPositiveSafeInteger } from "@/lib/pricing";
 import { getProductImages } from "@/lib/product-media";
@@ -182,7 +182,7 @@ export async function POST(req: NextRequest) {
 
     // If online payment, generate real gateway payment link
     if (paymentMethod === "online" && totalAmount > 0) {
-      const payRes = await createZibalPayment({
+      const payRes = await createPayment({
         trackingCode: order.trackingCode,
         totalAmount,
         customerPhone,
@@ -193,7 +193,7 @@ export async function POST(req: NextRequest) {
       if (payRes.success && payRes.paymentUrl) {
         paymentLink = payRes.paymentUrl;
         paymentTrackId = payRes.trackId || "";
-        const activated = await atomicUpdateOrderPaymentRetry(order.id, paymentTrackId, paymentLink);
+        const activated = await atomicUpdateOrderPaymentRetry(order.id, paymentTrackId, paymentLink, payRes.provider);
         if (!activated) {
           return NextResponse.json({ error: "سفارش پیش از فعال‌سازی پرداخت تسویه یا نامعتبر شد." }, { status: 409 });
         }
@@ -201,7 +201,7 @@ export async function POST(req: NextRequest) {
         paymentError = payRes.error || "خطا در اتصال به درگاه پرداخت اینترنتی";
         await recordPaymentAttempt({
           orderId: order.id,
-          provider: "zibal",
+          provider: payRes.provider,
           trackId: `request-failed-${order.id}-${crypto.randomUUID()}`,
           amountTomans: totalAmount,
           status: "failed",
@@ -235,7 +235,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: unknown) {
     console.error("Order creation failed:", error);
-    const msg = error instanceof Error ? error.message : "خطا در ثبت سفارش. لطفاً مجدداً تلاش کنید.";
+    const msg = error instanceof Error && !/MERCHANT|PAYMENT_PROVIDER|پیکربندی/.test(error.message)
+      ? error.message
+      : "خطا در اتصال به درگاه پرداخت";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

@@ -1,5 +1,5 @@
 /**
- * Akma Official - Production Payment Gateway Integration (Zibal)
+ * Akma Official - Production Payment Gateway Integration (Zibal + Zarinpal)
  * Supports real online payment requests, relational payment attempts tracking,
  * verified callbacks, concurrency-safe retries, duplicate charge escalation, and fail-closed settlement.
  */
@@ -20,9 +20,31 @@ function integrationMockEnabled(): boolean {
 
 export interface PaymentRequestResult {
   success: boolean;
+  provider: PaymentProvider;
   trackId?: string;
   paymentUrl?: string;
   error?: string;
+}
+
+export type PaymentProvider = "zibal" | "zarinpal";
+
+export const ZARINPAL_REQUEST_ENDPOINT = "https://payment.zarinpal.com/pg/v4/payment/request.json";
+export const ZARINPAL_VERIFY_ENDPOINT = "https://payment.zarinpal.com/pg/v4/payment/verify.json";
+export const ZARINPAL_START_PAY_ENDPOINT = "https://payment.zarinpal.com/pg/StartPay/";
+
+export function tomansToRials(amountTomans: number): number {
+  if (!Number.isSafeInteger(amountTomans) || amountTomans <= 0) throw new Error("مبلغ سفارش نامعتبر است.");
+  const rials = amountTomans * 10;
+  if (!Number.isSafeInteger(rials)) throw new Error("مبلغ سفارش خارج از محدوده مجاز است.");
+  return rials;
+}
+
+export function getConfiguredPaymentProvider(): PaymentProvider {
+  const configured = (process.env.PAYMENT_PROVIDER || "zibal").trim().toLowerCase();
+  if (configured !== "zibal" && configured !== "zarinpal") {
+    throw new Error("PAYMENT_PROVIDER must be either zibal or zarinpal.");
+  }
+  return configured;
 }
 
 export interface PaymentVerifyResult {
@@ -73,6 +95,16 @@ function getZibalMerchant(): string {
   return merchant || "zibal";
 }
 
+function getZarinpalMerchantId(): string {
+  const merchantId = (process.env.ZARINPAL_MERCHANT_ID || "").trim();
+  const valid = /^[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$/.test(merchantId);
+  if (!valid && process.env.NODE_ENV === "production") {
+    throw new Error("خطای امنیتی پیکربندی: شناسه پذیرنده زرین‌پال تنظیم نشده یا نامعتبر است.");
+  }
+  if (!valid) throw new Error("ZARINPAL_MERCHANT_ID must be a valid 36-character merchant ID.");
+  return merchantId;
+}
+
 function getBaseUrl(): string {
   if (process.env.APP_URL) return process.env.APP_URL.replace(/\/+$/, "");
   if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL.replace(/\/+$/, "");
@@ -97,10 +129,10 @@ export async function createZibalPayment(order: {
       throw new Error("Integration tests require AKMA_TEST_TRANSPORT=mock; real payment transport is disabled.");
     }
     const trackId = `mock-${order.id ?? order.trackingCode}-${crypto.randomUUID()}`;
-    return { success: true, trackId, paymentUrl: `https://payments.invalid/start/${encodeURIComponent(trackId)}` };
+    return { success: true, provider: "zibal", trackId, paymentUrl: `https://payments.invalid/start/${encodeURIComponent(trackId)}` };
   }
   const merchant = getZibalMerchant();
-  const amountRials = Math.round(Number(order.totalAmount) * 10);
+  const amountRials = tomansToRials(Number(order.totalAmount));
   const baseUrl = getBaseUrl();
 
   const callbackUrl = `${baseUrl}/api/payment/verify?orderId=${encodeURIComponent(order.trackingCode)}`;
@@ -134,6 +166,7 @@ export async function createZibalPayment(order: {
 
       return {
         success: true,
+        provider: "zibal",
         trackId,
         paymentUrl,
       };
@@ -143,15 +176,67 @@ export async function createZibalPayment(order: {
     console.error("[PAYMENT] Zibal request returned error:", data);
     return {
       success: false,
+      provider: "zibal",
       error: message,
     };
   } catch (err: unknown) {
     console.error("[PAYMENT] Failed to reach Zibal API:", err);
     return {
       success: false,
+      provider: "zibal",
       error: "خطا در اتصال به درگاه پرداخت اینترنتی",
     };
   }
+}
+
+export type PaymentOrder = {
+  id?: number;
+  trackingCode: string;
+  totalAmount: number;
+  customerPhone?: string;
+  customerName?: string;
+  orderType?: string;
+};
+
+export async function createZarinpalPayment(order: PaymentOrder): Promise<PaymentRequestResult> {
+  if (integrationMockEnabled()) {
+    if (process.env.AKMA_TEST_TRANSPORT !== "mock") throw new Error("Integration tests require mock payment transport.");
+    const authority = `A-MOCK-${order.id ?? order.trackingCode}-${crypto.randomUUID()}`;
+    return { success: true, provider: "zarinpal", trackId: authority, paymentUrl: `https://payments.invalid/zarinpal/${encodeURIComponent(authority)}` };
+  }
+  const merchantId = getZarinpalMerchantId();
+  const amountRials = tomansToRials(Number(order.totalAmount));
+  const callbackUrl = `${getBaseUrl()}/api/payment/verify?orderId=${encodeURIComponent(order.trackingCode)}`;
+  const description = `سفارش شماره ${order.trackingCode} (${order.orderType === "wholesale" ? "خرید عمده" : "خرید تکی"}) در فروشگاه آکما`;
+  try {
+    const res = await fetch(ZARINPAL_REQUEST_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        merchant_id: merchantId,
+        amount: amountRials,
+        currency: "IRR",
+        callback_url: callbackUrl,
+        description,
+        metadata: { mobile: order.customerPhone || undefined, order_id: order.trackingCode },
+      }),
+    });
+    const payload = await res.json();
+    const data = payload?.data;
+    if (res.ok && Number(data?.code) === 100 && typeof data?.authority === "string" && data.authority.trim()) {
+      const authority = data.authority.trim();
+      return { success: true, provider: "zarinpal", trackId: authority, paymentUrl: `${ZARINPAL_START_PAY_ENDPOINT}${encodeURIComponent(authority)}` };
+    }
+    console.error("[PAYMENT] Zarinpal request rejected:", { status: res.status, code: data?.code ?? payload?.errors?.code });
+    return { success: false, provider: "zarinpal", error: "خطا در اتصال به درگاه پرداخت" };
+  } catch (error) {
+    console.error("[PAYMENT] Failed to reach Zarinpal API:", error);
+    return { success: false, provider: "zarinpal", error: "خطا در اتصال به درگاه پرداخت" };
+  }
+}
+
+export async function createPayment(order: PaymentOrder, provider = getConfiguredPaymentProvider()): Promise<PaymentRequestResult> {
+  return provider === "zarinpal" ? createZarinpalPayment(order) : createZibalPayment(order);
 }
 
 /**
@@ -211,6 +296,54 @@ export async function verifyZibalPayment(trackId: string): Promise<PaymentVerify
       error: "خطا در استعلام وضعیت پرداخت از بانک",
     };
   }
+}
+
+export async function verifyZarinpalPayment(authority: string, expectedAmountTomans: number): Promise<PaymentVerifyResult> {
+  const amountRials = tomansToRials(expectedAmountTomans);
+  if (integrationMockEnabled()) {
+    if (process.env.AKMA_TEST_TRANSPORT !== "mock") throw new Error("Integration tests require mock payment transport.");
+    return { success: false, resultCode: -2, error: `Mock verification requires an explicit test override (${authority}).` };
+  }
+  const merchantId = getZarinpalMerchantId();
+  try {
+    const res = await fetch(ZARINPAL_VERIFY_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ merchant_id: merchantId, amount: amountRials, authority }),
+    });
+    const payload = await res.json();
+    const data = payload?.data;
+    const resultCode = Number(data?.code ?? payload?.errors?.code ?? -1);
+    if (res.ok && (resultCode === 100 || resultCode === 101) && data?.ref_id !== undefined) {
+      return {
+        success: true,
+        resultCode,
+        refNumber: String(data.ref_id),
+        // Zarinpal v4 verifies the exact amount supplied by the merchant but does not
+        // echo it in the response. Preserve that server-trusted IRR amount for the
+        // common strict settlement comparison; never source it from callback data.
+        rawAmountRials: amountRials,
+        amountTomans: expectedAmountTomans,
+        cardNumber: typeof data.card_pan === "string" ? data.card_pan : undefined,
+        paidAt: new Date(),
+        alreadyVerified: resultCode === 101,
+      };
+    }
+    return { success: false, resultCode, error: "تأیید پرداخت ناموفق بود" };
+  } catch (error) {
+    console.error("[PAYMENT] Zarinpal verification failed:", error);
+    return { success: false, resultCode: -1, error: "خطا در استعلام وضعیت پرداخت از بانک" };
+  }
+}
+
+export async function verifyPayment(
+  provider: PaymentProvider,
+  providerTransactionId: string,
+  expectedAmountTomans: number,
+): Promise<PaymentVerifyResult> {
+  return provider === "zarinpal"
+    ? verifyZarinpalPayment(providerTransactionId, expectedAmountTomans)
+    : verifyZibalPayment(providerTransactionId);
 }
 
 /**
@@ -335,6 +468,7 @@ export async function atomicUpdateOrderPaymentRetry(
   orderId: number,
   newTrackId: string,
   newPaymentLink: string,
+  provider: PaymentProvider = "zibal",
 ): Promise<OrderRow | null> {
   const now = new Date();
   if (db || process.env.DATABASE_URL) {
@@ -353,7 +487,7 @@ export async function atomicUpdateOrderPaymentRetry(
           if (existingOrder) {
             await tx.insert(paymentAttempts).values({
               orderId,
-              provider: "zibal",
+              provider,
               trackId: newTrackId,
               amount: existingOrder.totalAmount,
               amountRials: Math.round(existingOrder.totalAmount * 10),
@@ -381,7 +515,7 @@ export async function atomicUpdateOrderPaymentRetry(
         // 3. Insert new payment attempt row (unique index on provider+trackId prevents collisions)
         await tx.insert(paymentAttempts).values({
           orderId,
-          provider: "zibal",
+          provider,
           trackId: newTrackId,
           amount: existingOrder.totalAmount,
           amountRials: Math.round(existingOrder.totalAmount * 10),
@@ -439,7 +573,7 @@ export async function atomicUpdateOrderPaymentRetry(
     memAttempts.push({
       id: memAttempts.length + 1,
       orderId,
-      provider: "zibal",
+      provider,
       trackId: newTrackId,
       amount: order.totalAmount,
       amountRials: Math.round(order.totalAmount * 10),
@@ -465,11 +599,12 @@ export async function recordPaymentCallbackFailure(
   trackingCode: string,
   callbackTrackId: string,
   reason: string,
+  provider: PaymentProvider = "zibal",
 ): Promise<boolean> {
   const cleanTrackId = String(callbackTrackId || "").trim();
   if (!trackingCode || !cleanTrackId) return false;
   const order = await getOrderByTrackingCode(trackingCode);
-  const attempt = await findPaymentAttempt("zibal", cleanTrackId);
+  const attempt = await findPaymentAttempt(provider, cleanTrackId);
   if (!order || !attempt || attempt.orderId !== order.id) return false;
 
   const metadata = safeGatewayMetadata({ error: reason });
@@ -509,7 +644,7 @@ export async function recordPaymentCallbackFailure(
 /**
  * Securely processes payment verification bound to a specific order & relational payment attempt:
  * 1. Loads the order and performs relational lookup in payment_attempts
- * 2. Verifies transaction with Zibal
+ * 2. Resolves the provider from the exact attempt and verifies with that provider
  * 3. FAILS CLOSED if amount is missing or not a positive number
  * 4. Verifies returned amount matches order total in Rials (order.totalAmount * 10)
  * 5. Reconciles payment:
@@ -520,7 +655,8 @@ export async function recordPaymentCallbackFailure(
 export async function processOrderPaymentVerification(
   trackingCode: string,
   callbackTrackId: string,
-  mockZibalVerifyOverride?: (trackId: string) => Promise<PaymentVerifyResult>,
+  mockVerifyOverride?: (trackId: string, expectedAmountTomans: number, provider: PaymentProvider) => Promise<PaymentVerifyResult>,
+  providerHint?: PaymentProvider,
 ): Promise<OrderPaymentProcessResult> {
   if (!trackingCode || !callbackTrackId) {
     return { success: false, error: "کد پیگیری سفارش و شناسه پرداخت الزامی است." };
@@ -535,11 +671,17 @@ export async function processOrderPaymentVerification(
   const cleanTrackId = String(callbackTrackId).trim();
 
   // 2. Exact relational lookup in payment_attempts
-  let attempt = await findPaymentAttempt("zibal", cleanTrackId);
+  const zibalAttempt = !providerHint || providerHint === "zibal" ? await findPaymentAttempt("zibal", cleanTrackId) : null;
+  const zarinpalAttempt = !providerHint || providerHint === "zarinpal" ? await findPaymentAttempt("zarinpal", cleanTrackId) : null;
+  if (zibalAttempt && zarinpalAttempt) {
+    return { success: false, error: "شناسه تراکنش بین درگاه‌ها مبهم است." };
+  }
+  let attempt = zibalAttempt || zarinpalAttempt;
+  let provider: PaymentProvider = attempt?.provider === "zarinpal" ? "zarinpal" : "zibal";
 
   // If no attempt row exists yet (e.g., initial creation without explicit attempt row), verify if cleanTrackId matches order.paymentTrackId
   if (!attempt) {
-    if (order.paymentTrackId && cleanTrackId === order.paymentTrackId.trim()) {
+    if ((!providerHint || providerHint === "zibal") && order.paymentTrackId && cleanTrackId === order.paymentTrackId.trim()) {
       attempt = await recordPaymentAttempt({
         orderId: order.id,
         provider: "zibal",
@@ -547,6 +689,7 @@ export async function processOrderPaymentVerification(
         amountTomans: order.totalAmount,
         paymentLink: order.paymentLink,
       });
+      provider = "zibal";
     } else {
       return {
         success: false,
@@ -563,9 +706,11 @@ export async function processOrderPaymentVerification(
     };
   }
 
-  // 3. Verify the transaction with Zibal
-  const verifyFn = mockZibalVerifyOverride || verifyZibalPayment;
-  const verifyRes = await verifyFn(cleanTrackId);
+  // 3. Verify using the provider stored on this exact attempt, not the current environment selection.
+  provider = attempt.provider === "zarinpal" ? "zarinpal" : "zibal";
+  const verifyRes = mockVerifyOverride
+    ? await mockVerifyOverride(cleanTrackId, order.totalAmount, provider)
+    : await verifyPayment(provider, cleanTrackId, order.totalAmount);
 
   if (!verifyRes.success) {
     // Record failed attempt
@@ -589,7 +734,7 @@ export async function processOrderPaymentVerification(
     };
   }
 
-  // 4. FAIL CLOSED: Reject if Zibal returns no valid numeric amount
+  // 4. FAIL CLOSED: Reject if the provider result has no valid normalized amount
   if (typeof verifyRes.rawAmountRials !== "number" || isNaN(verifyRes.rawAmountRials) || verifyRes.rawAmountRials <= 0) {
     if (db) await db.update(paymentAttempts).set({ status: "failed", rawGatewayResponse: safeGatewayMetadata({ ...verifyRes, error: "invalid_or_missing_amount" }), updatedAt: new Date() }).where(eq(paymentAttempts.id, attempt.id));
     return {

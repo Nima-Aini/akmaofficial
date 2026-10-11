@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { getOrderByTrackingCode, updateOrder } from "@/lib/store";
-import { createZibalPayment, atomicUpdateOrderPaymentRetry, recordPaymentAttempt } from "@/lib/payment";
+import { createPayment, atomicUpdateOrderPaymentRetry, recordPaymentAttempt } from "@/lib/payment";
 import { getCurrentCustomer } from "@/lib/customer-auth";
 import { getAdminUsername } from "@/lib/auth";
 import { normalizePhone } from "@/lib/format";
@@ -70,8 +70,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 5. Generate new Zibal Gateway payment link
-    const payRes = await createZibalPayment({
+    // 5. Generate a payment link with the configured provider.
+    const payRes = await createPayment({
       trackingCode: order.trackingCode,
       totalAmount: order.totalAmount,
       customerPhone: order.customerPhone,
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       const errorMsg = payRes.error || "خطا در اتصال مجدد به درگاه پرداخت";
       await recordPaymentAttempt({
         orderId: order.id,
-        provider: "zibal",
+        provider: payRes.provider,
         trackId: `retry-request-failed-${order.id}-${crypto.randomUUID()}`,
         amountTomans: order.totalAmount,
         status: "failed",
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
     const paymentTrackId = payRes.trackId || "";
     const paymentLink = payRes.paymentUrl;
 
-    const updated = await atomicUpdateOrderPaymentRetry(order.id, paymentTrackId, paymentLink);
+    const updated = await atomicUpdateOrderPaymentRetry(order.id, paymentTrackId, paymentLink, payRes.provider);
 
     if (!updated) {
       return NextResponse.json(

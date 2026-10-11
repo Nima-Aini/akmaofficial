@@ -34,7 +34,7 @@ function validatedDatabaseUrl() {
 const dbUrl = validatedDatabaseUrl();
 const schema = await import("../src/db/schema.ts");
 const { orders, paymentAttempts, customerUsers, customerOtps, adminUsers, settings, products } = schema;
-const { atomicUpdateOrderPaymentRetry, processOrderPaymentVerification } = await import("../src/lib/payment.ts");
+const { atomicUpdateOrderPaymentRetry, createPayment, processOrderPaymentVerification } = await import("../src/lib/payment.ts");
 const { createCustomerToken, sendCustomerOtp } = await import("../src/lib/customer-auth.ts");
 const { createSessionToken, hashPassword } = await import("../src/lib/auth.ts");
 const { getAllProducts, saveSetting } = await import("../src/lib/store.ts");
@@ -62,7 +62,7 @@ async function reset() {
 async function startServer() {
   server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "-p", String(port), "-H", "127.0.0.1"], {
     cwd: process.cwd(),
-    env: { ...process.env, DATABASE_URL: dbUrl, AKMA_INTEGRATION_TEST: "1", AKMA_TEST_TRANSPORT: "mock", AKMA_TEST_OTP_CODE: "54321", APP_URL: baseUrl },
+    env: { ...process.env, DATABASE_URL: dbUrl, AKMA_INTEGRATION_TEST: "1", AKMA_TEST_TRANSPORT: "mock", AKMA_TEST_OTP_CODE: "54321", PAYMENT_PROVIDER: "zarinpal", APP_URL: baseUrl },
     stdio: ["ignore", "pipe", "pipe"],
   });
   server.stdout.on("data", (chunk) => process.stdout.write(`[next] ${chunk}`));
@@ -135,6 +135,52 @@ try {
     assert.ok(order); assert.notEqual(order.totalAmount, 1);
     const attempts = await db.select().from(paymentAttempts).where(eq(paymentAttempts.orderId, order.id));
     assert.equal(attempts.length, 1); assert.equal(attempts[0].status, "pending");
+    assert.equal(attempts[0].provider, "zarinpal");
+  });
+
+  await test("configured Zarinpal creation persists Authority and provider", async () => {
+    const previous = process.env.PAYMENT_PROVIDER;
+    process.env.PAYMENT_PROVIDER = "zarinpal";
+    try {
+      const order = (await db.insert(orders).values(orderValues(customerA, "AKM-ZARINPAL-CREATE")).returning())[0];
+      const payment = await createPayment({ id: order.id, trackingCode: order.trackingCode, totalAmount: order.totalAmount });
+      assert.equal(payment.provider, "zarinpal");
+      assert.match(payment.trackId, /^A-MOCK-/);
+      await atomicUpdateOrderPaymentRetry(order.id, payment.trackId, payment.paymentUrl, payment.provider);
+      const attempt = (await db.select().from(paymentAttempts).where(eq(paymentAttempts.orderId, order.id)))[0];
+      assert.equal(attempt.provider, "zarinpal");
+      assert.equal(attempt.trackId, payment.trackId);
+    } finally {
+      if (previous === undefined) delete process.env.PAYMENT_PROVIDER; else process.env.PAYMENT_PROVIDER = previous;
+    }
+  });
+
+  await test("historical Zibal attempt verifies after provider changes to Zarinpal", async () => {
+    const order = (await db.insert(orders).values(orderValues(customerA, "AKM-HISTORICAL-ZIBAL", { paymentTrackId: "OLD-ZIBAL" })).returning())[0];
+    await db.insert(paymentAttempts).values({ orderId: order.id, provider: "zibal", trackId: "OLD-ZIBAL", amount: 100000, amountRials: 1000000 });
+    process.env.PAYMENT_PROVIDER = "zarinpal";
+    const result = await processOrderPaymentVerification(order.trackingCode, "OLD-ZIBAL", async (_id, _amount, provider) => {
+      assert.equal(provider, "zibal");
+      return { success: true, resultCode: 100, refNumber: "OLD-ZIBAL-REF", rawAmountRials: 1000000, paidAt: new Date() };
+    });
+    delete process.env.PAYMENT_PROVIDER;
+    assert.equal(result.success, true);
+    assert.equal((await db.select().from(orders).where(eq(orders.id, order.id)))[0].paymentRefId, "OLD-ZIBAL-REF");
+  });
+
+  await test("Zarinpal verification stores RefID and rejects amount mismatch", async () => {
+    const order = (await db.insert(orders).values(orderValues(customerA, "AKM-ZARINPAL-VERIFY", { paymentTrackId: "AUTH-VERIFY" })).returning())[0];
+    await db.insert(paymentAttempts).values({ orderId: order.id, provider: "zarinpal", trackId: "AUTH-VERIFY", amount: 100000, amountRials: 1000000 });
+    const mismatch = await processOrderPaymentVerification(order.trackingCode, "AUTH-VERIFY", async () => ({ success: true, resultCode: 100, refNumber: "REF-BAD", rawAmountRials: 999999 }), "zarinpal");
+    assert.equal(mismatch.success, false);
+    await db.update(paymentAttempts).set({ status: "pending" }).where(eq(paymentAttempts.trackId, "AUTH-VERIFY"));
+    const missing = await processOrderPaymentVerification(order.trackingCode, "AUTH-VERIFY", async () => ({ success: true, resultCode: 100, refNumber: "REF-MISSING" }), "zarinpal");
+    assert.equal(missing.success, false);
+    await db.update(paymentAttempts).set({ status: "pending" }).where(eq(paymentAttempts.trackId, "AUTH-VERIFY"));
+    const paid = await processOrderPaymentVerification(order.trackingCode, "AUTH-VERIFY", async () => ({ success: true, resultCode: 100, refNumber: "REF-ZARINPAL", rawAmountRials: 1000000, paidAt: new Date() }), "zarinpal");
+    assert.equal(paid.success, true);
+    const attempt = (await db.select().from(paymentAttempts).where(eq(paymentAttempts.trackId, "AUTH-VERIFY")))[0];
+    assert.equal(attempt.verifiedRef, "REF-ZARINPAL");
   });
 
   let configuredProduct;
@@ -227,10 +273,21 @@ try {
     assert.equal((await db.select().from(orders).where(eq(orders.id, order.id)))[0].paymentStatus, "failed");
   });
 
+  await test("unknown Zarinpal callback fails closed", async () => {
+    const response = await fetch(`${baseUrl}/api/payment/verify?orderId=AKM-UNKNOWN&Authority=UNKNOWN-AUTH&Status=OK`, { redirect: "manual" });
+    assert.equal(response.status, 307);
+    assert.match(response.headers.get("location") || "", /status=failed/);
+  });
+
   const orderB = (await db.insert(orders).values(orderValues(customerB, "AKM-USER-B")).returning())[0];
   await test("anonymous retry is 401", async () => assert.equal((await post("/api/orders/retry-payment", { trackingCode: orderB.trackingCode })).status, 401));
   await test("User A retrying User B order is 403", async () => assert.equal((await post("/api/orders/retry-payment", { trackingCode: orderB.trackingCode }, `akma_customer_session=${createCustomerToken(customerA.phone)}`)).status, 403));
-  await test("User B retries own order", async () => assert.equal((await post("/api/orders/retry-payment", { trackingCode: orderB.trackingCode }, `akma_customer_session=${createCustomerToken(customerB.phone)}`)).status, 200));
+  await test("User B retry uses configured Zarinpal provider", async () => {
+    assert.equal((await post("/api/orders/retry-payment", { trackingCode: orderB.trackingCode }, `akma_customer_session=${createCustomerToken(customerB.phone)}`)).status, 200);
+    const attempts = await db.select().from(paymentAttempts).where(eq(paymentAttempts.orderId, orderB.id));
+    assert.equal(attempts.at(-1)?.provider, "zarinpal");
+    assert.match(attempts.at(-1)?.trackId || "", /^A-MOCK-/);
+  });
   await test("revoked admin is 401", async () => assert.equal((await post("/api/orders/retry-payment", { trackingCode: orderB.trackingCode }, `akma_admin_session=${createSessionToken("revoked_admin")}`)).status, 401));
   await test("valid current admin is authorized", async () => assert.equal((await post("/api/orders/retry-payment", { trackingCode: orderB.trackingCode }, `akma_admin_session=${createSessionToken(admin.username)}`)).status, 200));
   await test("paid order cannot retry", async () => {
