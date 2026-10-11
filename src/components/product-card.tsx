@@ -18,7 +18,7 @@ import {
 export const PRODUCT_GLASS_OVERLAY_CLASS =
   "relative rounded-2xl border border-white/25 bg-black/25 p-4 text-white shadow-lg backdrop-blur-md supports-[not_(backdrop-filter:blur(1px))]:bg-black/65";
 export const PRODUCT_CARD_LINK_CLASS =
-  "absolute inset-0 z-20 touch-manipulation rounded-2xl outline-none focus-visible:ring-4 focus-visible:ring-[#FFB0B7]/80 focus-visible:ring-inset";
+  "absolute inset-0 z-10 touch-manipulation rounded-2xl outline-none focus-visible:ring-4 focus-visible:ring-[#FFB0B7]/80 focus-visible:ring-inset";
 
 export function getProductDetailHref(slug: string) {
   return `/products/${slug}`;
@@ -87,7 +87,7 @@ export function ProductCard({
         className={`pointer-events-none absolute z-0 backdrop-blur-[3px] ${getTextRegionBackdropClass(textRegionPosition, "bottom")}`}
       />
       {/* Top Badge: e.g. "پرفروش" or category */}
-      <div className="pointer-events-none absolute inset-x-4 top-4 z-10 flex items-center justify-between gap-2">
+      <div className="pointer-events-none absolute inset-x-4 top-4 z-20 flex items-center justify-between gap-2">
         {product.badge ? (
           <span className="rounded-full bg-[#8E111E] px-2.5 py-0.5 text-[10px] font-black text-white shadow-xs">
             {product.badge}
@@ -112,7 +112,7 @@ export function ProductCard({
       <Link href={productHref} className={PRODUCT_CARD_LINK_CLASS} aria-label={`مشاهده ${product.name}`} />
 
       {/* Product Info */}
-      <div className={`pointer-events-none relative flex min-h-full w-full p-4 pt-16 ${getTextRegionLayoutClass(textRegionPosition, "bottom")}`}>
+      <div className={`pointer-events-none relative z-20 flex min-h-full w-full p-4 pt-16 ${getTextRegionLayoutClass(textRegionPosition, "bottom")}`}>
         <div className={`${PRODUCT_GLASS_OVERLAY_CLASS} ${getTextRegionContentWidthClass(textRegionPosition, "bottom")}`}>
           <div>
             <h3 className="line-clamp-2 text-xs font-black leading-5 text-white transition-colors group-hover:text-[#FFD6DA]">

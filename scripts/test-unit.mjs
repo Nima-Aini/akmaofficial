@@ -187,6 +187,7 @@ runTest("Product price presentation ignores legacy unitPrice text", () => {
 runTest("Product card link covers the whole card and targets its detail route", () => {
   assert.equal(getProductDetailHref("foam-box-10"), "/products/foam-box-10");
   assert.match(PRODUCT_CARD_LINK_CLASS, /absolute inset-0/);
+  assert.match(PRODUCT_CARD_LINK_CLASS, /z-10/);
   assert.match(PRODUCT_CARD_LINK_CLASS, /touch-manipulation/);
   assert.match(PRODUCT_CARD_LINK_CLASS, /focus-visible/);
 });
