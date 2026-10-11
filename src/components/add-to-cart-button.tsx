@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Check, Minus, Plus, ShoppingBag, Building2, User } from "lucide-react";
 import { useCart } from "@/context/cart-context";
 import { formatPrice, toFa } from "@/lib/format";
-import { calculateProductPricing, getWholesalePackConfig } from "@/lib/pricing";
+import { getProductPricePresentation, getWholesalePackConfig } from "@/lib/pricing";
 import type { ProductRow } from "@/db/schema";
 import { useProductMode } from "@/context/product-mode-context";
 
@@ -28,7 +28,7 @@ export function AddToCartButton({
   const [qty, setQty] = useState(mode === "wholesale" ? pack.minimumPackCount : 1);
   const [added, setAdded] = useState(false);
 
-  const pricing = calculateProductPricing(product, qty, mode);
+  const pricing = getProductPricePresentation(product, qty, mode);
 
   const handleAdd = () => {
     addItem(
@@ -47,7 +47,6 @@ export function AddToCartButton({
         wholesaleMinQty: product.wholesaleMinQty,
         retailImages: product.retailImages,
         wholesaleImages: product.wholesaleImages,
-        unitPrice: product.unitPrice,
       },
       qty,
       mode,
@@ -100,13 +99,20 @@ export function AddToCartButton({
         </div>
       )}
 
-      {/* Tier Label info */}
-      {showQty && pricing.tierLabel && (
-        <p className="text-center text-xs font-bold text-[#8E111E]">
-          {pricing.tierLabel}: {formatPrice(pricing.unitPrice)} تومان برای هر {pack.packLabel}
-        </p>
+      {showQty && (
+        <div className="rounded-2xl border border-[#E7E3DC] bg-[#FAF8F5] p-4 text-center" aria-live="polite">
+          <p className="text-xs font-bold text-[#78716C]">{pricing.label}</p>
+          <p className="mt-1 text-2xl font-black text-[#1C1816]">
+            {formatPrice(pricing.unitPrice)}
+            <span className="mr-1.5 text-xs font-bold text-[#78716C]">تومان</span>
+          </p>
+          {pricing.isTierPrice && pricing.tierLabel && (
+            <p className="mt-1 text-[11px] font-bold text-[#8E111E]">{pricing.tierLabel}</p>
+          )}
+        </div>
       )}
 
+      {/* Tier Label info */}
       {showQty && mode === "wholesale" && (
         <div className="grid grid-cols-2 gap-2 rounded-2xl border border-[#8E111E]/15 bg-[#8E111E]/5 p-3 text-center text-xs">
           <p><span className="block text-[10px] text-[#78716C]">هر بسته</span><b>{toFa(pack.unitsPerPack)} عدد</b></p>

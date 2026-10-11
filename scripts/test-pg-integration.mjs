@@ -142,7 +142,7 @@ try {
     const response = await fetch(`${baseUrl}/api/admin/products/${product.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json", Cookie: `akma_admin_session=${createSessionToken(admin.username)}` },
-      body: JSON.stringify({ ...product, wholesalePackSize: 12, wholesalePackLabel: "بسته ۱۲ عددی", wholesaleMinPackQty: 1, wholesalePrice: 1200000, wholesaleTiers: [{ minQty: 1, price: 1200000, label: "۱ تا ۴ بسته" }, { minQty: 5, price: 1100000, label: "۵+ بسته" }], retailUnitLabel: "عدد", retailImages: ["/uploads/products/retail-ci.webp"], wholesaleImages: ["/uploads/products/wholesale-ci.webp"], cardTextRegionPosition: "left" }),
+      body: JSON.stringify({ ...product, wholesalePackSize: 12, wholesalePackLabel: "بسته ۱۲ عددی", wholesaleMinPackQty: 1, wholesalePrice: 1200000, wholesaleTiers: [{ minQty: 1, price: 1200000, label: "۱ تا ۴ بسته" }, { minQty: 5, price: 1100000, label: "۵+ بسته" }], retailUnitLabel: "عدد", retailImages: ["/uploads/products/retail-ci.webp"], wholesaleImages: ["/uploads/products/wholesale-ci.webp"], cardTextRegionPosition: "left", unitPrice: "LEGACY_MANUAL_PRICE_SHOULD_NOT_RENDER" }),
     });
     assert.equal(response.status, 200, await response.text());
     configuredProduct = (await db.select().from(products).where(eq(products.id, product.id)))[0];
@@ -150,6 +150,20 @@ try {
     assert.equal(configuredProduct.wholesaleMinPackQty, 1);
     assert.equal(configuredProduct.wholesalePackLabel, "بسته ۱۲ عددی");
     assert.equal(configuredProduct.cardTextRegionPosition, "left");
+  });
+
+  await test("storefront renders automatic prices instead of legacy unitPrice text", async () => {
+    const detailResponse = await fetch(`${baseUrl}/products/${configuredProduct.slug}`);
+    assert.equal(detailResponse.status, 200);
+    const detailHtml = await detailResponse.text();
+    const visibleDetailHtml = detailHtml.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
+    assert.match(visibleDetailHtml, /قیمت هر عدد/);
+    assert.doesNotMatch(visibleDetailHtml, /LEGACY_MANUAL_PRICE_SHOULD_NOT_RENDER/);
+
+    const listingResponse = await fetch(`${baseUrl}/products`);
+    assert.equal(listingResponse.status, 200);
+    const listingHtml = await listingResponse.text();
+    assert.match(listingHtml, new RegExp(`href=["']\\/products\\/${configuredProduct.slug}["']`));
   });
 
   await test("admin persists retail images", async () => {

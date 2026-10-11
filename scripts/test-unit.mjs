@@ -4,7 +4,7 @@
  */
 import assert from "node:assert";
 import { generateSecureOtp } from "../src/lib/sms.ts";
-import { calculateProductPricing, getWholesalePackConfig, isPositiveSafeInteger } from "../src/lib/pricing.ts";
+import { calculateProductPricing, getProductPricePresentation, getWholesalePackConfig, isPositiveSafeInteger } from "../src/lib/pricing.ts";
 import { getProductImages } from "../src/lib/product-media.ts";
 import {
   getTextRegionBackdropClass,
@@ -12,7 +12,12 @@ import {
   normalizeTextRegionPosition,
   TEXT_REGION_BACKDROP_CLASSES,
 } from "../src/lib/text-region.ts";
-import { PRODUCT_GLASS_OVERLAY_CLASS } from "../src/components/product-card.tsx";
+import {
+  getProductDetailHref,
+  PRODUCT_CARD_LINK_CLASS,
+  PRODUCT_GLASS_OVERLAY_CLASS,
+  stopProductCardNavigation,
+} from "../src/components/product-card.tsx";
 
 console.log("==================================================================");
 console.log("📦 RUNNING ISOLATED UNIT TESTS");
@@ -134,6 +139,64 @@ runTest("Pricing rejects invalid quantities instead of coercing them", () => {
   for (const quantity of [0, -1, 1.5, NaN, Infinity]) {
     assert.throws(() => calculateProductPricing({ price: 10 }, quantity, "retail"));
   }
+});
+
+runTest("Retail price presentation is generated from the authoritative retail price", () => {
+  const result = getProductPricePresentation({ price: 300000, retailPrice: 240000, retailUnitLabel: "عدد" }, 1, "retail");
+  assert.equal(result.unitPrice, 240000);
+  assert.equal(result.label, "قیمت هر عدد");
+});
+
+runTest("Retail price presentation uses a custom unit label", () => {
+  const result = getProductPricePresentation({ price: 300000, retailPrice: 240000, retailUnitLabel: "جفت" }, 1, "retail");
+  assert.equal(result.label, "قیمت هر جفت");
+});
+
+runTest("Retail price presentation falls back to عدد and the legacy base price", () => {
+  const result = getProductPricePresentation({ price: 195000, retailPrice: 0, retailUnitLabel: "" }, 1, "retail");
+  assert.equal(result.unitPrice, 195000);
+  assert.equal(result.label, "قیمت هر عدد");
+});
+
+runTest("Wholesale price presentation generates the configured pack label and size", () => {
+  const result = getProductPricePresentation({ price: 1, wholesalePrice: 1200000, wholesalePackSize: 12, wholesalePackLabel: "بسته ۱۲ عددی" }, 1, "wholesale");
+  assert.equal(result.unitPrice, 1200000);
+  assert.equal(result.label, "قیمت هر بسته ۱۲ عددی");
+});
+
+runTest("Wholesale price presentation generates a pack-size fallback label", () => {
+  const result = getProductPricePresentation({ price: 1, wholesalePrice: 1200000, wholesalePackSize: 12, wholesalePackLabel: "" }, 1, "wholesale");
+  assert.equal(result.label, "قیمت هر بسته ۱۲ عددی");
+});
+
+runTest("Wholesale price presentation updates at a selected pricing tier", () => {
+  const product = { price: 1, wholesalePrice: 1200000, wholesalePackSize: 12, wholesalePackLabel: "بسته ۱۲ عددی", wholesaleTiers: [{ minQty: 5, price: 1100000, label: "۵+ بسته" }] };
+  assert.equal(getProductPricePresentation(product, 4, "wholesale").unitPrice, 1200000);
+  const tier = getProductPricePresentation(product, 5, "wholesale");
+  assert.equal(tier.unitPrice, 1100000);
+  assert.equal(tier.isTierPrice, true);
+  assert.equal(tier.tierLabel, "۵+ بسته");
+});
+
+runTest("Product price presentation ignores legacy unitPrice text", () => {
+  const result = getProductPricePresentation({ price: 200000, retailPrice: 180000, unitPrice: "قیمت واحد: ۱ تومان" }, 1, "retail");
+  assert.equal(result.unitPrice, 180000);
+  assert.equal(result.label, "قیمت هر عدد");
+});
+
+runTest("Product card link covers the whole card and targets its detail route", () => {
+  assert.equal(getProductDetailHref("foam-box-10"), "/products/foam-box-10");
+  assert.match(PRODUCT_CARD_LINK_CLASS, /absolute inset-0/);
+  assert.match(PRODUCT_CARD_LINK_CLASS, /touch-manipulation/);
+  assert.match(PRODUCT_CARD_LINK_CLASS, /focus-visible/);
+});
+
+runTest("Product card internal actions cancel card navigation", () => {
+  let prevented = false;
+  let stopped = false;
+  stopProductCardNavigation({ preventDefault: () => { prevented = true; }, stopPropagation: () => { stopped = true; } });
+  assert.equal(prevented, true);
+  assert.equal(stopped, true);
 });
 
 runTest("Legacy banners fall back to the right text region", () => {

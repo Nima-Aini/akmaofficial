@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { calculateProductPricing, getWholesalePackConfig, type WholesaleTierItem } from "@/lib/pricing";
+import { getProductPricePresentation, getWholesalePackConfig, type WholesaleTierItem } from "@/lib/pricing";
 import { getProductImages } from "@/lib/product-media";
 
 export type CartItem = {
@@ -44,6 +44,7 @@ type CartContextType = {
       wholesaleMinQty?: number;
       retailImages?: string[];
       wholesaleImages?: string[];
+      /** @deprecated Accepted only for compatibility with older callers; ignored for pricing. */
       unitPrice?: string;
     },
     quantity?: number,
@@ -105,12 +106,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const recalculateItem = (item: CartItem, newQty: number, newMode?: "retail" | "wholesale"): CartItem => {
     const mode = newMode || item.mode || cartMode;
-    const pricing = calculateProductPricing(
+    const pricing = getProductPricePresentation(
       {
         price: item.price,
         retailPrice: item.retailPrice,
         wholesalePrice: item.wholesalePrice,
         wholesaleTiers: item.wholesaleTiers,
+        retailUnitLabel: item.retailUnitLabel,
         wholesalePackSize: item.wholesalePackSize,
         wholesalePackLabel: item.wholesalePackLabel,
         wholesaleMinPackQty: item.wholesaleMinPackQty,
@@ -125,7 +127,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       mode,
       price: pricing.unitPrice,
       tierLabel: pricing.tierLabel,
-      unitPrice: pricing.tierLabel || `${pricing.unitPrice.toLocaleString("fa-IR")} تومان`,
+      unitPrice: `${pricing.label}: ${pricing.unitPrice.toLocaleString("fa-IR")} تومان`,
       totalUnits: pricing.totalUnits,
     };
   };
@@ -146,6 +148,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       wholesaleMinQty?: number;
       retailImages?: string[];
       wholesaleImages?: string[];
+      /** @deprecated Accepted only for compatibility with older callers; ignored for pricing. */
       unitPrice?: string;
     },
     quantity = 1,
@@ -168,7 +171,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         return copy;
       }
 
-      const pricing = calculateProductPricing(product, addQty, targetMode);
+      const pricing = getProductPricePresentation(product, addQty, targetMode);
       const newItem: CartItem = {
         productId: product.id,
         productName: product.name,
@@ -183,7 +186,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         wholesaleMinPackQty: product.wholesaleMinPackQty,
         wholesaleMinQty: product.wholesaleMinQty,
         totalUnits: pricing.totalUnits,
-        unitPrice: pricing.tierLabel || product.unitPrice,
+        unitPrice: `${pricing.label}: ${pricing.unitPrice.toLocaleString("fa-IR")} تومان`,
         quantity: addQty,
         mode: targetMode,
         tierLabel: pricing.tierLabel,

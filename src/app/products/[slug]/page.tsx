@@ -108,7 +108,7 @@ export default async function ProductPage({
         <span className="font-bold text-ink">{product.name}</span>
       </nav>
 
-      <ProductModeProvider>
+      <ProductModeProvider initialMode={product.isRetail === false && product.isWholesale !== false ? "wholesale" : "retail"}>
       <div className="mt-8 grid gap-10 lg:grid-cols-2 lg:gap-14">
         {/* gallery */}
         <Reveal className="relative">
@@ -131,30 +131,7 @@ export default async function ProductPage({
 
           <Reveal delay={80}>
             <div className="card mt-7 p-6 space-y-6">
-              <div className="flex flex-wrap items-end justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <p className="text-xs text-muted">قیمت خرید تکی</p>
-                      <p className="mt-1 text-2xl font-black text-ink">
-                        {formatPrice(product.retailPrice || product.price)}
-                        <span className="mr-1.5 text-xs font-bold text-muted">تومان</span>
-                      </p>
-                    </div>
-                    {product.wholesalePrice && product.wholesalePrice > 0 && (
-                      <div className="border-r border-line pr-3">
-                        <p className="text-xs text-accent font-bold">قیمت همکاری عمده</p>
-                        <p className="mt-1 text-2xl font-black text-accent">
-                          {formatPrice(product.wholesalePrice)}
-                          <span className="mr-1.5 text-xs font-bold text-muted">تومان</span>
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                  {product.unitPrice && (
-                    <p className="mt-2 text-xs font-bold text-muted">{product.unitPrice}</p>
-                  )}
-                </div>
+              <div className="flex flex-wrap items-center justify-end gap-4">
                 {product.inStock ? (
                   <span className="flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-4 py-2 text-xs font-bold text-emerald-600">
                     <PackageCheck size={15} /> موجود — آماده ارسال فوری
@@ -187,7 +164,7 @@ export default async function ProductPage({
 
               {/* Add to cart action with quantity selector */}
               <div className="border-t border-line pt-6">
-                <AddToCartButton product={product} size="lg" showQty={true} />
+                <AddToCartButton product={product} size="lg" showQty />
               </div>
 
               <div className="flex items-center gap-3">

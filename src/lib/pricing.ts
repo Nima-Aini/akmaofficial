@@ -29,8 +29,12 @@ export function getWholesalePackConfig(product: PriceableProduct) {
       ? product.wholesaleMinQty as number
       : 1;
   const packLabel = product.wholesalePackLabel?.trim() ||
-    (configured ? `بسته ${unitsPerPack} عددی` : "بسته");
+    (configured ? `بسته ${unitsPerPack.toLocaleString("fa-IR")} عددی` : "بسته");
   return { unitsPerPack, minimumPackCount: minimum, packLabel, configured };
+}
+
+export function getRetailUnitLabel(product: PriceableProduct): string {
+  return product.retailUnitLabel?.trim() || "عدد";
 }
 
 export function calculateProductPricing(
@@ -76,5 +80,32 @@ export function calculateProductPricing(
     tierLabel: undefined,
     lineTotal: baseRetail * qty,
     totalUnits: qty,
+  };
+}
+
+export function getProductPricePresentation(
+  product: PriceableProduct,
+  quantity: number,
+  mode: "retail" | "wholesale" = "retail",
+  { applyWholesaleTiers = true }: { applyWholesaleTiers?: boolean } = {},
+) {
+  const priceSource = mode === "wholesale" && !applyWholesaleTiers
+    ? { ...product, wholesaleTiers: [] }
+    : product;
+  const pricing = calculateProductPricing(priceSource, quantity, mode);
+  const unitLabel = mode === "wholesale"
+    ? getWholesalePackConfig(product).packLabel
+    : getRetailUnitLabel(product);
+  const matchedTier = mode === "wholesale" && applyWholesaleTiers
+    ? (product.wholesaleTiers ?? [])
+        .filter((tier) => quantity >= tier.minQty)
+        .sort((a, b) => b.minQty - a.minQty)[0]
+    : undefined;
+
+  return {
+    ...pricing,
+    unitLabel,
+    label: `قیمت هر ${unitLabel}`,
+    isTierPrice: Boolean(matchedTier),
   };
 }

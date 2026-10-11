@@ -37,6 +37,8 @@ export const products = pgTable("products", {
   isRetail: boolean("is_retail").notNull().default(true),
   isWholesale: boolean("is_wholesale").notNull().default(true),
   videoUrl: text("video_url").notNull().default(""),
+  // Legacy free-text field retained for production-data compatibility only.
+  // Storefront prices are generated from the authoritative numeric fields.
   unitPrice: text("unit_price").notNull().default(""),
   category: text("category").notNull().default("foam"),
   categoryLabel: text("category_label").notNull().default(""),

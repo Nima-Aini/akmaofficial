@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ShoppingCart, Eye, PackageCheck } from "lucide-react";
 import { formatPrice } from "@/lib/format";
 import { useCart } from "@/context/cart-context";
-import { calculateProductPricing } from "@/lib/pricing";
+import { getProductPricePresentation } from "@/lib/pricing";
 import type { ProductRow } from "@/db/schema";
 import { getProductImages } from "@/lib/product-media";
 import { getWholesalePackConfig } from "@/lib/pricing";
@@ -17,6 +17,17 @@ import {
 
 export const PRODUCT_GLASS_OVERLAY_CLASS =
   "relative rounded-2xl border border-white/25 bg-black/25 p-4 text-white shadow-lg backdrop-blur-md supports-[not_(backdrop-filter:blur(1px))]:bg-black/65";
+export const PRODUCT_CARD_LINK_CLASS =
+  "absolute inset-0 z-20 touch-manipulation rounded-2xl outline-none focus-visible:ring-4 focus-visible:ring-[#FFB0B7]/80 focus-visible:ring-inset";
+
+export function getProductDetailHref(slug: string) {
+  return `/products/${slug}`;
+}
+
+export function stopProductCardNavigation(event: { preventDefault: () => void; stopPropagation: () => void }) {
+  event.preventDefault();
+  event.stopPropagation();
+}
 
 export function ProductCard({
   product,
@@ -33,12 +44,16 @@ export function ProductCard({
   const textRegionPosition = normalizeTextRegionPosition(product.cardTextRegionPosition, "bottom");
 
   // Calculate pricing based on current active mode
-  const pricing = calculateProductPricing(product, mode === "wholesale" ? pack.minimumPackCount : 1, mode);
-  const displayPrice = pricing.unitPrice;
+  const pricing = getProductPricePresentation(
+    product,
+    mode === "wholesale" ? pack.minimumPackCount : 1,
+    mode,
+    { applyWholesaleTiers: false },
+  );
+  const productHref = getProductDetailHref(product.slug);
 
   const handleQuickAdd = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+    stopProductCardNavigation(e);
     addItem(
       {
         id: product.id,
@@ -55,7 +70,6 @@ export function ProductCard({
         wholesaleMinQty: product.wholesaleMinQty,
         retailImages: product.retailImages,
         wholesaleImages: product.wholesaleImages,
-        unitPrice: product.unitPrice,
       },
       mode === "wholesale" ? pack.minimumPackCount : 1,
       mode,
@@ -63,7 +77,7 @@ export function ProductCard({
   };
 
   return (
-    <article className="group relative isolate flex min-h-[390px] overflow-hidden rounded-2xl border border-white/50 bg-[#eee7dd] shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+    <article className="group relative isolate flex min-h-[390px] cursor-pointer overflow-hidden rounded-2xl border border-white/50 bg-[#eee7dd] shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl focus-within:shadow-xl">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={img} alt={product.name} loading="lazy" className="absolute inset-0 -z-20 size-full object-cover transition-transform duration-700 group-hover:scale-105" />
       <div className="absolute inset-0 -z-10 bg-black/10" />
@@ -73,7 +87,7 @@ export function ProductCard({
         className={`pointer-events-none absolute z-0 backdrop-blur-[3px] ${getTextRegionBackdropClass(textRegionPosition, "bottom")}`}
       />
       {/* Top Badge: e.g. "پرفروش" or category */}
-      <div className="absolute inset-x-4 top-4 z-30 flex items-center justify-between gap-2">
+      <div className="pointer-events-none absolute inset-x-4 top-4 z-10 flex items-center justify-between gap-2">
         {product.badge ? (
           <span className="rounded-full bg-[#8E111E] px-2.5 py-0.5 text-[10px] font-black text-white shadow-xs">
             {product.badge}
@@ -95,17 +109,15 @@ export function ProductCard({
         )}
       </div>
 
-      <Link href={`/products/${product.slug}`} className="absolute inset-0 z-10" aria-label={`مشاهده ${product.name}`} />
+      <Link href={productHref} className={PRODUCT_CARD_LINK_CLASS} aria-label={`مشاهده ${product.name}`} />
 
       {/* Product Info */}
-      <div className={`relative z-20 flex min-h-full w-full p-4 pt-16 ${getTextRegionLayoutClass(textRegionPosition, "bottom")}`}>
+      <div className={`pointer-events-none relative flex min-h-full w-full p-4 pt-16 ${getTextRegionLayoutClass(textRegionPosition, "bottom")}`}>
         <div className={`${PRODUCT_GLASS_OVERLAY_CLASS} ${getTextRegionContentWidthClass(textRegionPosition, "bottom")}`}>
           <div>
-            <Link href={`/products/${product.slug}`}>
-              <h3 className="line-clamp-2 text-xs font-black leading-5 text-white transition-colors group-hover:text-[#FFD6DA]">
-                {product.name}
-              </h3>
-            </Link>
+            <h3 className="line-clamp-2 text-xs font-black leading-5 text-white transition-colors group-hover:text-[#FFD6DA]">
+              {product.name}
+            </h3>
             {product.subtitle && (
               <p className="mt-1 line-clamp-1 text-[11px] text-white/75">
                 {product.subtitle}
@@ -117,29 +129,27 @@ export function ProductCard({
           <div className="mt-4 flex items-center justify-between border-t border-white/15 pt-3">
             <div>
               <span className="block font-mono text-base font-black text-[#FFB0B7]">
-                {formatPrice(displayPrice)}
+                {formatPrice(pricing.unitPrice)}
                 <span className="mr-1 text-[11px] font-bold text-white/70">تومان</span>
               </span>
-              {pricing.tierLabel && (
-                <span className="mt-0.5 block text-[9px] font-bold text-white/70">
-                  {pricing.tierLabel}
-                </span>
-              )}
+              <span className="mt-0.5 block text-[9px] font-bold text-white/70">{pricing.label}</span>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="pointer-events-auto relative z-30 flex items-center gap-1.5">
               <Link
-                href={`/products/${product.slug}`}
-                className="relative z-30 grid size-9 place-items-center rounded-xl border border-white/25 bg-white/10 text-white backdrop-blur-md transition-colors hover:bg-white/20"
+                href={productHref}
+                className="grid size-9 place-items-center rounded-xl border border-white/25 bg-white/10 text-white backdrop-blur-md transition-colors hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                 title="مشاهده جزئیات"
+                aria-label={`مشاهده جزئیات ${product.name}`}
               >
                 <Eye size={16} />
               </Link>
               <button
                 type="button"
                 onClick={handleQuickAdd}
-                className="relative z-30 grid size-9 place-items-center rounded-xl bg-[#8E111E] text-white shadow-xs transition-all hover:bg-[#740D18] active:scale-95"
+                className="grid size-9 place-items-center rounded-xl bg-[#8E111E] text-white shadow-xs transition-all hover:bg-[#740D18] active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                 title="افزودن به سبد خرید"
+                aria-label={`افزودن ${product.name} به سبد خرید`}
               >
                 <ShoppingCart size={16} />
               </button>

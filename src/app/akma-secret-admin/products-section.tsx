@@ -7,6 +7,7 @@ import { formatPrice } from "@/lib/format";
 import { Field, ImageUploader, ListEditor, Textarea, TextRegionControl, Toggle } from "./fields";
 import type { TextRegionPosition } from "@/lib/text-region";
 import { getProductImages } from "@/lib/product-media";
+import { getProductPricePresentation } from "@/lib/pricing";
 
 export type AdminProduct = {
   id: number;
@@ -28,6 +29,7 @@ export type AdminProduct = {
   isRetail?: boolean;
   isWholesale?: boolean;
   videoUrl?: string;
+  /** Legacy field retained in API payloads; no longer edited or rendered as storefront price text. */
   unitPrice: string;
   category: string;
   categoryLabel: string;
@@ -164,6 +166,13 @@ export function ProductsSection({
     patch({ wholesaleTiers: editing.wholesaleTiers.filter((_, i) => i !== idx) });
   };
 
+  const retailPreview = editing
+    ? getProductPricePresentation(editing, 1, "retail")
+    : null;
+  const wholesalePreview = editing
+    ? getProductPricePresentation(editing, 1, "wholesale", { applyWholesaleTiers: false })
+    : null;
+
   return (
     <div className="card p-6 sm:p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -286,7 +295,10 @@ export function ProductsSection({
                   image={getProductImages(editing, "retail")[0]}
                   variant="product"
                 />
-                <div className="rounded-xl border border-line bg-card p-3 text-xs"><span className="text-muted">پیش‌نمایش مشتری: </span><b>۱ {editing.retailUnitLabel || "عدد"}</b></div>
+                <div className="rounded-xl border border-line bg-card p-3 text-xs">
+                  <span className="text-muted">پیش‌نمایش خودکار مشتری: </span>
+                  <b>{retailPreview?.label}: {formatPrice(retailPreview?.unitPrice)} تومان</b>
+                </div>
               </div>
 
               <div className="rounded-2xl border border-line bg-surface/50 p-4 space-y-4">
@@ -298,7 +310,10 @@ export function ProductsSection({
                   <Field label="قیمت هر بسته (تومان)" type="number" value={editing.wholesalePrice ?? editing.price} onChange={(v) => patch({ wholesalePrice: Number(v) || 0 })} dir="ltr" />
                   <Field label="حداقل تعداد بسته" type="number" value={editing.wholesaleMinPackQty ?? ""} onChange={(v) => patch({ wholesaleMinPackQty: v ? Number(v) : null })} dir="ltr" hint="خالی = استفاده از حداقل قدیمی برای سازگاری" />
                 </div>
-                <div className="rounded-xl border border-line bg-card p-3 text-xs"><span className="text-muted">پیش‌نمایش مشتری: </span><b>۱ {editing.wholesalePackLabel || (editing.wholesalePackSize ? `بسته ${editing.wholesalePackSize} عددی` : "بسته")}</b></div>
+                <div className="rounded-xl border border-line bg-card p-3 text-xs">
+                  <span className="text-muted">پیش‌نمایش خودکار مشتری: </span>
+                  <b>{wholesalePreview?.label}: {formatPrice(wholesalePreview?.unitPrice)} تومان</b>
+                </div>
 
                 {/* Wholesale Tiers */}
                 <div className="space-y-3 pt-2 border-t border-line">
