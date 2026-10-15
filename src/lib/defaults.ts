@@ -1,4 +1,5 @@
 import type { TextRegionPosition } from "./text-region";
+import type { ResponsiveImageSettings } from "./responsive-image";
 
 export type ThemeSettings = {
   mode: "dark" | "light";
@@ -9,36 +10,30 @@ export type ThemeSettings = {
   buttonShape: "soft" | "pill" | "sharp";
 };
 
-export type HeroSettings = {
+export type HeroSettings = ResponsiveImageSettings & {
   badge: string;
   title: string;
   highlight: string;
   subtitle: string;
   primaryCta: { label: string; href: string };
   secondaryCta: { label: string; href: string };
-  image: string;
-  textRegionPosition?: TextRegionPosition;
   stats: { value: string; label: string }[];
 };
 
-export type Banner = {
+export type Banner = ResponsiveImageSettings & {
   id: string;
   title: string;
   subtitle: string;
   cta: string;
   href: string;
-  image: string;
   enabled: boolean;
-  textRegionPosition?: TextRegionPosition;
 };
 
-export type BottomBanner = {
+export type BottomBanner = ResponsiveImageSettings & {
   id: string;
-  image: string;
   href: string;
   alt: string;
   enabled: boolean;
-  textRegionPosition?: TextRegionPosition;
 };
 
 export type SectionTitles = {
@@ -91,42 +86,34 @@ export type SiteSettings = {
 };
 
 export type DualCardsSettings = {
-  retail: {
+  retail: ResponsiveImageSettings & {
     title: string;
     subtitle: string;
     checklist: string[];
     buttonText: string;
     buttonHref: string;
-    image: string;
-    textRegionPosition?: TextRegionPosition;
   };
-  wholesale: {
+  wholesale: ResponsiveImageSettings & {
     title: string;
     subtitle: string;
     checklist: string[];
     buttonText: string;
     buttonHref: string;
-    image: string;
-    textRegionPosition?: TextRegionPosition;
   };
 };
 
-export type CategoryItem = {
+export type CategoryItem = ResponsiveImageSettings & {
   key: string;
   label: string;
-  image: string;
   href?: string;
-  textRegionPosition?: TextRegionPosition;
 };
 
-export type WholesalePromoSettings = {
+export type WholesalePromoSettings = ResponsiveImageSettings & {
   title: string;
   subtitle: string;
   tags: string[];
   buttonText: string;
   buttonHref: string;
-  image: string;
-  textRegionPosition?: TextRegionPosition;
 };
 
 export const DEFAULT_THEME: ThemeSettings = {
@@ -147,6 +134,9 @@ export const DEFAULT_HERO: HeroSettings = {
   secondaryCta: { label: "خرید عمده و همکاری", href: "/products?mode=wholesale" },
   image: "/images/redesign/hero.jpg",
   textRegionPosition: "right",
+  mobileTextRegionPosition: "bottom",
+  desktopObjectPosition: { x: 50, y: 50 },
+  mobileObjectPosition: { x: 50, y: 38 },
   stats: [
     { value: "+۱۵", label: "محصول تخصصی" },
     { value: "تک و عمده", label: "فروش مستقیم" },
@@ -169,6 +159,9 @@ export const DEFAULT_DUAL_CARDS: DualCardsSettings = {
     buttonHref: "/products?mode=retail",
     image: "/images/redesign/retail-card.jpg",
     textRegionPosition: "right",
+    mobileTextRegionPosition: "bottom",
+    desktopObjectPosition: { x: 50, y: 50 },
+    mobileObjectPosition: { x: 50, y: 38 },
   },
   wholesale: {
     title: "خرید عمده",
@@ -182,6 +175,9 @@ export const DEFAULT_DUAL_CARDS: DualCardsSettings = {
     buttonHref: "/products?mode=wholesale",
     image: "/images/redesign/wholesale-boxes.jpg",
     textRegionPosition: "right",
+    mobileTextRegionPosition: "bottom",
+    desktopObjectPosition: { x: 50, y: 50 },
+    mobileObjectPosition: { x: 50, y: 38 },
   },
 };
 
@@ -231,6 +227,9 @@ export const DEFAULT_WHOLESALE_PROMO: WholesalePromoSettings = {
   buttonHref: "/products?mode=wholesale",
   image: "/images/redesign/wholesale-banner.jpg",
   textRegionPosition: "right",
+  mobileTextRegionPosition: "bottom",
+  desktopObjectPosition: { x: 50, y: 50 },
+  mobileObjectPosition: { x: 50, y: 38 },
 };
 
 export const DEFAULT_MARQUEE: string[] = [
@@ -253,6 +252,9 @@ export const DEFAULT_BANNERS: Banner[] = [
     image: "/images/redesign/cat-packs.jpg",
     enabled: true,
     textRegionPosition: "right",
+    mobileTextRegionPosition: "bottom",
+    desktopObjectPosition: { x: 50, y: 50 },
+    mobileObjectPosition: { x: 50, y: 38 },
   },
 ];
 
@@ -350,6 +352,9 @@ export const DEFAULT_BOTTOM_BANNERS: BottomBanner[] = [
     alt: "محصولات مراقبت از کفش آکما",
     enabled: true,
     textRegionPosition: "bottom",
+    mobileTextRegionPosition: "bottom",
+    desktopObjectPosition: { x: 50, y: 50 },
+    mobileObjectPosition: { x: 50, y: 50 },
   },
 ];
 

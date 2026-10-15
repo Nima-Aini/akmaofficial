@@ -26,31 +26,12 @@ import {
 } from "@/lib/defaults";
 import { ProductCard } from "@/components/product-card";
 import {
-  getTextRegionBackdropClass,
-  getTextRegionContentWidthClass,
-  getTextRegionLayoutClass,
-  normalizeTextRegionPosition,
-  type TextRegionPosition,
-} from "@/lib/text-region";
+  ResponsiveBannerContent,
+  ResponsiveBannerMedia,
+  ResponsiveTextRegionBackdrop,
+} from "@/components/responsive-banner";
 
 export const dynamic = "force-dynamic";
-
-function TextRegionBackdrop({
-  position,
-  fallback = "right",
-}: {
-  position?: TextRegionPosition;
-  fallback?: TextRegionPosition;
-}) {
-  const normalized = normalizeTextRegionPosition(position, fallback);
-  return (
-    <span
-      aria-hidden="true"
-      data-text-region={normalized}
-      className={`pointer-events-none absolute z-0 backdrop-blur-[3px] ${getTextRegionBackdropClass(normalized, fallback)}`}
-    />
-  );
-}
 
 export default async function HomePage() {
   const [s, products] = await Promise.all([getSettings(), getActiveProducts()]);
@@ -77,11 +58,12 @@ export default async function HomePage() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-12 sm:space-y-16 pt-6">
 
         {/* ================= 1. HERO SECTION (MATCHING LEFT REFERENCE PANEL) ================= */}
-        <section className="relative isolate min-h-[460px] overflow-hidden rounded-[2rem] bg-[#4A0811] bg-cover bg-center text-white shadow-xl sm:rounded-[2.5rem]" style={{ backgroundImage: `url(${hero.image || "/images/redesign/hero.jpg"})` }}>
+        <section className="relative isolate min-h-[500px] overflow-hidden rounded-[2rem] bg-[#4A0811] text-white shadow-xl md:min-h-[460px] sm:rounded-[2.5rem]">
+          <ResponsiveBannerMedia settings={hero} fallback="/images/redesign/hero.jpg" alt="" priority />
           <span aria-hidden="true" className="absolute inset-0 z-0 bg-black/10" />
-          <TextRegionBackdrop position={hero.textRegionPosition} />
-          <div className={`relative z-10 flex min-h-[460px] p-6 sm:p-10 lg:p-14 ${getTextRegionLayoutClass(hero.textRegionPosition)}`}>
-            <div className={`space-y-6 drop-shadow-[0_2px_12px_rgba(0,0,0,0.55)] ${getTextRegionContentWidthClass(hero.textRegionPosition)}`}>
+          <ResponsiveTextRegionBackdrop settings={hero} />
+          <ResponsiveBannerContent settings={hero} className="min-h-[500px] p-5 sm:p-10 md:min-h-[460px] lg:p-14">
+            <div className="space-y-5 drop-shadow-[0_2px_12px_rgba(0,0,0,0.55)] sm:space-y-6">
               <div className="inline-flex items-center gap-2 rounded-full bg-black/25 px-4 py-1.5 text-xs font-bold text-white/90 backdrop-blur-xs border border-white/10">
                 <span className="size-2 rounded-full bg-[#E53E3E] animate-pulse" />
                 {hero.badge}
@@ -115,8 +97,7 @@ export default async function HomePage() {
                 </Link>
               </div>
             </div>
-
-          </div>
+          </ResponsiveBannerContent>
 
           {/* Dots Indicator in bottom corner */}
           <div className="absolute bottom-4 left-6 hidden sm:flex items-center gap-1.5 z-20">
@@ -151,10 +132,11 @@ export default async function HomePage() {
         {/* ================= 3. DUAL ACTION CARDS (RETAIL VS. WHOLESALE) ================= */}
         <section className="grid md:grid-cols-2 gap-6 lg:gap-8">
           {/* RETAIL CARD: خرید تکی */}
-          <div className="relative isolate min-h-[360px] overflow-hidden rounded-[2rem] border border-white/60 bg-cover bg-center shadow-md transition-shadow hover:shadow-xl" style={{ backgroundImage: `url(${dualCards.retail.image || "/images/redesign/retail-card.jpg"})` }}>
-            <TextRegionBackdrop position={dualCards.retail.textRegionPosition} />
-            <div className={`relative z-10 flex min-h-[360px] p-6 sm:p-8 ${getTextRegionLayoutClass(dualCards.retail.textRegionPosition)}`}>
-              <div className={`space-y-4 text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.65)] ${getTextRegionContentWidthClass(dualCards.retail.textRegionPosition)}`}>
+          <div className="relative isolate min-h-[360px] overflow-hidden rounded-[2rem] border border-white/60 shadow-md transition-shadow hover:shadow-xl">
+            <ResponsiveBannerMedia settings={dualCards.retail} fallback="/images/redesign/retail-card.jpg" />
+            <ResponsiveTextRegionBackdrop settings={dualCards.retail} />
+            <ResponsiveBannerContent settings={dualCards.retail} className="min-h-[360px] p-6 sm:p-8">
+              <div className="space-y-4 text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.65)]">
                 <div>
                   <h2 className="text-2xl font-black sm:text-3xl">
                     {dualCards.retail.title}
@@ -185,15 +167,16 @@ export default async function HomePage() {
                   </Link>
                 </div>
               </div>
-            </div>
+            </ResponsiveBannerContent>
 
           </div>
 
           {/* WHOLESALE CARD: خرید عمده */}
-          <div className="relative isolate min-h-[360px] overflow-hidden rounded-[2rem] border border-white/60 bg-cover bg-center shadow-md transition-shadow hover:shadow-xl" style={{ backgroundImage: `url(${dualCards.wholesale.image || "/images/redesign/wholesale-boxes.jpg"})` }}>
-            <TextRegionBackdrop position={dualCards.wholesale.textRegionPosition} />
-            <div className={`relative z-10 flex min-h-[360px] p-6 sm:p-8 ${getTextRegionLayoutClass(dualCards.wholesale.textRegionPosition)}`}>
-              <div className={`space-y-4 text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.65)] ${getTextRegionContentWidthClass(dualCards.wholesale.textRegionPosition)}`}>
+          <div className="relative isolate min-h-[360px] overflow-hidden rounded-[2rem] border border-white/60 shadow-md transition-shadow hover:shadow-xl">
+            <ResponsiveBannerMedia settings={dualCards.wholesale} fallback="/images/redesign/wholesale-boxes.jpg" />
+            <ResponsiveTextRegionBackdrop settings={dualCards.wholesale} />
+            <ResponsiveBannerContent settings={dualCards.wholesale} className="min-h-[360px] p-6 sm:p-8">
+              <div className="space-y-4 text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.65)]">
                 <div>
                   <h2 className="text-2xl font-black sm:text-3xl">
                     {dualCards.wholesale.title}
@@ -224,7 +207,7 @@ export default async function HomePage() {
                   </Link>
                 </div>
               </div>
-            </div>
+            </ResponsiveBannerContent>
 
           </div>
         </section>
@@ -282,13 +265,13 @@ export default async function HomePage() {
               <Link
                 key={cat.key}
                 href={cat.href || `/products?cat=${cat.key}`}
-                className={`group relative isolate flex aspect-square overflow-hidden rounded-2xl border border-white/60 bg-cover bg-center p-3 text-center shadow-md transition-all hover:-translate-y-1 hover:shadow-xl ${getTextRegionLayoutClass(cat.textRegionPosition, "bottom")}`}
-                style={{ backgroundImage: `url(${cat.image})` }}
+                className="group relative isolate aspect-square overflow-hidden rounded-2xl border border-white/60 text-center shadow-md transition-all hover:-translate-y-1 hover:shadow-xl"
               >
-                <TextRegionBackdrop position={cat.textRegionPosition} fallback="bottom" />
-                <span className="relative z-10 w-full px-3 py-2 text-xs font-black text-white drop-shadow-md transition-colors group-hover:text-[#FFD6DA]">
-                  {cat.label}
-                </span>
+                <ResponsiveBannerMedia settings={cat} fallback="/images/redesign/cat-packs.jpg" alt="" />
+                <ResponsiveTextRegionBackdrop settings={cat} desktopFallback="bottom" mobileFallback="bottom" />
+                <ResponsiveBannerContent settings={cat} desktopFallback="bottom" mobileFallback="bottom" className="min-h-full p-3">
+                  <span className="block w-full px-3 py-2 text-xs font-black text-white drop-shadow-md transition-colors group-hover:text-[#FFD6DA]">{cat.label}</span>
+                </ResponsiveBannerContent>
               </Link>
             ))}
           </div>
@@ -297,13 +280,16 @@ export default async function HomePage() {
         {banners.length > 0 && (
           <section className="grid gap-6 md:grid-cols-2" aria-label="پیشنهادهای ویژه">
             {banners.map((banner) => (
-              <Link key={banner.id} href={banner.href || "/products"} className={`group relative isolate flex min-h-[300px] overflow-hidden rounded-[2rem] border border-white/50 bg-cover bg-center p-6 shadow-lg ${getTextRegionLayoutClass(banner.textRegionPosition)}`} style={{ backgroundImage: `url(${banner.image})` }}>
-                <TextRegionBackdrop position={banner.textRegionPosition} />
-                <span className={`relative z-10 block text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.65)] ${getTextRegionContentWidthClass(banner.textRegionPosition)}`}>
+              <Link key={banner.id} href={banner.href || "/products"} className="group relative isolate min-h-[340px] overflow-hidden rounded-[2rem] border border-white/50 shadow-lg md:min-h-[300px]">
+                <ResponsiveBannerMedia settings={banner} fallback="/images/hero.png" alt="" />
+                <ResponsiveTextRegionBackdrop settings={banner} />
+                <ResponsiveBannerContent settings={banner} className="min-h-[340px] p-6 md:min-h-[300px]">
+                <span className="block text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.65)]">
                   <strong className="block text-xl font-black">{banner.title}</strong>
                   <span className="mt-2 block text-xs leading-6 text-white/85">{banner.subtitle}</span>
                   <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-5 py-2 text-xs font-black text-[#8E111E]">{banner.cta}<ArrowLeft size={14} /></span>
                 </span>
+                </ResponsiveBannerContent>
               </Link>
             ))}
           </section>
@@ -332,10 +318,11 @@ export default async function HomePage() {
         </section>
 
         {/* ================= 7. LOWER WHOLESALE COLLABORATION BANNER ================= */}
-        <section className="relative isolate min-h-[360px] overflow-hidden rounded-[2.5rem] bg-[#4A0811] bg-cover bg-center text-white shadow-xl" style={{ backgroundImage: `url(${wholesalePromo.image || "/images/redesign/wholesale-banner.jpg"})` }}>
-          <TextRegionBackdrop position={wholesalePromo.textRegionPosition} />
-          <div className={`relative z-10 flex min-h-[360px] p-8 sm:p-12 ${getTextRegionLayoutClass(wholesalePromo.textRegionPosition)}`}>
-            <div className={`space-y-4 drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)] ${getTextRegionContentWidthClass(wholesalePromo.textRegionPosition)}`}>
+        <section className="relative isolate min-h-[390px] overflow-hidden rounded-[2.5rem] bg-[#4A0811] text-white shadow-xl md:min-h-[360px]">
+          <ResponsiveBannerMedia settings={wholesalePromo} fallback="/images/redesign/wholesale-banner.jpg" alt="" />
+          <ResponsiveTextRegionBackdrop settings={wholesalePromo} />
+          <ResponsiveBannerContent settings={wholesalePromo} className="min-h-[390px] p-7 sm:p-12 md:min-h-[360px]">
+            <div className="space-y-4 drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)]">
               <h2 className="text-2xl sm:text-4xl font-black leading-tight">
                 {wholesalePromo.title}
               </h2>
@@ -366,16 +353,18 @@ export default async function HomePage() {
                 </Link>
               </div>
             </div>
-
-          </div>
+          </ResponsiveBannerContent>
         </section>
 
         {bottomBanners.length > 0 && (
           <section className="grid gap-5 sm:grid-cols-2" aria-label="بنرهای پایانی">
             {bottomBanners.map((banner) => (
-              <Link key={banner.id} href={banner.href || "/products"} aria-label={banner.alt} className={`relative isolate flex min-h-[220px] overflow-hidden rounded-[2rem] border border-white/50 bg-cover bg-center p-5 shadow-lg ${getTextRegionLayoutClass(banner.textRegionPosition, "bottom")}`} style={{ backgroundImage: `url(${banner.image})` }}>
-                <TextRegionBackdrop position={banner.textRegionPosition} fallback="bottom" />
-                <span className={`relative z-10 px-4 py-3 text-sm font-black text-white drop-shadow-md ${getTextRegionContentWidthClass(banner.textRegionPosition, "bottom")}`}>{banner.alt}</span>
+              <Link key={banner.id} href={banner.href || "/products"} aria-label={banner.alt} className="relative isolate min-h-[280px] overflow-hidden rounded-[2rem] border border-white/50 shadow-lg md:min-h-[220px]">
+                <ResponsiveBannerMedia settings={banner} fallback="/images/craft.png" alt="" />
+                <ResponsiveTextRegionBackdrop settings={banner} desktopFallback="bottom" mobileFallback="bottom" />
+                <ResponsiveBannerContent settings={banner} desktopFallback="bottom" mobileFallback="bottom" className="min-h-[280px] p-5 md:min-h-[220px]">
+                  <span className="px-4 py-3 text-sm font-black text-white drop-shadow-md">{banner.alt}</span>
+                </ResponsiveBannerContent>
               </Link>
             ))}
           </section>

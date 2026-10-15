@@ -13,6 +13,15 @@ import {
   TEXT_REGION_BACKDROP_CLASSES,
 } from "../src/lib/text-region.ts";
 import {
+  clampPercentage,
+  getResponsiveFocalPoint,
+  getResponsiveImageSource,
+  getResponsiveTextRegion,
+  sanitizeImageUrl,
+  sanitizeResponsiveSetting,
+} from "../src/lib/responsive-image.ts";
+import { ResponsiveBannerMedia, getResponsiveTextLayoutClass } from "../src/components/responsive-banner.tsx";
+import {
   getProductDetailHref,
   PRODUCT_CARD_LINK_CLASS,
   PRODUCT_GLASS_OVERLAY_CLASS,
@@ -248,6 +257,54 @@ runTest("Invalid persisted text regions safely use the requested fallback", () =
 runTest("Admin preview selection changes the marked region", () => {
   assert.notEqual(TEXT_REGION_BACKDROP_CLASSES.right, TEXT_REGION_BACKDROP_CLASSES.left);
   assert.notEqual(TEXT_REGION_BACKDROP_CLASSES.bottom, TEXT_REGION_BACKDROP_CLASSES.center);
+});
+
+runTest("Responsive banners select desktop and mobile sources independently", () => {
+  const config = { image: "/desktop.webp", mobileImage: "/mobile.webp" };
+  assert.equal(getResponsiveImageSource(config, "desktop", "/fallback.webp"), "/desktop.webp");
+  assert.equal(getResponsiveImageSource(config, "mobile", "/fallback.webp"), "/mobile.webp");
+});
+
+runTest("Missing mobile and legacy responsive fields preserve existing banners", () => {
+  assert.equal(getResponsiveImageSource({ image: "/legacy.webp" }, "mobile", "/fallback.webp"), "/legacy.webp");
+  assert.equal(getResponsiveImageSource({}, "desktop", "/fallback.webp"), "/fallback.webp");
+});
+
+runTest("Mobile and desktop focal positions are normalized and clamped", () => {
+  const config = { desktopObjectPosition: { x: -12, y: 125 }, mobileObjectPosition: { x: 34.4, y: 62.7 } };
+  assert.deepEqual(getResponsiveFocalPoint(config, "desktop"), { x: 0, y: 100 });
+  assert.deepEqual(getResponsiveFocalPoint(config, "mobile"), { x: 34, y: 63 });
+  assert.equal(clampPercentage("not-a-number"), 50);
+});
+
+runTest("Mobile text region defaults to bottom without changing legacy desktop placement", () => {
+  const legacy = { textRegionPosition: "left" };
+  assert.equal(getResponsiveTextRegion(legacy, "desktop"), "left");
+  assert.equal(getResponsiveTextRegion(legacy, "mobile"), "bottom");
+  assert.notEqual(getResponsiveTextLayoutClass("right", "bottom"), getResponsiveTextLayoutClass("left", "center"));
+});
+
+runTest("Responsive media renders picture metadata and a mobile source", () => {
+  const element = ResponsiveBannerMedia({ settings: { image: "/desktop.webp", mobileImage: "/mobile.webp" }, fallback: "/fallback.webp" });
+  assert.equal(element.type, "picture");
+  assert.equal(element.props["data-desktop-source"], "/desktop.webp");
+  assert.equal(element.props["data-mobile-source"], "/mobile.webp");
+  assert.equal(element.props.children[0].type, "source");
+  assert.equal(element.props.children[0].props.media, "(max-width: 767px)");
+});
+
+runTest("Responsive setting validation blocks unsafe image CSS injection", () => {
+  assert.equal(sanitizeImageUrl("javascript:alert(1)"), "");
+  assert.equal(sanitizeImageUrl("url(https://evil.invalid/x)"), "");
+  const saved = sanitizeResponsiveSetting("hero", { image: "/safe.webp", mobileImage: "javascript:alert(1)", desktopObjectPosition: { x: -1, y: 101 }, mobileTextRegionPosition: "invalid" });
+  assert.deepEqual(saved, { image: "/safe.webp", mobileImage: "", desktopObjectPosition: { x: 0, y: 100 }, mobileTextRegionPosition: "bottom" });
+});
+
+runTest("Admin preview can switch mobile text placement without changing desktop", () => {
+  const before = { image: "/desktop.webp", textRegionPosition: "right", mobileTextRegionPosition: "bottom" };
+  const after = { ...before, mobileTextRegionPosition: "center" };
+  assert.equal(getResponsiveTextRegion(after, "desktop"), "right");
+  assert.notEqual(getResponsiveTextRegion(before, "mobile"), getResponsiveTextRegion(after, "mobile"));
 });
 
 runTest("Product content uses frosted glass instead of a solid white box", () => {

@@ -107,11 +107,15 @@ try {
   const admin = (await db.insert(adminUsers).values({ username: "ci_admin", passwordHash: hashPassword("unused-ci-password") }).returning())[0];
   await startServer();
 
-  await test("admin persists banner text-region settings in PostgreSQL", async () => {
+  await test("admin persists responsive banner settings in PostgreSQL", async () => {
     const value = {
       title: "هیرو تست",
       image: "/uploads/banners/hero-ci.webp",
+      mobileImage: "/uploads/hero/hero-mobile-ci.webp",
       textRegionPosition: "left",
+      mobileTextRegionPosition: "bottom",
+      desktopObjectPosition: { x: 42, y: 48 },
+      mobileObjectPosition: { x: 60, y: 35 },
     };
     const response = await fetch(`${baseUrl}/api/admin/settings`, {
       method: "PUT",
@@ -120,6 +124,39 @@ try {
     });
     assert.equal(response.status, 200, await response.text());
     assert.deepEqual((await db.select().from(settings).where(eq(settings.key, "hero")))[0]?.value, value);
+  });
+
+  await test("changing mobile composition preserves the desktop image", async () => {
+    const current = (await db.select().from(settings).where(eq(settings.key, "hero")))[0]?.value;
+    const value = { ...current, mobileImage: "/uploads/hero/replacement-mobile.webp", mobileObjectPosition: { x: 130, y: -20 } };
+    const response = await fetch(`${baseUrl}/api/admin/settings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: `akma_admin_session=${createSessionToken(admin.username)}` },
+      body: JSON.stringify({ key: "hero", value }),
+    });
+    assert.equal(response.status, 200, await response.text());
+    const stored = (await db.select().from(settings).where(eq(settings.key, "hero")))[0]?.value;
+    assert.equal(stored.image, "/uploads/banners/hero-ci.webp");
+    assert.equal(stored.mobileImage, "/uploads/hero/replacement-mobile.webp");
+    assert.deepEqual(stored.mobileObjectPosition, { x: 100, y: 0 });
+  });
+
+  await test("homepage emits art-directed mobile source and focal metadata", async () => {
+    const response = await fetch(`${baseUrl}/`);
+    const html = await response.text();
+    assert.equal(response.status, 200);
+    assert.match(html, /data-responsive-banner-media="true"/);
+    assert.match(html, /data-mobile-source="\/uploads\/hero\/replacement-mobile.webp"/);
+    assert.match(html, /media="\(max-width: 767px\)"/);
+  });
+
+  await test("unauthorized responsive CMS update is rejected", async () => {
+    const response = await fetch(`${baseUrl}/api/admin/settings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: "hero", value: { image: "/unauthorized.webp" } }),
+    });
+    assert.equal(response.status, 401);
   });
 
   await test("initial HTTP checkout stores trusted order and attempt", async () => {

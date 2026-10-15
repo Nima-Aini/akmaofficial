@@ -27,7 +27,11 @@ export const IMAGE_GUIDELINES = {
     usage: "در موبایل و دسکتاپ با برش کنترل‌شده نمایش داده می‌شود؛ متن را داخل خود تصویر نگذارید.",
     format: "WebP یا AVIF",
   },
+  bannerMobile: { width: 1080, height: 1350, ratio: "4:5", fit: "cover", usage: "نسخه موبایل بنر عریض؛ سوژه را بیرون ناحیه متن نگه دارید.", format: "WebP یا AVIF" },
   mediumBanner: { width: 1200, height: 600, ratio: "2:1", fit: "cover", usage: "برای کارت‌های تبلیغاتی متوسط؛ سوژه را از محل پنل متن دور نگه دارید.", format: "WebP یا AVIF" },
+  mediumBannerMobile: { width: 1080, height: 1350, ratio: "4:5", fit: "cover", usage: "نسخه موبایل کارت تبلیغاتی؛ فضای امن متن را خلوت نگه دارید.", format: "WebP یا AVIF" },
+  bottomBanner: { width: 1200, height: 600, ratio: "2:1", fit: "cover", usage: "بنر پایانی دسکتاپ با فضای مناسب برای عنوان کوتاه.", format: "WebP یا AVIF" },
+  bottomBannerMobile: { width: 1080, height: 1080, ratio: "1:1", fit: "cover", usage: "بنر پایانی موبایل؛ سوژه در قاب مربعی و بیرون محدوده متن باشد.", format: "WebP یا AVIF" },
   squarePromo: { width: 1080, height: 1080, ratio: "1:1", fit: "cover", usage: "برای تبلیغ مربعی و کارت تصویری.", format: "WebP یا AVIF" },
   blogCover: {
     width: 1600,

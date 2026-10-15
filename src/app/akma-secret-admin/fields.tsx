@@ -1,6 +1,6 @@
 "use client";
 
-import { ImagePlus, Loader2, Plus, Trash2, X } from "lucide-react";
+import { ImagePlus, Loader2, Monitor, Plus, RotateCcw, Smartphone, Trash2, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { IMAGE_GUIDELINES, type ImageGuidelineKey } from "@/lib/image-guidelines";
 import {
@@ -9,6 +9,17 @@ import {
   TEXT_REGION_POSITIONS,
   type TextRegionPosition,
 } from "@/lib/text-region";
+import {
+  getResponsiveFocalPoint,
+  getResponsiveTextRegion,
+  type ImageFocalPoint,
+  type ResponsiveImageSettings,
+} from "@/lib/responsive-image";
+import {
+  getPreviewTextLayoutClass,
+  ResponsiveBannerMedia,
+  ResponsiveTextRegionBackdrop,
+} from "@/components/responsive-banner";
 
 export function Field({
   label,
@@ -173,6 +184,132 @@ export function TextRegionControl({
         <span className="absolute inset-0 z-20 grid place-items-center p-4 text-center text-[10px] font-black text-white drop-shadow-md">
           ناحیه امن متن
         </span>
+      </div>
+    </div>
+  );
+}
+
+export function FocalPointControl({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value?: ImageFocalPoint;
+  onChange: (value: ImageFocalPoint) => void;
+}) {
+  const point = value ?? { x: 50, y: 50 };
+  const set = (patch: Partial<ImageFocalPoint>) => onChange({ ...point, ...patch });
+  return (
+    <div className="space-y-3 rounded-2xl border border-line bg-surface p-4">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-black text-ink">{label}</span>
+        <button type="button" onClick={() => onChange({ x: 50, y: 50 })} className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-line px-3 text-[10px] font-bold text-muted hover:border-accent hover:text-accent">
+          <RotateCcw size={12} /> بازنشانی به مرکز
+        </button>
+      </div>
+      <label className="block text-[10px] font-bold text-muted">
+        افقی: <b className="text-ink">{point.x}٪</b>
+        <input aria-label={`${label} افقی`} type="range" min="0" max="100" value={point.x} onChange={(event) => set({ x: Number(event.target.value) })} className="mt-2 block w-full accent-[var(--accent)]" />
+      </label>
+      <label className="block text-[10px] font-bold text-muted">
+        عمودی: <b className="text-ink">{point.y}٪</b>
+        <input aria-label={`${label} عمودی`} type="range" min="0" max="100" value={point.y} onChange={(event) => set({ y: Number(event.target.value) })} className="mt-2 block w-full accent-[var(--accent)]" />
+      </label>
+      <p className="text-[10px] leading-5 text-muted">این کنترل فقط محل برش و تمرکز سوژه را تغییر می‌دهد و تصویر را کشیده یا بدشکل نمی‌کند.</p>
+    </div>
+  );
+}
+
+const PREVIEW_WIDTHS = [
+  { width: 360, label: "موبایل ۳۶۰" },
+  { width: 390, label: "موبایل ۳۹۰" },
+  { width: 430, label: "موبایل ۴۳۰" },
+  { width: 768, label: "تبلت" },
+  { width: 1440, label: "دسکتاپ" },
+] as const;
+
+export function ResponsiveBannerDesign({
+  value,
+  onChange,
+  desktopGuideline,
+  mobileGuideline = "heroMobile",
+  kind = "banners",
+  previewTitle,
+  previewSubtitle,
+  previewCta,
+  fallback,
+  desktopTextFallback = "right",
+  mobileTextFallback = "bottom",
+  category = false,
+}: {
+  value: Partial<ResponsiveImageSettings> & { image: string };
+  onChange: (patch: Partial<ResponsiveImageSettings>) => void;
+  desktopGuideline: ImageGuidelineKey;
+  mobileGuideline?: ImageGuidelineKey;
+  kind?: "banners" | "hero";
+  previewTitle: string;
+  previewSubtitle?: string;
+  previewCta?: string;
+  fallback: string;
+  desktopTextFallback?: TextRegionPosition;
+  mobileTextFallback?: TextRegionPosition;
+  category?: boolean;
+}) {
+  const [previewWidth, setPreviewWidth] = useState(390);
+  const [showSafeRegion, setShowSafeRegion] = useState(true);
+  const viewport = previewWidth < 768 ? "mobile" : "desktop";
+  const textPosition = getResponsiveTextRegion(value, viewport, desktopTextFallback, mobileTextFallback);
+  const previewHeight = category ? previewWidth : viewport === "mobile" ? Math.round(previewWidth * 1.18) : Math.min(500, Math.round(previewWidth * 0.36));
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-2xl border border-line bg-bg/60 p-4 sm:p-5">
+        <div className="mb-4 flex items-center gap-2 border-b border-line pb-3 text-sm font-black text-ink"><Monitor size={16} /> طراحی دسکتاپ</div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ImageUploader label="تصویر دسکتاپ" value={value.image} onChange={(next) => onChange({ image: typeof next === "string" ? next : (next[0] ?? "") })} kind={kind} guideline={desktopGuideline} hint="تصویر فعلی شما حفظ می‌شود و نیازی به آپلود مجدد نیست." />
+          <div className="space-y-4">
+            <FocalPointControl label="موقعیت تصویر دسکتاپ" value={getResponsiveFocalPoint(value, "desktop")} onChange={(desktopObjectPosition) => onChange({ desktopObjectPosition })} />
+            <TextRegionControl label="موقعیت متن دسکتاپ" value={getResponsiveTextRegion(value, "desktop", desktopTextFallback, mobileTextFallback)} onChange={(textRegionPosition) => onChange({ textRegionPosition })} image={value.image || fallback} />
+          </div>
+        </div>
+        <p className="mt-4 rounded-xl border border-accent/20 bg-accent/5 px-3 py-2 text-[10px] leading-5 text-muted">هنگام طراحی تصویر دسکتاپ، قسمت مشخص‌شده برای عنوان، توضیحات و دکمه را خلوت نگه دارید.</p>
+      </div>
+
+      <div className="rounded-2xl border border-line bg-bg/60 p-4 sm:p-5">
+        <div className="mb-4 flex items-center gap-2 border-b border-line pb-3 text-sm font-black text-ink"><Smartphone size={16} /> طراحی موبایل</div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ImageUploader label="تصویر موبایل" value={value.mobileImage || ""} onChange={(next) => onChange({ mobileImage: typeof next === "string" ? next : (next[0] ?? "") })} kind={kind} guideline={mobileGuideline} hint="در صورت عدم انتخاب یا حذف، تصویر دسکتاپ با برش کنترل‌شده نمایش داده می‌شود." />
+          <div className="space-y-4">
+            <FocalPointControl label="موقعیت تصویر موبایل" value={getResponsiveFocalPoint(value, "mobile")} onChange={(mobileObjectPosition) => onChange({ mobileObjectPosition })} />
+            <TextRegionControl label="موقعیت متن موبایل" value={getResponsiveTextRegion(value, "mobile", desktopTextFallback, mobileTextFallback)} onChange={(mobileTextRegionPosition) => onChange({ mobileTextRegionPosition })} image={value.mobileImage || value.image || fallback} />
+          </div>
+        </div>
+        <p className="mt-4 rounded-xl border border-accent/20 bg-accent/5 px-3 py-2 text-[10px] leading-5 text-muted">هنگام طراحی تصویر موبایل، سوژه اصلی را خارج از محدوده متن قرار دهید تا در صفحه گوشی تصویر و نوشته‌ها روی یکدیگر نیفتند.</p>
+      </div>
+
+      <div className="space-y-4 rounded-2xl border border-line bg-surface p-4 sm:p-5" data-responsive-banner-preview>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h4 className="text-sm font-black text-ink">پیش‌نمایش واقعی بنر</h4><p className="mt-1 text-[10px] text-muted">منبع تصویر، crop، نقطه تمرکز، blur، متن و CTA همین تنظیمات را نمایش می‌دهند.</p></div>
+          <button type="button" onClick={() => setShowSafeRegion((current) => !current)} aria-pressed={showSafeRegion} className={`min-h-10 rounded-xl border px-4 text-[10px] font-bold ${showSafeRegion ? "border-accent bg-accent/10 text-accent" : "border-line text-muted"}`}>نمایش محدوده امن متن</button>
+        </div>
+        <div className="flex flex-wrap gap-2" role="group" aria-label="اندازه پیش‌نمایش">
+          {PREVIEW_WIDTHS.map((item) => <button key={item.width} type="button" onClick={() => setPreviewWidth(item.width)} aria-pressed={previewWidth === item.width} className={`min-h-10 rounded-xl border px-3 text-[10px] font-bold ${previewWidth === item.width ? "border-accent bg-accent text-on-accent" : "border-line text-muted hover:border-accent"}`}>{item.label}</button>)}
+        </div>
+        <div className="overflow-x-auto rounded-2xl bg-bg p-3">
+          <div className="relative isolate mx-auto shrink-0 overflow-hidden rounded-2xl bg-[#4A0811] text-white shadow-lg" style={{ width: `${previewWidth}px`, height: `${previewHeight}px`, maxWidth: "none" }} data-preview-width={previewWidth}>
+            <ResponsiveBannerMedia settings={value} fallback={fallback} mode={viewport} alt="" />
+            <ResponsiveTextRegionBackdrop settings={value} desktopFallback={desktopTextFallback} mobileFallback={mobileTextFallback} mode={viewport} />
+            {showSafeRegion ? <span aria-hidden="true" className={`pointer-events-none absolute z-20 border-2 border-dashed border-amber-300/90 ${TEXT_REGION_BACKDROP_CLASSES[textPosition]}`}><span className="absolute right-3 top-3 rounded-full bg-amber-300 px-3 py-1 text-[10px] font-black text-stone-900">ناحیه مخصوص متن</span></span> : null}
+            <div className={`relative z-10 flex size-full p-5 ${getPreviewTextLayoutClass(textPosition)}`}>
+              <div className={`${textPosition === "right" || textPosition === "left" ? "w-[58%]" : "w-full max-w-[680px]"} space-y-3 drop-shadow-[0_2px_10px_rgba(0,0,0,.7)]`}>
+                <strong className={`${viewport === "mobile" ? "text-2xl" : "text-4xl"} block font-black leading-tight`}>{previewTitle || "عنوان بنر"}</strong>
+                {previewSubtitle ? <p className={`${viewport === "mobile" ? "text-xs" : "text-sm"} leading-6 text-white/90`}>{previewSubtitle}</p> : null}
+                {previewCta ? <span className="inline-flex min-h-10 items-center rounded-full bg-white px-5 text-xs font-black text-[#8E111E]">{previewCta}</span> : null}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

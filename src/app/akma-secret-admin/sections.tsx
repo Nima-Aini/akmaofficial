@@ -33,7 +33,7 @@ import {
   type WholesalePromoSettings,
 } from "@/lib/defaults";
 import { ICON_CHOICES, DynIcon } from "@/components/icon";
-import { SectionCard, Field, ImageUploader, Textarea, Toggle, Select, ColorField, ListEditor, TextRegionControl } from "./fields";
+import { SectionCard, Field, ImageUploader, Textarea, Toggle, Select, ColorField, ListEditor, ResponsiveBannerDesign } from "./fields";
 
 type Settings = Record<string, unknown>;
 export type SetKey = (key: string, value: unknown) => void;
@@ -233,22 +233,7 @@ export function HeroBannersSection({
         onSave={() => saveKey("hero")}
         saving={saving}
       >
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="متن بج بالای تیتر" value={hero.badge} onChange={(v) => setHero({ badge: v })} />
-          <ImageUploader
-            label="تصویر اصلی"
-            value={hero.image}
-            onChange={(v) => setHero({ image: typeof v === "string" ? v : (v[0] ?? "") })}
-            kind="hero"
-            guideline="hero"
-            hint="تصویر را مستقیم از کامپیوتر انتخاب کنید؛ حداکثر 10MB."
-          />
-        </div>
-        <TextRegionControl
-          value={hero.textRegionPosition || "right"}
-          onChange={(textRegionPosition) => setHero({ textRegionPosition })}
-          image={hero.image}
-        />
+        <Field label="متن بج بالای تیتر" value={hero.badge} onChange={(v) => setHero({ badge: v })} />
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label="تیتر (بخش اول)" value={hero.title} onChange={(v) => setHero({ title: v })} />
           <Field
@@ -287,6 +272,17 @@ export function HeroBannersSection({
             dir="ltr"
           />
         </div>
+        <ResponsiveBannerDesign
+          value={hero}
+          onChange={setHero}
+          desktopGuideline="hero"
+          mobileGuideline="heroMobile"
+          kind="hero"
+          previewTitle={`${hero.title} ${hero.highlight}`}
+          previewSubtitle={hero.subtitle}
+          previewCta={hero.primaryCta.label}
+          fallback="/images/redesign/hero.jpg"
+        />
         <div>
           <span className="mb-2 block text-xs font-bold text-muted">آمارهای پایین هیرو</span>
           <div className="space-y-2">
@@ -381,23 +377,8 @@ export function HeroBannersSection({
                   </button>
                 </div>
               </div>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <Field label="عنوان" value={b.title} onChange={(v) => setBanner(i, { title: v })} />
-                <ImageUploader
-                  label="تصویر بنر"
-                  value={b.image}
-                  onChange={(v) => setBanner(i, { image: typeof v === "string" ? v : (v[0] ?? "") })}
-                  kind="banners"
-                  guideline="banner"
-                  hint="تصویر را مستقیم از کامپیوتر انتخاب کنید؛ حداکثر 10MB."
-                />
-              </div>
               <div className="mt-4">
-                <TextRegionControl
-                  value={b.textRegionPosition || "right"}
-                  onChange={(textRegionPosition) => setBanner(i, { textRegionPosition })}
-                  image={b.image}
-                />
+                <Field label="عنوان" value={b.title} onChange={(v) => setBanner(i, { title: v })} />
               </div>
               <div className="mt-4">
                 <Textarea
@@ -416,6 +397,9 @@ export function HeroBannersSection({
                   dir="ltr"
                 />
               </div>
+              <div className="mt-5">
+                <ResponsiveBannerDesign value={b} onChange={(patch) => setBanner(i, patch)} desktopGuideline="banner" mobileGuideline="bannerMobile" previewTitle={b.title} previewSubtitle={b.subtitle} previewCta={b.cta} fallback="/images/hero.png" />
+              </div>
             </div>
           ))}
           <button
@@ -432,6 +416,9 @@ export function HeroBannersSection({
                   image: "/images/hero.png",
                   enabled: true,
                   textRegionPosition: "right",
+                  mobileTextRegionPosition: "bottom",
+                  desktopObjectPosition: { x: 50, y: 50 },
+                  mobileObjectPosition: { x: 50, y: 38 },
                 },
               ])
             }
@@ -480,22 +467,7 @@ export function HeroBannersSection({
                 </div>
               </div>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <ImageUploader
-                  label="تصویر بنر (بدون متن روی تصویر)"
-                  value={bb.image}
-                  onChange={(v) =>
-                    setKey(
-                      "bottomBanners",
-                      bottomBanners.map((x, j) =>
-                        j === i ? { ...x, image: typeof v === "string" ? v : (v[0] ?? "") } : x,
-                      ),
-                    )
-                  }
-                  kind="banners"
-                  guideline="banner"
-                  hint="تصویر با کیفیت و بدون متن اضافی آپلود کنید."
-                />
-                <div className="space-y-4">
+                <div className="space-y-4 sm:col-span-2">
                   <Field
                     label="لینک هدایت (اختیاری)"
                     value={bb.href || ""}
@@ -521,16 +493,7 @@ export function HeroBannersSection({
                 </div>
               </div>
               <div className="mt-4">
-                <TextRegionControl
-                  value={bb.textRegionPosition || "bottom"}
-                  onChange={(textRegionPosition) =>
-                    setKey(
-                      "bottomBanners",
-                      bottomBanners.map((x, j) => (j === i ? { ...x, textRegionPosition } : x)),
-                    )
-                  }
-                  image={bb.image}
-                />
+                <ResponsiveBannerDesign value={bb} onChange={(patch) => setKey("bottomBanners", bottomBanners.map((x, j) => j === i ? { ...x, ...patch } : x))} desktopGuideline="bottomBanner" mobileGuideline="bottomBannerMobile" previewTitle={bb.alt} fallback="/images/craft.png" desktopTextFallback="bottom" mobileTextFallback="bottom" />
               </div>
             </div>
           ))}
@@ -546,6 +509,9 @@ export function HeroBannersSection({
                   alt: "محصولات آکما",
                   enabled: true,
                   textRegionPosition: "bottom",
+                  mobileTextRegionPosition: "bottom",
+                  desktopObjectPosition: { x: 50, y: 50 },
+                  mobileObjectPosition: { x: 50, y: 50 },
                 },
               ])
             }
@@ -666,19 +632,6 @@ export function HomePageCardsSection({
                 onChange={(v) => setDualRetail({ subtitle: v })}
               />
             </div>
-            <ImageUploader
-              label="تصویر کارت تکی"
-              value={dualCards.retail.image}
-              onChange={(v) => setDualRetail({ image: typeof v === "string" ? v : (v[0] ?? "") })}
-              kind="banners"
-              guideline="mediumBanner"
-              hint="تصویر اسنیکر / کفش شیک برای کارت تکی."
-            />
-            <TextRegionControl
-              value={dualCards.retail.textRegionPosition || "right"}
-              onChange={(textRegionPosition) => setDualRetail({ textRegionPosition })}
-              image={dualCards.retail.image}
-            />
             <div className="grid gap-3 sm:grid-cols-2">
               <Field
                 label="متن دکمه"
@@ -698,6 +651,7 @@ export function HomePageCardsSection({
               onChange={(items) => setDualRetail({ checklist: items })}
               placeholder="مثلاً: سفارش از ۱ عدد"
             />
+            <ResponsiveBannerDesign value={dualCards.retail} onChange={setDualRetail} desktopGuideline="mediumBanner" mobileGuideline="mediumBannerMobile" previewTitle={dualCards.retail.title} previewSubtitle={dualCards.retail.subtitle} previewCta={dualCards.retail.buttonText} fallback="/images/redesign/retail-card.jpg" />
           </div>
 
           {/* Wholesale Card */}
@@ -720,19 +674,6 @@ export function HomePageCardsSection({
                 onChange={(v) => setDualWholesale({ subtitle: v })}
               />
             </div>
-            <ImageUploader
-              label="تصویر کارت عمده"
-              value={dualCards.wholesale.image}
-              onChange={(v) => setDualWholesale({ image: typeof v === "string" ? v : (v[0] ?? "") })}
-              kind="banners"
-              guideline="mediumBanner"
-              hint="تصویر کارتن‌ها و سفارشات شرکتی آکما."
-            />
-            <TextRegionControl
-              value={dualCards.wholesale.textRegionPosition || "right"}
-              onChange={(textRegionPosition) => setDualWholesale({ textRegionPosition })}
-              image={dualCards.wholesale.image}
-            />
             <div className="grid gap-3 sm:grid-cols-2">
               <Field
                 label="متن دکمه"
@@ -752,6 +693,7 @@ export function HomePageCardsSection({
               onChange={(items) => setDualWholesale({ checklist: items })}
               placeholder="مثلاً: قیمت همکاری و تخفیف عمده"
             />
+            <ResponsiveBannerDesign value={dualCards.wholesale} onChange={setDualWholesale} desktopGuideline="mediumBanner" mobileGuideline="mediumBannerMobile" previewTitle={dualCards.wholesale.title} previewSubtitle={dualCards.wholesale.subtitle} previewCta={dualCards.wholesale.buttonText} fallback="/images/redesign/wholesale-boxes.jpg" />
           </div>
         </div>
       </SectionCard>
@@ -767,7 +709,7 @@ export function HomePageCardsSection({
           {categories.map((cat, idx) => (
             <div
               key={cat.key || idx}
-              className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-4 sm:flex-row sm:items-center"
+              className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-4 sm:flex-row sm:flex-wrap sm:items-center"
             >
               <div className="flex items-center gap-2">
                 <span className="grid size-7 place-items-center rounded-full bg-accent/15 text-xs font-black text-accent">
@@ -815,25 +757,6 @@ export function HomePageCardsSection({
                 />
               </div>
 
-              <div className="w-full sm:w-48">
-                <ImageUploader
-                  label="تصویر دسته"
-                  value={cat.image}
-                  onChange={(v) =>
-                    setCategoryItem(idx, { image: typeof v === "string" ? v : (v[0] ?? "") })
-                  }
-                  kind="products"
-                  guideline="category"
-                />
-                <div className="mt-3">
-                  <TextRegionControl
-                    value={cat.textRegionPosition || "bottom"}
-                    onChange={(textRegionPosition) => setCategoryItem(idx, { textRegionPosition })}
-                    image={cat.image}
-                  />
-                </div>
-              </div>
-
               <button
                 type="button"
                 onClick={() => removeCategory(idx)}
@@ -842,6 +765,9 @@ export function HomePageCardsSection({
               >
                 <Trash2 size={16} />
               </button>
+              <div className="w-full basis-full">
+                <ResponsiveBannerDesign value={cat} onChange={(patch) => setCategoryItem(idx, patch)} desktopGuideline="category" mobileGuideline="category" previewTitle={cat.label} fallback={cat.image} desktopTextFallback="bottom" mobileTextFallback="bottom" category />
+              </div>
             </div>
           ))}
 
@@ -862,25 +788,13 @@ export function HomePageCardsSection({
         onSave={() => saveKey("wholesalePromo")}
         saving={saving}
       >
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div>
           <Field
             label="عنوان بنر همکاری"
             value={wholesalePromo.title}
             onChange={(v) => setPromo({ title: v })}
           />
-          <ImageUploader
-            label="تصویر بنر همکاری"
-            value={wholesalePromo.image}
-            onChange={(v) => setPromo({ image: typeof v === "string" ? v : (v[0] ?? "") })}
-            kind="banners"
-            guideline="banner"
-          />
         </div>
-        <TextRegionControl
-          value={wholesalePromo.textRegionPosition || "right"}
-          onChange={(textRegionPosition) => setPromo({ textRegionPosition })}
-          image={wholesalePromo.image}
-        />
         <Textarea
           label="توضیحات بنر همکاری"
           value={wholesalePromo.subtitle}
@@ -906,6 +820,7 @@ export function HomePageCardsSection({
           onChange={(tags) => setPromo({ tags })}
           placeholder="مثلاً: قیمت ویژه همکاری"
         />
+        <ResponsiveBannerDesign value={wholesalePromo} onChange={setPromo} desktopGuideline="banner" mobileGuideline="bannerMobile" previewTitle={wholesalePromo.title} previewSubtitle={wholesalePromo.subtitle} previewCta={wholesalePromo.buttonText} fallback="/images/redesign/wholesale-banner.jpg" />
       </SectionCard>
     </div>
   );

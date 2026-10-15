@@ -74,6 +74,24 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+.responsive-banner-media {
+  object-position: var(--banner-mobile-position, 50% 50%);
+}
+
+@media (min-width: 768px) {
+  .responsive-banner-media {
+    object-position: var(--banner-desktop-position, 50% 50%);
+  }
+}
+
+@supports not ((-webkit-backdrop-filter: blur(3px)) or (backdrop-filter: blur(3px))) {
+  [data-mobile-text-region],
+  [data-desktop-text-region],
+  [data-text-region] {
+    background-color: rgba(20, 8, 10, 0.58);
+  }
+}
+
 ::selection {
   background: var(--accent);
   color: var(--accent-contrast);
