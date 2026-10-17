@@ -5,7 +5,8 @@
 import assert from "node:assert";
 import { generateSecureOtp } from "../src/lib/sms.ts";
 import { calculateProductPricing, getProductPricePresentation, getWholesalePackConfig, isPositiveSafeInteger } from "../src/lib/pricing.ts";
-import { getProductImages } from "../src/lib/product-media.ts";
+import { getProductImages, getResponsiveProductImages } from "../src/lib/product-media.ts";
+import { applyRichTextMark, normalizeRichTextValue, replaceRichTextPlainText, richTextToPlainText, sanitizeRichTextMap, sanitizeTextColor } from "../src/lib/rich-text.ts";
 import {
   getTextRegionBackdropClass,
   getTextRegionLayoutClass,
@@ -162,6 +163,41 @@ runTest("Wholesale images prefer wholesale gallery", () => {
 runTest("Wholesale images fall back through retail then legacy", () => {
   assert.deepEqual(getProductImages({ images: ["legacy.webp"], retailImages: ["retail.webp"] }, "wholesale"), ["retail.webp"]);
   assert.deepEqual(getProductImages({ images: ["legacy.webp"] }, "wholesale"), ["legacy.webp"]);
+});
+
+runTest("Responsive product media selects all four independent galleries", () => {
+  const media = { images: ["legacy.webp"], retailImages: ["retail-desktop.webp"], retailMobileImages: ["retail-mobile.webp"], wholesaleImages: ["wholesale-desktop.webp"], wholesaleMobileImages: ["wholesale-mobile.webp"] };
+  assert.deepEqual(getResponsiveProductImages(media, "retail", "desktop"), ["retail-desktop.webp"]);
+  assert.deepEqual(getResponsiveProductImages(media, "retail", "mobile"), ["retail-mobile.webp"]);
+  assert.deepEqual(getResponsiveProductImages(media, "wholesale", "desktop"), ["wholesale-desktop.webp"]);
+  assert.deepEqual(getResponsiveProductImages(media, "wholesale", "mobile"), ["wholesale-mobile.webp"]);
+});
+
+runTest("Responsive product mobile galleries follow deterministic legacy fallbacks", () => {
+  assert.deepEqual(getResponsiveProductImages({ images: ["legacy.webp"], retailImages: ["retail.webp"] }, "retail", "mobile"), ["retail.webp"]);
+  assert.deepEqual(getResponsiveProductImages({ images: ["legacy.webp"], retailImages: ["retail.webp"], retailMobileImages: ["retail-mobile.webp"] }, "wholesale", "mobile"), ["retail-mobile.webp"]);
+  assert.deepEqual(getResponsiveProductImages({ images: ["legacy.webp"] }, "wholesale", "mobile"), ["legacy.webp"]);
+});
+
+runTest("Rich text supports partial bold and color while preserving plain SEO text", () => {
+  const original = normalizeRichTextValue(undefined, "آکما، انتخاب حرفه‌ای‌ها");
+  const start = "آکما، ".length;
+  const bold = applyRichTextMark(original, start, 24, { bold: true });
+  const colored = applyRichTextMark(bold, start, 24, { color: "#E91239" });
+  assert.equal(richTextToPlainText(colored), "آکما، انتخاب حرفه‌ای‌ها");
+  assert.ok(colored.segments.some((segment) => segment.bold && segment.color === "#E91239"));
+});
+
+runTest("Rich text formatting reset and text replacement retain safe structure", () => {
+  const formatted = applyRichTextMark(normalizeRichTextValue(undefined, "متن نمونه"), 0, 3, { bold: true, color: "#780B18" });
+  const reset = applyRichTextMark(formatted, 0, 3, { bold: null, color: null });
+  assert.equal(reset.segments[0].bold, undefined);
+  assert.equal(richTextToPlainText(replaceRichTextPlainText(reset, "متن امن جدید")), "متن امن جدید");
+});
+
+runTest("Rich text rejects unsafe CSS and malformed metadata", () => {
+  assert.equal(sanitizeTextColor("expression(alert(1))"), undefined);
+  assert.deepEqual(sanitizeRichTextMap({ title: { segments: [{ text: "امن", color: "url(javascript:1)", bold: true }] }, "bad key!": { segments: [{ text: "x" }] } }), { title: { segments: [{ text: "امن", bold: true }] } });
 });
 
 runTest("Pricing rejects invalid quantities instead of coercing them", () => {

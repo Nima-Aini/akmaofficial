@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 /* eslint-disable @next/next/no-img-element */
 import type { BlogContentBlock } from "@/db/schema";
+import { RichText } from "@/components/rich-text";
 
 function safeHref(href: string) {
   return href.startsWith("/") || /^https?:\/\//i.test(href) || /^(mailto|tel):/i.test(href) ? href : "#";
@@ -19,13 +20,13 @@ function inline(text: string): ReactNode[] {
 
 export function BlogContent({ blocks }: { blocks: BlogContentBlock[] }) {
   return <div className="blog-content">{blocks.map((block) => {
-    if (block.type === "h2") return <h2 key={block.id}>{inline(block.text ?? "")}</h2>;
-    if (block.type === "h3") return <h3 key={block.id}>{inline(block.text ?? "")}</h3>;
-    if (block.type === "quote") return <blockquote key={block.id}>{inline(block.text ?? "")}</blockquote>;
-    if (block.type === "bulletList") return <ul key={block.id}>{(block.items ?? []).filter(Boolean).map((item, index) => <li key={index}>{inline(item)}</li>)}</ul>;
-    if (block.type === "numberedList") return <ol key={block.id}>{(block.items ?? []).filter(Boolean).map((item, index) => <li key={index}>{inline(item)}</li>)}</ol>;
-    if (block.type === "image" && block.url) return <figure key={block.id}><img src={block.url} alt={block.alt || "تصویر مقاله آکما"} width="1400" height="933" loading="lazy" />{block.caption && <figcaption>{block.caption}</figcaption>}</figure>;
+    if (block.type === "h2") return <h2 key={block.id}>{block.richText ? <RichText value={block.richText} fallback={block.text ?? ""} /> : inline(block.text ?? "")}</h2>;
+    if (block.type === "h3") return <h3 key={block.id}>{block.richText ? <RichText value={block.richText} fallback={block.text ?? ""} /> : inline(block.text ?? "")}</h3>;
+    if (block.type === "quote") return <blockquote key={block.id}>{block.richText ? <RichText value={block.richText} fallback={block.text ?? ""} /> : inline(block.text ?? "")}</blockquote>;
+    if (block.type === "bulletList") return <ul key={block.id}>{(block.items ?? []).filter(Boolean).map((item, index) => <li key={index}>{block.itemsRichText?.[index] ? <RichText value={block.itemsRichText[index]} fallback={item} /> : inline(item)}</li>)}</ul>;
+    if (block.type === "numberedList") return <ol key={block.id}>{(block.items ?? []).filter(Boolean).map((item, index) => <li key={index}>{block.itemsRichText?.[index] ? <RichText value={block.itemsRichText[index]} fallback={item} /> : inline(item)}</li>)}</ol>;
+    if (block.type === "image" && block.url) return <figure key={block.id}><img src={block.url} alt={block.alt || "تصویر مقاله آکما"} width="1400" height="933" loading="lazy" />{block.caption && <figcaption><RichText value={block.captionRichText} fallback={block.caption} /></figcaption>}</figure>;
     if (block.type === "divider") return <hr key={block.id} />;
-    return <p key={block.id}>{inline(block.text ?? "")}</p>;
+    return <p key={block.id}>{block.richText ? <RichText value={block.richText} fallback={block.text ?? ""} /> : inline(block.text ?? "")}</p>;
   })}</div>;
 }

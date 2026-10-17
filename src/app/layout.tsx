@@ -4,9 +4,11 @@ import "./globals.css";
 import { getSettings } from "@/lib/store";
 import {
   DEFAULT_CONTACT,
+  DEFAULT_BRANDING,
   DEFAULT_SITE,
   DEFAULT_THEME,
   type ContactSettings,
+  type BrandingSettings,
   type SiteSettings,
   type ThemeSettings,
 } from "@/lib/defaults";
@@ -33,6 +35,7 @@ const RADIUS_MAP: Record<ThemeSettings["radius"], string> = {
 export async function generateMetadata(): Promise<Metadata> {
   const s = await getSettings();
   const site = { ...DEFAULT_SITE, ...(s.site as Partial<SiteSettings>) };
+  const branding = { ...DEFAULT_BRANDING, ...(s.branding as Partial<BrandingSettings>) };
   return {
     metadataBase: new URL(process.env.SITE_URL ?? "https://akmaofficial.ir"),
     title: site.seoTitle,
@@ -45,7 +48,9 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: site.name,
       locale: "fa_IR",
       type: "website",
+      ...(branding.socialImage ? { images: [{ url: branding.socialImage, alt: site.name }] } : {}),
     },
+    ...(branding.favicon ? { icons: { icon: "/favicon.ico" } } : {}),
   };
 }
 
@@ -58,6 +63,7 @@ export default async function RootLayout({
   const theme = { ...DEFAULT_THEME, ...(s.theme as Partial<ThemeSettings>) };
   const site = { ...DEFAULT_SITE, ...(s.site as Partial<SiteSettings>) };
   const contact = { ...DEFAULT_CONTACT, ...(s.contact as Partial<ContactSettings>) };
+  const branding = { ...DEFAULT_BRANDING, ...(s.branding as Partial<BrandingSettings>) };
   const phone = contact.phones[0] ?? "09033253065";
 
   return (
@@ -78,9 +84,9 @@ export default async function RootLayout({
     >
       <body className="grain min-h-dvh antialiased">
         <CartProvider>
-          <SiteHeader name={site.name} latin={site.latinName} phone={phone} />
+          <SiteHeader name={site.name} latin={site.latinName} phone={phone} branding={branding} nameRichText={site.nameRichText} latinRichText={site.latinNameRichText} />
           <main>{children}</main>
-          <SiteFooter site={site} contact={contact} />
+          <SiteFooter site={site} contact={contact} branding={branding} />
           <FloatingCallBar phone={phone} />
           <CartDrawer />
         </CartProvider>

@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -17,6 +18,9 @@ import {
 } from "lucide-react";
 import { useCart } from "@/context/cart-context";
 import { toFa } from "@/lib/format";
+import type { BrandingSettings } from "@/lib/defaults";
+import type { RichTextValue } from "@/lib/rich-text";
+import { RichText } from "@/components/rich-text";
 
 type CategoryNav = {
   key: string;
@@ -37,13 +41,21 @@ export function SiteHeader({
   name,
   latin,
   phone,
+  branding,
+  nameRichText,
+  latinRichText,
 }: {
   name: string;
   latin: string;
   phone: string;
+  branding: BrandingSettings;
+  nameRichText?: RichTextValue;
+  latinRichText?: RichTextValue;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const desktopLogo = branding.desktopHeaderLogo || branding.lightBackgroundLogo;
+  const mobileLogo = branding.mobileHeaderLogo || desktopLogo;
   const [catMenuOpen, setCatMenuOpen] = useState(false);
   const [customer, setCustomer] = useState<{ name?: string; phone?: string } | null>(null);
   const [wishlistCount, setWishlistCount] = useState(0);
@@ -127,7 +139,6 @@ export function SiteHeader({
                           className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-bold text-[#2A2421] hover:bg-[#FAF6F0] hover:text-[#8E111E] transition-colors"
                         >
                           {cat.image ? (
-                            // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={cat.image}
                               alt={cat.label}
@@ -184,11 +195,15 @@ export function SiteHeader({
 
             {/* CENTER: AKMA BRAND LOGO */}
             <div className="flex-1 flex justify-center">
-              <Link href="/" className="group flex flex-col items-center gap-0.5">
+              <Link href="/" className="group flex flex-col items-center gap-0.5" aria-label={`${name} — صفحه اصلی`}>
+                {desktopLogo ? <picture className="block">
+                  {mobileLogo !== desktopLogo ? <source media="(max-width: 767px)" srcSet={mobileLogo} /> : null}
+                  <img src={desktopLogo} alt={`لوگوی ${name}`} className="brand-header-logo h-12 object-contain" style={{ "--brand-logo-desktop-width": `${branding.desktopLogoWidth}px`, "--brand-logo-mobile-width": `${branding.mobileLogoWidth}px` } as React.CSSProperties} />
+                </picture> : <>
                 <div className="flex items-center gap-1.5">
                   <span className="relative flex items-center justify-center">
                     <span className="font-black text-2xl tracking-tighter text-[#1C1816] group-hover:text-[#8E111E] transition-colors font-sans">
-                      AKMA
+                      <RichText value={latinRichText} fallback={latin || "AKMA"} />
                     </span>
                     <span className="absolute -top-1.5 -right-2 text-[#8E111E]">
                       <svg width="18" height="12" viewBox="0 0 18 12" fill="none">
@@ -201,8 +216,9 @@ export function SiteHeader({
                   </span>
                 </div>
                 <span className="text-[9px] font-black tracking-[0.25em] text-[#8E111E] -mt-1">
-                  آکــمـا
+                  <RichText value={nameRichText} fallback={name} />
                 </span>
+                </>}
               </Link>
             </div>
 

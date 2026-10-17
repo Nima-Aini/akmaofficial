@@ -1,5 +1,9 @@
 import type { TextRegionPosition } from "./text-region";
 import type { ResponsiveImageSettings } from "./responsive-image";
+import type { ImageFocalPoint } from "./responsive-image";
+import type { RichTextMap, RichTextValue } from "./rich-text";
+
+type RichFields<T extends string> = Partial<Record<`${T}RichText`, RichTextValue>>;
 
 export type ThemeSettings = {
   mode: "dark" | "light";
@@ -10,17 +14,17 @@ export type ThemeSettings = {
   buttonShape: "soft" | "pill" | "sharp";
 };
 
-export type HeroSettings = ResponsiveImageSettings & {
+export type HeroSettings = ResponsiveImageSettings & RichFields<"badge" | "title" | "highlight" | "subtitle"> & {
   badge: string;
   title: string;
   highlight: string;
   subtitle: string;
-  primaryCta: { label: string; href: string };
-  secondaryCta: { label: string; href: string };
-  stats: { value: string; label: string }[];
+  primaryCta: { label: string; href: string; labelRichText?: RichTextValue };
+  secondaryCta: { label: string; href: string; labelRichText?: RichTextValue };
+  stats: ({ value: string; label: string } & RichFields<"value" | "label">)[];
 };
 
-export type Banner = ResponsiveImageSettings & {
+export type Banner = ResponsiveImageSettings & RichFields<"title" | "subtitle" | "cta"> & {
   id: string;
   title: string;
   subtitle: string;
@@ -29,14 +33,15 @@ export type Banner = ResponsiveImageSettings & {
   enabled: boolean;
 };
 
-export type BottomBanner = ResponsiveImageSettings & {
+export type BottomBanner = ResponsiveImageSettings & RichFields<"alt"> & {
   id: string;
   href: string;
   alt: string;
   enabled: boolean;
 };
 
-export type SectionTitles = {
+export type SectionTitles = RichFields<Exclude<keyof SectionTitlesBase, "promoCtaHref">> & SectionTitlesBase;
+type SectionTitlesBase = {
   whyAkmaBadge: string;
   whyAkmaTitle: string;
   whyAkmaSubtitle: string;
@@ -59,11 +64,11 @@ export type SectionTitles = {
   stepsSubtitle: string;
 };
 
-export type Feature = { icon: string; title: string; desc: string };
-export type PriceRow = { name: string; note: string; price: number };
-export type Step = { title: string; desc: string };
+export type Feature = { icon: string; title: string; desc: string } & RichFields<"title" | "desc">;
+export type PriceRow = { name: string; note: string; price: number } & RichFields<"name" | "note">;
+export type Step = { title: string; desc: string } & RichFields<"title" | "desc">;
 
-export type ContactSettings = {
+export type ContactSettings = RichFields<"address" | "hours" | "note"> & {
   phones: string[];
   email: string;
   address: string;
@@ -74,7 +79,7 @@ export type ContactSettings = {
   note: string;
 };
 
-export type SiteSettings = {
+export type SiteSettings = RichFields<"name" | "latinName" | "tagline" | "footerText" | "aboutTitle" | "aboutText"> & {
   name: string;
   latinName: string;
   tagline: string;
@@ -85,33 +90,44 @@ export type SiteSettings = {
   seoDescription: string;
 };
 
-export type DualCardsSettings = {
-  retail: ResponsiveImageSettings & {
-    title: string;
-    subtitle: string;
-    checklist: string[];
-    buttonText: string;
-    buttonHref: string;
-  };
-  wholesale: ResponsiveImageSettings & {
-    title: string;
-    subtitle: string;
-    checklist: string[];
-    buttonText: string;
-    buttonHref: string;
-  };
+export type BrandingSettings = {
+  desktopHeaderLogo: string;
+  mobileHeaderLogo: string;
+  footerLogo: string;
+  darkBackgroundLogo: string;
+  lightBackgroundLogo: string;
+  favicon: string;
+  appIcon: string;
+  socialImage: string;
+  desktopLogoWidth: number;
+  mobileLogoWidth: number;
 };
 
-export type CategoryItem = ResponsiveImageSettings & {
+type DualCard = ResponsiveImageSettings & RichFields<"title" | "subtitle" | "buttonText"> & {
+  title: string;
+  subtitle: string;
+  checklist: string[];
+  checklistRichTextList?: RichTextValue[];
+  buttonText: string;
+  buttonHref: string;
+};
+
+export type DualCardsSettings = {
+  retail: DualCard;
+  wholesale: DualCard;
+};
+
+export type CategoryItem = ResponsiveImageSettings & RichFields<"label"> & {
   key: string;
   label: string;
   href?: string;
 };
 
-export type WholesalePromoSettings = ResponsiveImageSettings & {
+export type WholesalePromoSettings = ResponsiveImageSettings & RichFields<"title" | "subtitle" | "buttonText"> & {
   title: string;
   subtitle: string;
   tags: string[];
+  tagsRichTextList?: RichTextValue[];
   buttonText: string;
   buttonHref: string;
 };
@@ -344,6 +360,19 @@ export const DEFAULT_SITE: SiteSettings = {
     "فروش عمده فوم تمیزکننده کفش، خوشبوکننده کفش و پولیش سفیدکننده لژ آکما با قیمت همکاری. ارسال به سراسر کشور. سفارش تلفنی: ۰۹۰۳۳۲۵۳۰۶۵",
 };
 
+export const DEFAULT_BRANDING: BrandingSettings = {
+  desktopHeaderLogo: "",
+  mobileHeaderLogo: "",
+  footerLogo: "",
+  darkBackgroundLogo: "",
+  lightBackgroundLogo: "",
+  favicon: "",
+  appIcon: "",
+  socialImage: "",
+  desktopLogoWidth: 120,
+  mobileLogoWidth: 94,
+};
+
 export const DEFAULT_BOTTOM_BANNERS: BottomBanner[] = [
   {
     id: "bottom-banner-1",
@@ -397,6 +426,7 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
   steps: DEFAULT_STEPS,
   contact: DEFAULT_CONTACT,
   site: DEFAULT_SITE,
+  branding: DEFAULT_BRANDING,
 };
 
 export type ProductSeed = {
@@ -423,6 +453,11 @@ export type ProductSeed = {
   images: string[];
   retailImages?: string[];
   wholesaleImages?: string[];
+  retailMobileImages?: string[];
+  wholesaleMobileImages?: string[];
+  desktopObjectPosition?: ImageFocalPoint;
+  mobileObjectPosition?: ImageFocalPoint;
+  textFormatting?: RichTextMap;
   cardTextRegionPosition?: TextRegionPosition;
   badge: string;
   featured: boolean;

@@ -6,7 +6,9 @@ import { formatPrice } from "@/lib/format";
 import { useCart } from "@/context/cart-context";
 import { getProductPricePresentation } from "@/lib/pricing";
 import type { ProductRow } from "@/db/schema";
-import { getProductImages } from "@/lib/product-media";
+import { getResponsiveProductCoverSources } from "@/lib/product-media";
+import { normalizeFocalPoint } from "@/lib/responsive-image";
+import { RichText } from "@/components/rich-text";
 import { getWholesalePackConfig } from "@/lib/pricing";
 import {
   getTextRegionBackdropClass,
@@ -39,7 +41,9 @@ export function ProductCard({
   mode?: "retail" | "wholesale";
 }) {
   const { addItem } = useCart();
-  const img = getProductImages(product, mode)[0];
+  const sources = getResponsiveProductCoverSources(product, mode);
+  const desktopPosition = normalizeFocalPoint(product.desktopObjectPosition);
+  const mobilePosition = normalizeFocalPoint(product.mobileObjectPosition);
   const pack = getWholesalePackConfig(product);
   const textRegionPosition = normalizeTextRegionPosition(product.cardTextRegionPosition, "bottom");
 
@@ -70,6 +74,8 @@ export function ProductCard({
         wholesaleMinQty: product.wholesaleMinQty,
         retailImages: product.retailImages,
         wholesaleImages: product.wholesaleImages,
+        retailMobileImages: product.retailMobileImages,
+        wholesaleMobileImages: product.wholesaleMobileImages,
       },
       mode === "wholesale" ? pack.minimumPackCount : 1,
       mode,
@@ -78,8 +84,19 @@ export function ProductCard({
 
   return (
     <article className="group relative isolate flex min-h-[330px] cursor-pointer overflow-hidden rounded-2xl border border-white/50 bg-[#eee7dd] shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl focus-within:shadow-xl md:min-h-[390px]">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={img} alt={product.name} loading="lazy" className="absolute inset-0 -z-20 size-full bg-[#eee7dd] object-contain p-2 transition-transform duration-700 group-hover:scale-105 md:object-cover md:p-0" />
+      <picture className="absolute inset-0 -z-20 block size-full" data-responsive-product-media="true" data-mobile-source={sources.mobile}>
+        <source media="(max-width: 767px)" srcSet={sources.mobile} />
+        <img
+          src={sources.desktop}
+          alt={product.name}
+          loading="lazy"
+          className="responsive-product-media size-full bg-[#eee7dd] object-contain p-2 transition-transform duration-700 group-hover:scale-105 md:object-cover md:p-0"
+          style={{
+            "--product-desktop-position": `${desktopPosition.x}% ${desktopPosition.y}%`,
+            "--product-mobile-position": `${mobilePosition.x}% ${mobilePosition.y}%`,
+          } as React.CSSProperties}
+        />
+      </picture>
       <div className="absolute inset-0 -z-10 bg-black/10" />
       <span
         aria-hidden="true"
@@ -90,7 +107,7 @@ export function ProductCard({
       <div className="pointer-events-none absolute inset-x-2.5 top-2.5 z-20 flex items-center justify-between gap-1 md:inset-x-4 md:top-4 md:gap-2">
         {product.badge ? (
           <span className="rounded-full bg-[#8E111E] px-2.5 py-0.5 text-[10px] font-black text-white shadow-xs">
-            {product.badge}
+            <RichText value={product.textFormatting?.badge} fallback={product.badge} />
           </span>
         ) : (
           <span className="rounded-full bg-black/40 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-sm">
@@ -116,11 +133,11 @@ export function ProductCard({
         <div className={`${PRODUCT_GLASS_OVERLAY_CLASS} ${getTextRegionContentWidthClass(textRegionPosition, "bottom")}`}>
           <div>
             <h3 className="line-clamp-2 text-xs font-black leading-5 text-white transition-colors group-hover:text-[#FFD6DA]">
-              {product.name}
+              <RichText value={product.textFormatting?.name} fallback={product.name} />
             </h3>
             {product.subtitle && (
               <p className="mt-1 line-clamp-1 text-[11px] text-white/75">
-                {product.subtitle}
+                <RichText value={product.textFormatting?.subtitle} fallback={product.subtitle} />
               </p>
             )}
           </div>

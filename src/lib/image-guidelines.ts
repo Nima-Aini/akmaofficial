@@ -8,7 +8,13 @@ export const IMAGE_GUIDELINES = {
     format: "WebP یا AVIF (در صورت نیاز PNG/JPEG)",
   },
   productRetail: { width: 1200, height: 1200, ratio: "1:1", fit: "contain", usage: "تصویر اصلی و گالری فروش تکی؛ محصول را وسط قاب قرار دهید.", format: "WebP یا AVIF" },
+  productRetailMobile: { width: 1080, height: 1350, ratio: "4:5", fit: "contain", usage: "ترکیب عمودی فروش تکی برای موبایل؛ فضای پایین کارت را خلوت نگه دارید.", format: "WebP یا AVIF" },
   productWholesale: { width: 1200, height: 1200, ratio: "1:1", fit: "contain", usage: "بسته، کارتن یا چیدمان عمده را کامل و واضح نشان دهید.", format: "WebP یا AVIF" },
+  productWholesaleMobile: { width: 1080, height: 1350, ratio: "4:5", fit: "contain", usage: "ترکیب عمودی بسته عمده برای موبایل؛ سوژه اصلی را در بخش میانی نگه دارید.", format: "WebP یا AVIF" },
+  logoDesktop: { width: 600, height: 200, ratio: "3:1", fit: "contain", usage: "لوگوی افقی شفاف برای سربرگ یا فوتر.", format: "PNG، WebP یا AVIF" },
+  logoMobile: { width: 360, height: 120, ratio: "3:1", fit: "contain", usage: "نسخه ساده و خوانای لوگو برای سربرگ موبایل.", format: "PNG، WebP یا AVIF" },
+  brandIcon: { width: 512, height: 512, ratio: "1:1", fit: "contain", usage: "آیکون مربع با حاشیه امن برای مرورگر و نصب سایت.", format: "PNG، WebP یا AVIF" },
+  socialShare: { width: 1200, height: 630, ratio: "1.91:1", fit: "cover", usage: "تصویر اشتراک‌گذاری شبکه‌های اجتماعی.", format: "WebP، PNG یا JPEG" },
   category: { width: 1000, height: 1000, ratio: "1:1", fit: "cover", usage: "تصویر دسته‌بندی؛ سوژه در مرکز امن قاب باشد.", format: "WebP یا AVIF" },
   hero: {
     width: 1600,

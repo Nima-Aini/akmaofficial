@@ -33,7 +33,7 @@ function validatedDatabaseUrl() {
 
 const dbUrl = validatedDatabaseUrl();
 const schema = await import("../src/db/schema.ts");
-const { orders, paymentAttempts, customerUsers, customerOtps, adminUsers, settings, products } = schema;
+const { orders, paymentAttempts, customerUsers, customerOtps, adminUsers, settings, products, cartProductSuggestions } = schema;
 const { atomicUpdateOrderPaymentRetry, createPayment, processOrderPaymentVerification } = await import("../src/lib/payment.ts");
 const { createCustomerToken, sendCustomerOtp } = await import("../src/lib/customer-auth.ts");
 const { createSessionToken, hashPassword } = await import("../src/lib/auth.ts");
@@ -159,6 +159,24 @@ try {
     assert.equal(response.status, 401);
   });
 
+  await test("admin persists validated branding and rich-text settings", async () => {
+    const branding = { desktopHeaderLogo: "/uploads/branding/header.webp", mobileHeaderLogo: "/uploads/branding/mobile.webp", footerLogo: "/uploads/branding/footer.webp", darkBackgroundLogo: "", lightBackgroundLogo: "", favicon: "/uploads/branding/favicon.png", appIcon: "/uploads/branding/app.png", socialImage: "/uploads/branding/social.webp", desktopLogoWidth: 999, mobileLogoWidth: 10 };
+    const response = await fetch(`${baseUrl}/api/admin/settings`, { method: "PUT", headers: { "Content-Type": "application/json", Cookie: `akma_admin_session=${createSessionToken(admin.username)}` }, body: JSON.stringify({ key: "branding", value: branding }) });
+    assert.equal(response.status, 200, await response.text());
+    const stored = (await db.select().from(settings).where(eq(settings.key, "branding")))[0]?.value;
+    assert.equal(stored.desktopHeaderLogo, branding.desktopHeaderLogo);
+    assert.equal(stored.mobileHeaderLogo, branding.mobileHeaderLogo);
+    assert.equal(stored.desktopLogoWidth, 240);
+    assert.equal(stored.mobileLogoWidth, 54);
+
+    const hero = { title: "آکما امن", image: "/hero.webp", titleRichText: { segments: [{ text: "آکما ", bold: true, color: "#E91239" }, { text: "امن", color: "expression(alert(1))" }] } };
+    const richResponse = await fetch(`${baseUrl}/api/admin/settings`, { method: "PUT", headers: { "Content-Type": "application/json", Cookie: `akma_admin_session=${createSessionToken(admin.username)}` }, body: JSON.stringify({ key: "hero", value: hero }) });
+    assert.equal(richResponse.status, 200, await richResponse.text());
+    const savedHero = (await db.select().from(settings).where(eq(settings.key, "hero")))[0]?.value;
+    assert.equal(savedHero.titleRichText.segments[0].color, "#E91239");
+    assert.equal(savedHero.titleRichText.segments[1].color, undefined);
+  });
+
   await test("initial HTTP checkout stores trusted order and attempt", async () => {
     const response = await post("/api/orders", {
       customerName: customerA.name, customerPhone: customerA.phone, customerAddress: "تهران خیابان آزادی پلاک ۱۰۰",
@@ -225,7 +243,7 @@ try {
     const response = await fetch(`${baseUrl}/api/admin/products/${product.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json", Cookie: `akma_admin_session=${createSessionToken(admin.username)}` },
-      body: JSON.stringify({ ...product, wholesalePackSize: 12, wholesalePackLabel: "بسته ۱۲ عددی", wholesaleMinPackQty: 1, wholesalePrice: 1200000, wholesaleTiers: [{ minQty: 1, price: 1200000, label: "۱ تا ۴ بسته" }, { minQty: 5, price: 1100000, label: "۵+ بسته" }], retailUnitLabel: "عدد", retailImages: ["/uploads/products/retail-ci.webp"], wholesaleImages: ["/uploads/products/wholesale-ci.webp"], cardTextRegionPosition: "left", unitPrice: "LEGACY_MANUAL_PRICE_SHOULD_NOT_RENDER" }),
+      body: JSON.stringify({ ...product, wholesalePackSize: 12, wholesalePackLabel: "بسته ۱۲ عددی", wholesaleMinPackQty: 1, wholesalePrice: 1200000, wholesaleTiers: [{ minQty: 1, price: 1200000, label: "۱ تا ۴ بسته" }, { minQty: 5, price: 1100000, label: "۵+ بسته" }], retailUnitLabel: "عدد", retailImages: ["/uploads/products/retail-ci.webp"], retailMobileImages: ["/uploads/products/retail-mobile-ci.webp"], wholesaleImages: ["/uploads/products/wholesale-ci.webp"], wholesaleMobileImages: ["/uploads/products/wholesale-mobile-ci.webp"], desktopObjectPosition: { x: 40, y: 60 }, mobileObjectPosition: { x: 130, y: -20 }, textFormatting: { name: { segments: [{ text: product.name, bold: true, color: "#780B18" }] } }, cardTextRegionPosition: "left", unitPrice: "LEGACY_MANUAL_PRICE_SHOULD_NOT_RENDER" }),
     });
     assert.equal(response.status, 200, await response.text());
     configuredProduct = (await db.select().from(products).where(eq(products.id, product.id)))[0];
@@ -233,6 +251,11 @@ try {
     assert.equal(configuredProduct.wholesaleMinPackQty, 1);
     assert.equal(configuredProduct.wholesalePackLabel, "بسته ۱۲ عددی");
     assert.equal(configuredProduct.cardTextRegionPosition, "left");
+    assert.deepEqual(configuredProduct.retailMobileImages, ["/uploads/products/retail-mobile-ci.webp"]);
+    assert.deepEqual(configuredProduct.wholesaleMobileImages, ["/uploads/products/wholesale-mobile-ci.webp"]);
+    assert.deepEqual(configuredProduct.desktopObjectPosition, { x: 40, y: 60 });
+    assert.deepEqual(configuredProduct.mobileObjectPosition, { x: 100, y: 0 });
+    assert.equal(configuredProduct.textFormatting.name.segments[0].bold, true);
   });
 
   await test("storefront renders automatic prices instead of legacy unitPrice text", async () => {
@@ -255,6 +278,36 @@ try {
 
   await test("admin persists wholesale images", async () => {
     assert.deepEqual(configuredProduct.wholesaleImages, ["/uploads/products/wholesale-ci.webp"]);
+  });
+
+  await test("storefront emits responsive product art direction without changing mode galleries", async () => {
+    const response = await fetch(`${baseUrl}/products`);
+    const html = await response.text();
+    assert.equal(response.status, 200);
+    assert.match(html, /data-responsive-product-media="true"/);
+    assert.match(html, /data-mobile-source="\/uploads\/products\/retail-mobile-ci.webp"/);
+    assert.match(html, /media="\(max-width: 767px\)"/);
+  });
+
+  await test("cart suggestion rich text persists safely and remains plain-text compatible", async () => {
+    const response = await fetch(`${baseUrl}/api/admin/cart-suggestions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: `akma_admin_session=${createSessionToken(admin.username)}` },
+      body: JSON.stringify({
+        triggerProductId: seededProducts[0].id,
+        suggestedProductId: seededProducts[1].id,
+        message: "پیشنهاد ویژه آکما",
+        messageRichText: { segments: [{ text: "پیشنهاد ویژه ", bold: true, color: "#780B18" }, { text: "آکما", color: "url(javascript:alert(1))" }] },
+        active: true,
+        sortOrder: 0,
+      }),
+    });
+    assert.equal(response.status, 200, await response.text());
+    const stored = (await db.select().from(cartProductSuggestions))[0];
+    assert.equal(stored.message, "پیشنهاد ویژه آکما");
+    assert.equal(stored.messageRichText.segments[0].bold, true);
+    assert.equal(stored.messageRichText.segments[0].color, "#780B18");
+    assert.equal(stored.messageRichText.segments[1].color, undefined);
   });
 
   let wholesaleOrder;

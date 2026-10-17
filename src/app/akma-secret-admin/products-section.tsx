@@ -1,13 +1,19 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import { useState } from "react";
 import { Pencil, Plus, Save, Star, Trash2, X } from "lucide-react";
 import { CATEGORIES } from "@/lib/defaults";
 import { formatPrice } from "@/lib/format";
-import { Field, ImageUploader, ListEditor, Textarea, TextRegionControl, Toggle } from "./fields";
+import { Field, FocalPointControl, ImageUploader, ListEditor, RichTextEditor, TextRegionControl, Toggle } from "./fields";
 import type { TextRegionPosition } from "@/lib/text-region";
-import { getProductImages } from "@/lib/product-media";
+import { getProductImages, getResponsiveProductImages } from "@/lib/product-media";
 import { getProductPricePresentation } from "@/lib/pricing";
+import type { ImageFocalPoint } from "@/lib/responsive-image";
+import type { RichTextMap, RichTextValue } from "@/lib/rich-text";
+import { RichText } from "@/components/rich-text";
+import { PRODUCT_GLASS_OVERLAY_CLASS } from "@/components/product-card";
+import { getTextRegionContentWidthClass, getTextRegionLayoutClass } from "@/lib/text-region";
 
 export type AdminProduct = {
   id: number;
@@ -36,6 +42,11 @@ export type AdminProduct = {
   images: string[];
   retailImages?: string[];
   wholesaleImages?: string[];
+  retailMobileImages?: string[];
+  wholesaleMobileImages?: string[];
+  desktopObjectPosition?: ImageFocalPoint;
+  mobileObjectPosition?: ImageFocalPoint;
+  textFormatting?: RichTextMap;
   cardTextRegionPosition?: TextRegionPosition;
   badge: string;
   inStock: boolean;
@@ -69,6 +80,11 @@ const EMPTY: Omit<AdminProduct, "id"> = {
   images: ["/images/redesign/cat-foam.jpg"],
   retailImages: [],
   wholesaleImages: [],
+  retailMobileImages: [],
+  wholesaleMobileImages: [],
+  desktopObjectPosition: { x: 50, y: 50 },
+  mobileObjectPosition: { x: 50, y: 50 },
+  textFormatting: {},
   cardTextRegionPosition: "bottom",
   badge: "",
   inStock: true,
@@ -89,6 +105,8 @@ export function ProductsSection({
   const [editing, setEditing] = useState<AdminProduct | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [previewWidth, setPreviewWidth] = useState<360 | 390 | 430 | 1440>(390);
+  const [previewMode, setPreviewMode] = useState<"retail" | "wholesale">("retail");
 
   function openNew() {
     setIsNew(true);
@@ -149,6 +167,17 @@ export function ProductsSection({
   const patch = (v: Partial<AdminProduct>) =>
     setEditing((e) => (e ? { ...e, ...v } : e));
 
+  const patchRichText = (field: "name" | "subtitle" | "description" | "badge", plain: string, rich: RichTextValue) => {
+    if (!editing) return;
+    patch({ [field]: plain, textFormatting: { ...(editing.textFormatting ?? {}), [field]: rich } });
+  };
+  const patchRichList = (field: "features" | "contents", values: RichTextValue[]) => {
+    if (!editing) return;
+    const next = Object.fromEntries(Object.entries(editing.textFormatting ?? {}).filter(([key]) => !key.startsWith(`${field}.`)));
+    values.forEach((value, index) => { next[`${field}.${index}`] = value; });
+    patch({ textFormatting: next });
+  };
+
   const addTier = () => {
     if (!editing) return;
     const current = editing.wholesaleTiers || [];
@@ -193,7 +222,6 @@ export function ProductsSection({
             key={p.id}
             className="flex flex-wrap items-center gap-4 rounded-2xl border border-line p-4 transition-colors hover:border-accent/50"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={getProductImages(p, "retail")[0]}
               alt={p.name}
@@ -253,7 +281,7 @@ export function ProductsSection({
 
             <div className="space-y-5">
               <div className="grid gap-5 sm:grid-cols-2">
-                <Field label="نام محصول" value={editing.name} onChange={(v) => patch({ name: v })} />
+                <RichTextEditor label="نام محصول" value={editing.name} richValue={editing.textFormatting?.name} onChange={(plain, rich) => patchRichText("name", plain, rich)} />
                 <Field
                   label="اسلاگ (آدرس صفحه)"
                   value={editing.slug}
@@ -263,11 +291,14 @@ export function ProductsSection({
                 />
               </div>
 
-              <Field
+              <RichTextEditor
                 label="زیرعنوان (مثلاً: فرمولاسیون بدون نیاز به آب)"
                 value={editing.subtitle}
-                onChange={(v) => patch({ subtitle: v })}
+                richValue={editing.textFormatting?.subtitle}
+                onChange={(plain, rich) => patchRichText("subtitle", plain, rich)}
               />
+
+              <RichTextEditor label="برچسب محصول" value={editing.badge} richValue={editing.textFormatting?.badge} onChange={(plain, rich) => patchRichText("badge", plain, rich)} placeholder="مثلاً پرفروش" />
 
               <div className="rounded-2xl border border-line bg-surface/50 p-4 space-y-4">
                 <h5 className="text-sm font-black text-ink">فروش تکی</h5>
@@ -287,7 +318,10 @@ export function ProductsSection({
                     hint="نمونه: عدد، بطری، جفت"
                   />
                 </div>
-                <ImageUploader label="تصاویر فروش تکی" value={editing.retailImages || []} multiple onChange={(images) => patch({ retailImages: Array.isArray(images) ? images : [images] })} kind="products" guideline="productRetail" />
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="rounded-2xl border border-line bg-bg p-4"><h6 className="mb-4 text-xs font-black">تصاویر دسکتاپ تکی</h6><ImageUploader label="گالری دسکتاپ فروش تکی" value={editing.retailImages || []} multiple onChange={(images) => patch({ retailImages: Array.isArray(images) ? images : [images] })} kind="products" guideline="productRetail" /></div>
+                  <div className="rounded-2xl border border-line bg-bg p-4"><h6 className="mb-4 text-xs font-black">تصاویر موبایل تکی</h6><ImageUploader label="گالری موبایل فروش تکی" value={editing.retailMobileImages || []} multiple onChange={(images) => patch({ retailMobileImages: Array.isArray(images) ? images : [images] })} kind="products" guideline="productRetailMobile" hint="در صورت خالی بودن، گالری دسکتاپ تکی نمایش داده می‌شود." /></div>
+                </div>
                 <TextRegionControl
                   label="محل اطلاعات روی کارت محصول"
                   value={editing.cardTextRegionPosition || "bottom"}
@@ -385,10 +419,37 @@ export function ProductsSection({
                     </p>
                   )}
                 </div>
-                <ImageUploader label="تصاویر بسته‌های عمده" value={editing.wholesaleImages || []} multiple onChange={(images) => patch({ wholesaleImages: Array.isArray(images) ? images : [images] })} kind="products" guideline="productWholesale" />
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="rounded-2xl border border-line bg-bg p-4"><h6 className="mb-4 text-xs font-black">تصاویر دسکتاپ عمده</h6><ImageUploader label="گالری دسکتاپ فروش عمده" value={editing.wholesaleImages || []} multiple onChange={(images) => patch({ wholesaleImages: Array.isArray(images) ? images : [images] })} kind="products" guideline="productWholesale" /></div>
+                  <div className="rounded-2xl border border-line bg-bg p-4"><h6 className="mb-4 text-xs font-black">تصاویر موبایل عمده</h6><ImageUploader label="گالری موبایل فروش عمده" value={editing.wholesaleMobileImages || []} multiple onChange={(images) => patch({ wholesaleMobileImages: Array.isArray(images) ? images : [images] })} kind="products" guideline="productWholesaleMobile" hint="در صورت خالی بودن، ابتدا تصاویر عمده دسکتاپ و سپس تصاویر تکی استفاده می‌شود." /></div>
+                </div>
                 <p className="rounded-xl border border-accent/20 bg-accent/5 px-3 py-2 text-[10px] leading-5 text-muted">
                   همین محل اطلاعات برای کارت تکی و عمده استفاده می‌شود. لایه شیشه‌ای نیمه‌شفاف است و تصویر زیر آن کمی نرم می‌شود؛ جزئیات مهم یا متن آماده را در آن ناحیه قرار ندهید.
                 </p>
+              </div>
+
+              <div className="rounded-2xl border border-line bg-surface/50 p-4 space-y-4">
+                <h5 className="text-sm font-black text-ink">موقعیت و پیش‌نمایش واکنش‌گرای محصول</h5>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <FocalPointControl label="موقعیت تصویر دسکتاپ" value={editing.desktopObjectPosition} onChange={(desktopObjectPosition) => patch({ desktopObjectPosition })} />
+                  <FocalPointControl label="موقعیت تصویر موبایل" value={editing.mobileObjectPosition} onChange={(mobileObjectPosition) => patch({ mobileObjectPosition })} />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {([360, 390, 430, 1440] as const).map((width) => <button key={width} type="button" onClick={() => setPreviewWidth(width)} className={`min-h-10 rounded-xl border px-3 text-[10px] font-bold ${previewWidth === width ? "border-accent bg-accent text-white" : "border-line"}`}>{width === 1440 ? "دسکتاپ ۱۴۴۰" : `موبایل ${width}`}</button>)}
+                  {(["retail", "wholesale"] as const).map((mode) => <button key={mode} type="button" onClick={() => setPreviewMode(mode)} className={`min-h-10 rounded-xl border px-4 text-[10px] font-bold ${previewMode === mode ? "border-accent bg-accent/10 text-accent" : "border-line"}`}>{mode === "retail" ? "تکی" : "عمده"}</button>)}
+                </div>
+                {(() => {
+                  const viewport = previewWidth < 768 ? "mobile" : "desktop";
+                  const image = getResponsiveProductImages(editing, previewMode, viewport)[0];
+                  const focal = viewport === "mobile" ? editing.mobileObjectPosition : editing.desktopObjectPosition;
+                  const pricing = getProductPricePresentation(editing, 1, previewMode, { applyWholesaleTiers: false });
+                  const region = editing.cardTextRegionPosition || "bottom";
+                  return <div className="overflow-x-auto rounded-2xl bg-bg p-3" data-responsive-product-preview><div className="relative isolate mx-auto flex overflow-hidden rounded-2xl border border-white/50 bg-[#eee7dd] shadow-md" style={{ width: previewWidth < 768 ? `${previewWidth}px` : "360px", height: previewWidth < 768 ? "420px" : "390px" }}>
+                    <img src={image} alt="" className={`absolute inset-0 size-full ${viewport === "mobile" ? "object-contain p-2" : "object-cover"}`} style={{ objectPosition: `${focal?.x ?? 50}% ${focal?.y ?? 50}%` }} />
+                    <span className="pointer-events-none absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-t from-black/40 to-transparent backdrop-blur-[2px]" />
+                    <div className={`relative z-10 flex size-full p-3 pt-14 ${getTextRegionLayoutClass(region, "bottom")}`}><div className={`${PRODUCT_GLASS_OVERLAY_CLASS} ${getTextRegionContentWidthClass(region, "bottom")} pointer-events-none`}><h6 className="text-sm font-black"><RichText value={editing.textFormatting?.name} fallback={editing.name || "نام محصول"} /></h6><p className="mt-1 text-[11px] text-white/75"><RichText value={editing.textFormatting?.subtitle} fallback={editing.subtitle} /></p><div className="mt-3 border-t border-white/15 pt-2 text-sm font-black text-[#FFB0B7]">{formatPrice(pricing.unitPrice)} تومان</div></div></div>
+                  </div></div>;
+                })()}
               </div>
 
               <div className="grid gap-5 sm:grid-cols-2">
@@ -449,10 +510,11 @@ export function ProductsSection({
                 hint="برای محصولات قدیمی نگه داشته می‌شود و اگر تصاویر تکی/عمده خالی باشند نمایش داده خواهد شد."
               />
 
-              <Textarea
+              <RichTextEditor
                 label="توضیحات کامل محصول"
                 value={editing.description}
-                onChange={(v) => patch({ description: v })}
+                richValue={editing.textFormatting?.description}
+                onChange={(plain, rich) => patchRichText("description", plain, rich)}
                 rows={6}
               />
 
@@ -461,6 +523,8 @@ export function ProductsSection({
                 items={editing.features}
                 onChange={(features) => patch({ features })}
                 placeholder="ویژگی جدید…"
+                richItems={editing.features.map((item, index) => editing.textFormatting?.[`features.${index}`] ?? { segments: [{ text: item }] })}
+                onRichChange={(values) => patchRichList("features", values)}
               />
 
               <ListEditor
@@ -468,6 +532,8 @@ export function ProductsSection({
                 items={editing.contents}
                 onChange={(contents) => patch({ contents })}
                 placeholder="آیتم جدید محتویات…"
+                richItems={editing.contents.map((item, index) => editing.textFormatting?.[`contents.${index}`] ?? { segments: [{ text: item }] })}
+                onRichChange={(values) => patchRichList("contents", values)}
               />
             </div>
 

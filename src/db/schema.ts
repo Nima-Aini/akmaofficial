@@ -10,6 +10,8 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import type { TextRegionPosition } from "@/lib/text-region";
+import type { ImageFocalPoint } from "@/lib/responsive-image";
+import type { RichTextMap, RichTextValue } from "@/lib/rich-text";
 
 export type WholesaleTier = {
   minQty: number;
@@ -45,6 +47,11 @@ export const products = pgTable("products", {
   images: jsonb("images").$type<string[]>().notNull().default([]),
   retailImages: jsonb("retail_images").$type<string[]>().notNull().default([]),
   wholesaleImages: jsonb("wholesale_images").$type<string[]>().notNull().default([]),
+  retailMobileImages: jsonb("retail_mobile_images").$type<string[]>().notNull().default([]),
+  wholesaleMobileImages: jsonb("wholesale_mobile_images").$type<string[]>().notNull().default([]),
+  desktopObjectPosition: jsonb("desktop_object_position").$type<ImageFocalPoint>().notNull().default({ x: 50, y: 50 }),
+  mobileObjectPosition: jsonb("mobile_object_position").$type<ImageFocalPoint>().notNull().default({ x: 50, y: 50 }),
+  textFormatting: jsonb("text_formatting").$type<RichTextMap>().notNull().default({}),
   cardTextRegionPosition: text("card_text_region_position").$type<TextRegionPosition>().notNull().default("bottom"),
   badge: text("badge").notNull().default(""),
   inStock: boolean("in_stock").notNull().default(true),
@@ -176,6 +183,7 @@ export const cartProductSuggestions = pgTable(
       onDelete: "set null",
     }),
     message: text("message").notNull().default(""),
+    messageRichText: jsonb("message_rich_text").$type<RichTextValue>().notNull().default({ segments: [] }),
     active: boolean("active").notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -197,6 +205,9 @@ export type BlogContentBlock = {
   url?: string;
   alt?: string;
   caption?: string;
+  captionRichText?: RichTextValue;
+  richText?: RichTextValue;
+  itemsRichText?: RichTextValue[];
 };
 
 export const blogPosts = pgTable("blog_posts", {
@@ -207,6 +218,7 @@ export const blogPosts = pgTable("blog_posts", {
   coverImage: text("cover_image").notNull().default(""),
   coverImageAlt: text("cover_image_alt").notNull().default(""),
   content: jsonb("content").$type<BlogContentBlock[]>().notNull().default([]),
+  textFormatting: jsonb("text_formatting").$type<RichTextMap>().notNull().default({}),
   seoTitle: text("seo_title").notNull().default(""),
   metaDescription: text("meta_description").notNull().default(""),
   status: text("status").notNull().default("draft"),

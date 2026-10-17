@@ -335,3 +335,21 @@ select.field option {
 .blog-content figcaption { padding: 0.65rem 1rem; text-align: center; font-size: 0.72rem; color: var(--muted); }
 .blog-content hr { border: 0; border-top: 1px solid var(--line); margin-block: 2.5rem; }
 @media (max-width: 430px) { .blog-content { font-size: 0.88rem; line-height: 2; } .blog-content h2 { font-size: 1.3rem; } }
+ .responsive-product-media {
+  object-position: var(--product-mobile-position, 50% 50%);
+ }
+
+ @media (min-width: 768px) {
+  .responsive-product-media {
+    object-position: var(--product-desktop-position, 50% 50%);
+  }
+ }
+ .brand-header-logo {
+  width: var(--brand-logo-mobile-width, 94px);
+ }
+
+ @media (min-width: 768px) {
+  .brand-header-logo {
+    width: var(--brand-logo-desktop-width, 120px);
+  }
+ }

@@ -3,18 +3,21 @@
 import { useEffect, useState } from "react";
 import { Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import type { AdminProduct } from "./products-section";
-import { Field, Textarea, Toggle } from "./fields";
+import { Field, RichTextEditor, Toggle } from "./fields";
+import { RichText } from "@/components/rich-text";
+import type { RichTextValue } from "@/lib/rich-text";
 
 type Rule = {
   id: number;
   triggerProductId: number | null;
   suggestedProductId: number | null;
   message: string;
+  messageRichText: RichTextValue;
   active: boolean;
   sortOrder: number;
 };
 
-const emptyRule: Rule = { id: 0, triggerProductId: null, suggestedProductId: null, message: "", active: true, sortOrder: 0 };
+const emptyRule: Rule = { id: 0, triggerProductId: null, suggestedProductId: null, message: "", messageRichText: { segments: [] }, active: true, sortOrder: 0 };
 
 export function CartSuggestionsSection({ products, toast }: { products: AdminProduct[]; toast: (message: string, ok?: boolean) => void }) {
   const [rules, setRules] = useState<Rule[]>([]);
@@ -66,7 +69,7 @@ export function CartSuggestionsSection({ products, toast }: { products: AdminPro
         {rules.length === 0 && <p className="rounded-2xl border border-dashed border-line p-8 text-center text-xs text-muted">هنوز پیشنهادی تعریف نشده است.</p>}
         {rules.map((rule) => (
           <div key={rule.id} className="flex flex-wrap items-center gap-4 rounded-2xl border border-line p-4">
-            <div className="min-w-0 flex-1"><p className="text-sm font-extrabold">{productName(rule.triggerProductId)} ← {productName(rule.suggestedProductId)}</p><p className="mt-1 line-clamp-2 text-[11px] text-muted">{rule.message || "بدون پیام اختصاصی"}</p></div>
+            <div className="min-w-0 flex-1"><p className="text-sm font-extrabold">{productName(rule.triggerProductId)} ← {productName(rule.suggestedProductId)}</p><RichText as="p" className="mt-1 line-clamp-2 text-[11px] text-muted" value={rule.messageRichText} fallback={rule.message || "بدون پیام اختصاصی"} /></div>
             <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${rule.active ? "bg-emerald-400/10 text-emerald-400" : "bg-surface text-muted"}`}>{rule.active ? "فعال" : "غیرفعال"}</span>
             <button type="button" onClick={() => setEditing({ ...rule })} className="btn btn-ghost h-10 px-4 text-xs"><Pencil size={14} /> ویرایش</button>
             <button type="button" onClick={() => void remove(rule.id)} className="grid size-10 place-items-center rounded-xl border border-line text-rose-400 hover:border-rose-400" aria-label="حذف پیشنهاد"><Trash2 size={15} /></button>
@@ -82,7 +85,7 @@ export function CartSuggestionsSection({ products, toast }: { products: AdminPro
                 <label><span className="mb-1.5 block text-xs font-bold text-muted">محصول محرک</span><select className="field" value={editing.triggerProductId ?? ""} onChange={(event) => setEditing({ ...editing, triggerProductId: Number(event.target.value) || null })}><option value="">انتخاب کنید</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
                 <label><span className="mb-1.5 block text-xs font-bold text-muted">محصول پیشنهادی</span><select className="field" value={editing.suggestedProductId ?? ""} onChange={(event) => setEditing({ ...editing, suggestedProductId: Number(event.target.value) || null })}><option value="">انتخاب کنید</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
               </div>
-              <Textarea label="پیام اختصاصی" value={editing.message} onChange={(message) => setEditing({ ...editing, message })} rows={4} />
+              <RichTextEditor label="پیام اختصاصی" value={editing.message} richValue={editing.messageRichText} onChange={(message, messageRichText) => setEditing({ ...editing, message, messageRichText })} rows={4} />
               <Field label="ترتیب نمایش" type="number" dir="ltr" value={editing.sortOrder} onChange={(value) => setEditing({ ...editing, sortOrder: Number(value) || 0 })} />
               <Toggle label="پیشنهاد فعال باشد" checked={editing.active} onChange={(active) => setEditing({ ...editing, active })} />
               <button type="button" disabled={saving} onClick={() => void save()} className="btn btn-primary h-12 w-full text-sm"><Save size={16} />{saving ? "در حال ذخیره…" : "ذخیره پیشنهاد"}</button>

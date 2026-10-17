@@ -47,6 +47,8 @@ export function AddToCartButton({
         wholesaleMinQty: product.wholesaleMinQty,
         retailImages: product.retailImages,
         wholesaleImages: product.wholesaleImages,
+        retailMobileImages: product.retailMobileImages,
+        wholesaleMobileImages: product.wholesaleMobileImages,
       },
       qty,
       mode,

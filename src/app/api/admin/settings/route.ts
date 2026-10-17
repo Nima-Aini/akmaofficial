@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { saveSetting } from "@/lib/store";
 import { sanitizeResponsiveSetting } from "@/lib/responsive-image";
+import { sanitizeRichTextMetadataDeep, sanitizeRichTextValue } from "@/lib/rich-text";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ const ALLOWED_KEYS = new Set([
   "categories",
   "wholesalePromo",
   "marquee",
+  "marqueeFormatting",
   "banners",
   "bottomBanners",
   "sectionTitles",
@@ -20,6 +22,7 @@ const ALLOWED_KEYS = new Set([
   "steps",
   "contact",
   "site",
+  "branding",
 ]);
 
 export async function PUT(req: Request) {
@@ -31,7 +34,9 @@ export async function PUT(req: Request) {
     if (typeof key !== "string" || !ALLOWED_KEYS.has(key)) {
       return NextResponse.json({ ok: false, error: "کلید نامعتبر است" }, { status: 400 });
     }
-    const sanitizedValue = sanitizeResponsiveSetting(key, value);
+    const sanitizedValue = key === "marqueeFormatting"
+      ? (Array.isArray(value) ? value.slice(0, 100).map((entry) => sanitizeRichTextValue(entry, 2_000) ?? { segments: [] }) : [])
+      : sanitizeRichTextMetadataDeep(sanitizeResponsiveSetting(key, value));
     await saveSetting(key, sanitizedValue);
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {

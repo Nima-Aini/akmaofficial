@@ -78,6 +78,16 @@ export function sanitizeResponsiveImageFields<T extends Record<string, unknown>>
 }
 
 export function sanitizeResponsiveSetting(key: string, value: unknown): unknown {
+  if (key === "branding") {
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("ساختار برندینگ نامعتبر است");
+    const raw = value as Record<string, unknown>;
+    const imageFields = ["desktopHeaderLogo", "mobileHeaderLogo", "footerLogo", "darkBackgroundLogo", "lightBackgroundLogo", "favicon", "appIcon", "socialImage"] as const;
+    const next: Record<string, unknown> = {};
+    for (const field of imageFields) next[field] = sanitizeImageUrl(raw[field]);
+    next.desktopLogoWidth = Math.min(240, Math.max(60, Number(raw.desktopLogoWidth) || 120));
+    next.mobileLogoWidth = Math.min(180, Math.max(54, Number(raw.mobileLogoWidth) || 94));
+    return next;
+  }
   if (key === "banners" || key === "bottomBanners" || key === "categories") {
     if (!Array.isArray(value)) throw new Error("ساختار تنظیمات تصویر نامعتبر است");
     return value.map((item) => {

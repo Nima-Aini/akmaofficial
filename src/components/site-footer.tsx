@@ -1,9 +1,11 @@
 import Link from "next/link";
+/* eslint-disable @next/next/no-img-element */
 import { Clock, AtSign, Mail, MapPin, Phone, Send, Sparkle, MessageCircle } from "lucide-react";
 import { telHref, toFa } from "@/lib/format";
-import type { ContactSettings, SiteSettings } from "@/lib/defaults";
+import type { BrandingSettings, ContactSettings, SiteSettings } from "@/lib/defaults";
 import { CATEGORIES } from "@/lib/defaults";
 import { SectionLink } from "@/components/section-link";
+import { RichText } from "@/components/rich-text";
 
 const ENAMAD_SEAL_HTML =
   "<a referrerpolicy='origin' target='_blank' href='https://trustseal.enamad.ir/?id=7454940&Code=YlXUOhdwgVFdAzl3LZsrgoLDjJkhOpDo'><img referrerpolicy='origin' src='https://trustseal.enamad.ir/logo.aspx?id=7454940&Code=YlXUOhdwgVFdAzl3LZsrgoLDjJkhOpDo' alt='' style='cursor:pointer' code='YlXUOhdwgVFdAzl3LZsrgoLDjJkhOpDo'></a>";
@@ -11,9 +13,11 @@ const ENAMAD_SEAL_HTML =
 export function SiteFooter({
   site,
   contact,
+  branding,
 }: {
   site: SiteSettings;
   contact: ContactSettings;
+  branding: BrandingSettings;
 }) {
   const year = toFa(new Date().getFullYear());
   return (
@@ -22,17 +26,21 @@ export function SiteFooter({
         <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-4">
           <div>
             <div className="flex items-center gap-3">
+              {branding.footerLogo || branding.darkBackgroundLogo || branding.desktopHeaderLogo ? <div className="flex h-16 items-center">
+                <img src={branding.footerLogo || branding.darkBackgroundLogo || branding.desktopHeaderLogo} alt={`لوگوی ${site.name}`} className="max-h-14 max-w-[180px] object-contain" />
+              </div> : <>
               <span className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-accent2 to-accent text-on-accent">
                 <Sparkle size={20} strokeWidth={2.2} />
               </span>
               <span className="leading-none">
-                <span className="block text-xl font-black">{site.name}</span>
+                <RichText as="span" className="block text-xl font-black" value={site.nameRichText} fallback={site.name} />
                 <span className="block text-[10px] font-bold tracking-[0.35em] text-muted">
-                  {site.latinName}
+                  <RichText value={site.latinNameRichText} fallback={site.latinName} />
                 </span>
               </span>
+              </>}
             </div>
-            <p className="mt-5 text-sm leading-7 text-muted">{site.footerText}</p>
+            <RichText as="p" className="mt-5 text-sm leading-7 text-muted" value={site.footerTextRichText} fallback={site.footerText} />
             {(contact.instagram || contact.telegram || contact.whatsapp) && (
               <div className="mt-5 flex items-center gap-2">
                 {contact.instagram && (
@@ -119,13 +127,13 @@ export function SiteFooter({
               {contact.address && (
                 <li className="flex items-start gap-3">
                   <MapPin size={16} className="mt-1 shrink-0 text-accent" />
-                  <span>{contact.address}</span>
+                  <RichText value={contact.addressRichText} fallback={contact.address} />
                 </li>
               )}
               {contact.hours && (
                 <li className="flex items-start gap-3">
                   <Clock size={16} className="mt-1 shrink-0 text-accent" />
-                  <span>{contact.hours}</span>
+                  <RichText value={contact.hoursRichText} fallback={contact.hours} />
                 </li>
               )}
             </ul>
@@ -133,8 +141,8 @@ export function SiteFooter({
         </div>
 
         <div className="mt-14 flex flex-col items-center justify-between gap-4 border-t border-line pt-7 text-xs text-muted sm:flex-row">
-          <p>© {year} {site.name} — تمامی حقوق محفوظ است.</p>
-          <p>{site.tagline}</p>
+          <p>© {year} <RichText value={site.nameRichText} fallback={site.name} /> — تمامی حقوق محفوظ است.</p>
+          <RichText as="p" value={site.taglineRichText} fallback={site.tagline} />
         </div>
       </div>
     </footer>

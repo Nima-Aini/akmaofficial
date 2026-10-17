@@ -9,6 +9,7 @@ import {
   type ProductRow,
 } from "@/db/schema";
 import { getAllProducts, slugify } from "@/lib/store";
+import { sanitizeRichTextMap, sanitizeRichTextValue, type RichTextMap, type RichTextValue } from "@/lib/rich-text";
 
 type ContentMemory = {
   suggestions: CartProductSuggestionRow[];
@@ -31,6 +32,7 @@ export type SuggestionInput = {
   triggerProductId: number;
   suggestedProductId: number;
   message: string;
+  messageRichText: RichTextValue;
   active: boolean;
   sortOrder: number;
 };
@@ -41,10 +43,15 @@ export function sanitizeSuggestion(body: Record<string, unknown>): SuggestionInp
   if (!Number.isInteger(triggerProductId) || triggerProductId <= 0) throw new Error("محصول محرک نامعتبر است");
   if (!Number.isInteger(suggestedProductId) || suggestedProductId <= 0) throw new Error("محصول پیشنهادی نامعتبر است");
   if (triggerProductId === suggestedProductId) throw new Error("محصول محرک و پیشنهادی نمی‌توانند یکسان باشند");
+  const message = typeof body.message === "string" ? body.message.trim().slice(0, 1000) : "";
+  const messageRichText = sanitizeRichTextValue(body.messageRichText, 1_000);
   return {
     triggerProductId,
     suggestedProductId,
-    message: typeof body.message === "string" ? body.message.trim().slice(0, 1000) : "",
+    message,
+    messageRichText: messageRichText && messageRichText.segments.map((segment) => segment.text).join("") === message
+      ? messageRichText
+      : { segments: message ? [{ text: message }] : [] },
     active: body.active !== false,
     sortOrder: Number.isFinite(Number(body.sortOrder)) ? Math.trunc(Number(body.sortOrder)) : 0,
   };
@@ -161,10 +168,20 @@ function sanitizeBlocks(value: unknown): BlogContentBlock[] {
     };
     if (typeof block.text === "string") item.text = block.text.slice(0, 20000);
     if (Array.isArray(block.items)) item.items = block.items.filter((x): x is string => typeof x === "string").slice(0, 100).map((x) => x.slice(0, 2000));
+    const richText = sanitizeRichTextValue(block.richText, 20_000);
+    if (richText) item.richText = richText;
+    if (Array.isArray(block.itemsRichText)) {
+      item.itemsRichText = block.itemsRichText.slice(0, 100).flatMap((entry) => {
+        const clean = sanitizeRichTextValue(entry, 2_000);
+        return clean ? [clean] : [];
+      });
+    }
     if (type === "image") {
       item.url = cleanUrl(block.url);
       item.alt = typeof block.alt === "string" ? block.alt.trim().slice(0, 300) : "";
       item.caption = typeof block.caption === "string" ? block.caption.trim().slice(0, 500) : "";
+      const captionRichText = sanitizeRichTextValue(block.captionRichText, 500);
+      if (captionRichText) item.captionRichText = captionRichText;
     }
     return [item];
   });
@@ -177,6 +194,7 @@ export type BlogPostInput = {
   coverImage: string;
   coverImageAlt: string;
   content: BlogContentBlock[];
+  textFormatting: RichTextMap;
   seoTitle: string;
   metaDescription: string;
   status: "draft" | "published";
@@ -205,6 +223,7 @@ export function sanitizeBlogPost(body: Record<string, unknown>): BlogPostInput {
     coverImage: cleanUrl(body.coverImage),
     coverImageAlt: text(body.coverImageAlt, 300),
     content: sanitizeBlocks(body.content),
+    textFormatting: sanitizeRichTextMap(body.textFormatting),
     seoTitle: text(body.seoTitle, 300),
     metaDescription: text(body.metaDescription, 500),
     status,

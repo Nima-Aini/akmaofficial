@@ -5,17 +5,19 @@ import { useEffect, useState } from "react";
 import { Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import type { BlogContentBlock } from "@/db/schema";
 import { formatJalaliDateTime } from "@/lib/jalali-date";
-import { Field, ImageUploader, Textarea, Toggle } from "./fields";
+import { Field, ImageUploader, RichTextEditor, Toggle } from "./fields";
 import { BlogEditor } from "./blog-editor";
 import { JalaliDatePicker } from "./jalali-date-picker";
+import type { RichTextMap, RichTextValue } from "@/lib/rich-text";
 
 type AdminPost = {
   id: number; title: string; slug: string; excerpt: string; coverImage: string; coverImageAlt: string;
   content: BlogContentBlock[]; seoTitle: string; metaDescription: string; status: "draft" | "published";
   author: string; featured: boolean; sortOrder: number; publishedAt: string | null; updatedAt?: string;
+  textFormatting: RichTextMap;
 };
 
-const emptyPost: AdminPost = { id: 0, title: "", slug: "", excerpt: "", coverImage: "", coverImageAlt: "", content: [], seoTitle: "", metaDescription: "", status: "draft", author: "", featured: false, sortOrder: 0, publishedAt: null };
+const emptyPost: AdminPost = { id: 0, title: "", slug: "", excerpt: "", coverImage: "", coverImageAlt: "", content: [], textFormatting: {}, seoTitle: "", metaDescription: "", status: "draft", author: "", featured: false, sortOrder: 0, publishedAt: null };
 
 export function BlogSection({ toast }: { toast: (message: string, ok?: boolean) => void }) {
   const [posts, setPosts] = useState<AdminPost[]>([]);
@@ -45,6 +47,10 @@ export function BlogSection({ toast }: { toast: (message: string, ok?: boolean) 
   }
 
   const patch = (value: Partial<AdminPost>) => setEditing((current) => current ? { ...current, ...value } : current);
+  const patchRich = (field: "title" | "excerpt" | "author", plain: string, rich: RichTextValue) => {
+    if (!editing) return;
+    patch({ [field]: plain, textFormatting: { ...(editing.textFormatting ?? {}), [field]: rich } });
+  };
 
   return (
     <div className="card p-6 sm:p-8">
@@ -54,12 +60,12 @@ export function BlogSection({ toast }: { toast: (message: string, ok?: boolean) 
         return <div key={post.id} className="flex flex-wrap items-center gap-4 rounded-2xl border border-line p-4">{post.coverImage && <div className="aspect-video w-20 shrink-0 overflow-hidden rounded-xl bg-surface"><img src={post.coverImage} alt="" className="size-full object-cover" width="160" height="90" /></div>}<div className="min-w-0 flex-1"><p className="truncate text-sm font-extrabold">{post.title}</p><p className="mt-1 text-[11px] text-muted" dir="ltr">/blog/{post.slug}</p>{post.publishedAt && <p className="mt-1 text-[11px] text-muted">{formatJalaliDateTime(post.publishedAt)}</p>}</div><span className={`rounded-full px-3 py-1 text-[10px] font-bold ${post.status === "published" ? "bg-emerald-400/10 text-emerald-400" : "bg-amber-400/10 text-amber-400"}`}>{scheduled ? "زمان‌بندی‌شده" : post.status === "published" ? "منتشرشده" : "پیش‌نویس"}</span><button type="button" onClick={() => setEditing({ ...post })} className="btn btn-ghost h-10 px-4 text-xs"><Pencil size={14} /> ویرایش</button><button type="button" onClick={() => void remove(post.id)} className="grid size-10 place-items-center rounded-xl border border-line text-rose-400 hover:border-rose-400" aria-label={`حذف ${post.title}`}><Trash2 size={15} /></button></div>;
       })}</div>
       {editing && <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-black/70 p-3 backdrop-blur-sm sm:p-8"><div className="card my-4 w-full max-w-4xl p-5 sm:p-8"><div className="flex items-center justify-between"><h4 className="text-lg font-black">{editing.id ? `ویرایش «${editing.title}»` : "مقاله جدید"}</h4><button type="button" onClick={() => setEditing(null)} className="grid size-10 place-items-center rounded-xl border border-line" aria-label="بستن"><X size={17} /></button></div><div className="mt-6 space-y-5">
-        <div className="grid gap-5 sm:grid-cols-2"><Field label="عنوان مقاله" value={editing.title} onChange={(title) => patch({ title })} /><Field label="اسلاگ (آدرس)" dir="ltr" value={editing.slug} onChange={(slug) => patch({ slug })} hint="خالی بماند = ساخت خودکار از عنوان" /></div>
-        <Textarea label="خلاصه مقاله" value={editing.excerpt} onChange={(excerpt) => patch({ excerpt })} rows={3} />
+        <div className="grid gap-5 sm:grid-cols-2"><RichTextEditor label="عنوان مقاله" value={editing.title} richValue={editing.textFormatting?.title} onChange={(plain, rich) => patchRich("title", plain, rich)} /><Field label="اسلاگ (آدرس)" dir="ltr" value={editing.slug} onChange={(slug) => patch({ slug })} hint="خالی بماند = ساخت خودکار از عنوان" /></div>
+        <RichTextEditor label="خلاصه مقاله" value={editing.excerpt} richValue={editing.textFormatting?.excerpt} onChange={(plain, rich) => patchRich("excerpt", plain, rich)} rows={3} />
         <ImageUploader label="تصویر کاور" value={editing.coverImage} onChange={(value) => patch({ coverImage: typeof value === "string" ? value : value[0] ?? "" })} kind="blog" guideline="blogCover" /><Field label="متن جایگزین کاور (Alt)" value={editing.coverImageAlt} onChange={(coverImageAlt) => patch({ coverImageAlt })} />
         <BlogEditor value={editing.content} onChange={(content) => patch({ content })} />
-        <div className="grid gap-5 border-t border-line pt-5 sm:grid-cols-2"><Field label="عنوان SEO" value={editing.seoTitle} onChange={(seoTitle) => patch({ seoTitle })} hint="اگر خالی باشد از عنوان مقاله استفاده می‌شود." /><Textarea label="Meta Description" value={editing.metaDescription} onChange={(metaDescription) => patch({ metaDescription })} rows={2} hint="حدود ۱۴۰ تا ۱۶۰ کاراکتر پیشنهاد می‌شود." /></div>
-        <div className="grid gap-5 sm:grid-cols-2"><Field label="نویسنده (اختیاری)" value={editing.author} onChange={(author) => patch({ author })} /><Field label="ترتیب نمایش" type="number" dir="ltr" value={editing.sortOrder} onChange={(sortOrder) => patch({ sortOrder: Number(sortOrder) || 0 })} /></div>
+        <div className="grid gap-5 border-t border-line pt-5 sm:grid-cols-2"><Field label="عنوان SEO" value={editing.seoTitle} onChange={(seoTitle) => patch({ seoTitle })} hint="فیلد فنی SEO عمداً بدون قالب‌بندی ذخیره می‌شود." /><Field label="Meta Description" value={editing.metaDescription} onChange={(metaDescription) => patch({ metaDescription })} hint="فیلد فنی SEO عمداً متن ساده است؛ حدود ۱۴۰ تا ۱۶۰ کاراکتر پیشنهاد می‌شود." /></div>
+        <div className="grid gap-5 sm:grid-cols-2"><RichTextEditor label="نویسنده (اختیاری)" value={editing.author} richValue={editing.textFormatting?.author} onChange={(plain, rich) => patchRich("author", plain, rich)} /><Field label="ترتیب نمایش" type="number" dir="ltr" value={editing.sortOrder} onChange={(sortOrder) => patch({ sortOrder: Number(sortOrder) || 0 })} /></div>
         <JalaliDatePicker value={editing.publishedAt} onChange={(publishedAt) => patch({ publishedAt })} />
         <div className="flex flex-wrap gap-3"><Toggle label="مقاله ویژه" checked={editing.featured} onChange={(featured) => patch({ featured })} /><Toggle label={editing.status === "published" ? "منتشرشده" : "پیش‌نویس"} checked={editing.status === "published"} onChange={(published) => patch({ status: published ? "published" : "draft" })} /></div>
         <button type="button" disabled={saving} onClick={() => void save()} className="btn btn-primary h-12 w-full text-sm"><Save size={16} />{saving ? "در حال ذخیره…" : editing.status === "published" ? "ذخیره و انتشار" : "ذخیره پیش‌نویس"}</button>

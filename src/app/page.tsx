@@ -17,12 +17,16 @@ import {
   DEFAULT_DUAL_CARDS,
   DEFAULT_HERO,
   DEFAULT_WHOLESALE_PROMO,
+  DEFAULT_FEATURES,
+  DEFAULT_SECTION_TITLES,
   type CategoryItem,
   type Banner,
   type BottomBanner,
   type DualCardsSettings,
   type HeroSettings,
   type WholesalePromoSettings,
+  type Feature,
+  type SectionTitles,
 } from "@/lib/defaults";
 import { ProductCard } from "@/components/product-card";
 import {
@@ -30,6 +34,7 @@ import {
   ResponsiveBannerMedia,
   ResponsiveTextRegionBackdrop,
 } from "@/components/responsive-banner";
+import { RichText } from "@/components/rich-text";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +53,8 @@ export default async function HomePage() {
     ...DEFAULT_WHOLESALE_PROMO,
     ...(s.wholesalePromo as Partial<WholesalePromoSettings>),
   };
+  const features = (s.features as Feature[]) ?? DEFAULT_FEATURES;
+  const sectionTitles = { ...DEFAULT_SECTION_TITLES, ...(s.sectionTitles as Partial<SectionTitles>) };
 
   // Showcase 4 featured bestseller items matching reference panel
   const featured = products.filter((p) => p.featured);
@@ -66,18 +73,18 @@ export default async function HomePage() {
             <div className="space-y-5 drop-shadow-[0_2px_12px_rgba(0,0,0,0.55)] sm:space-y-6">
               <div className="inline-flex items-center gap-2 rounded-full bg-black/25 px-4 py-1.5 text-xs font-bold text-white/90 backdrop-blur-xs border border-white/10">
                 <span className="size-2 rounded-full bg-[#E53E3E] animate-pulse" />
-                {hero.badge}
+                <RichText value={hero.badgeRichText} fallback={hero.badge} />
               </div>
 
               <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black leading-[1.2] tracking-tight">
-                {hero.title}{" "}
+                <RichText value={hero.titleRichText} fallback={hero.title} />{" "}
                 <span className="text-[#FF6B78] drop-shadow-sm block sm:inline mt-1 sm:mt-0">
-                  {hero.highlight}
+                  <RichText value={hero.highlightRichText} fallback={hero.highlight} />
                 </span>
               </h1>
 
               <p className="max-w-xl text-sm font-medium leading-relaxed text-white/90 sm:text-base">
-                {hero.subtitle}
+                <RichText value={hero.subtitleRichText} fallback={hero.subtitle} />
               </p>
 
               <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -86,14 +93,14 @@ export default async function HomePage() {
                   className="inline-flex items-center gap-3 rounded-full bg-[#8E111E] hover:bg-[#720C17] text-white border border-white/20 px-8 py-3.5 text-sm font-black shadow-lg shadow-black/25 transition-transform active:scale-95"
                 >
                   <ArrowRight size={17} className="rotate-180" />
-                  <span>{hero.primaryCta.label || "مشاهده محصولات"}</span>
+                  <RichText value={hero.primaryCta.labelRichText} fallback={hero.primaryCta.label || "مشاهده محصولات"} />
                 </Link>
 
                 <Link
                   href={hero.secondaryCta.href || "/products?mode=wholesale"}
                   className="inline-flex items-center gap-2 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 px-6 py-3.5 text-sm font-bold backdrop-blur-xs transition-colors"
                 >
-                  <span>{hero.secondaryCta.label || "خرید عمده و همکاری"}</span>
+                  <RichText value={hero.secondaryCta.labelRichText} fallback={hero.secondaryCta.label || "خرید عمده و همکاری"} />
                 </Link>
               </div>
             </div>
@@ -139,10 +146,10 @@ export default async function HomePage() {
               <div className="space-y-4 text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.65)]">
                 <div>
                   <h2 className="text-2xl font-black sm:text-3xl">
-                    {dualCards.retail.title}
+                    <RichText value={dualCards.retail.titleRichText} fallback={dualCards.retail.title} />
                   </h2>
                   <p className="mt-1 text-xs font-bold text-white/80">
-                    {dualCards.retail.subtitle}
+                    <RichText value={dualCards.retail.subtitleRichText} fallback={dualCards.retail.subtitle} />
                   </p>
                 </div>
 
@@ -152,7 +159,7 @@ export default async function HomePage() {
                       <span className="grid size-4 place-items-center rounded-full bg-white/15 text-white backdrop-blur-sm">
                         <CheckCircle2 size={13} strokeWidth={2.5} />
                       </span>
-                      <span>{item}</span>
+                      <RichText value={dualCards.retail.checklistRichTextList?.[idx]} fallback={item} />
                     </li>
                   ))}
                 </ul>
@@ -163,7 +170,7 @@ export default async function HomePage() {
                     className="inline-flex items-center gap-2.5 rounded-full bg-[#8E111E] hover:bg-[#720C17] text-white px-6 py-3 text-xs font-black shadow-md shadow-[#8E111E]/20 transition-transform active:scale-95"
                   >
                     <ArrowRight size={15} className="rotate-180" />
-                    <span>{dualCards.retail.buttonText}</span>
+                    <RichText value={dualCards.retail.buttonTextRichText} fallback={dualCards.retail.buttonText} />
                   </Link>
                 </div>
               </div>
@@ -179,10 +186,10 @@ export default async function HomePage() {
               <div className="space-y-4 text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.65)]">
                 <div>
                   <h2 className="text-2xl font-black sm:text-3xl">
-                    {dualCards.wholesale.title}
+                    <RichText value={dualCards.wholesale.titleRichText} fallback={dualCards.wholesale.title} />
                   </h2>
                   <p className="mt-1 text-xs font-bold text-white/80">
-                    {dualCards.wholesale.subtitle}
+                    <RichText value={dualCards.wholesale.subtitleRichText} fallback={dualCards.wholesale.subtitle} />
                   </p>
                 </div>
 
@@ -192,7 +199,7 @@ export default async function HomePage() {
                       <span className="grid size-4 place-items-center rounded-full bg-white/15 text-white backdrop-blur-sm">
                         <CheckCircle2 size={13} strokeWidth={2.5} />
                       </span>
-                      <span>{item}</span>
+                      <RichText value={dualCards.wholesale.checklistRichTextList?.[idx]} fallback={item} />
                     </li>
                   ))}
                 </ul>
@@ -203,7 +210,7 @@ export default async function HomePage() {
                     className="inline-flex items-center gap-2.5 rounded-full bg-[#8E111E] hover:bg-[#720C17] text-white px-6 py-3 text-xs font-black shadow-md shadow-[#8E111E]/20 transition-transform active:scale-95"
                   >
                     <ArrowRight size={15} className="rotate-180" />
-                    <span>{dualCards.wholesale.buttonText}</span>
+                    <RichText value={dualCards.wholesale.buttonTextRichText} fallback={dualCards.wholesale.buttonText} />
                   </Link>
                 </div>
               </div>
@@ -214,49 +221,31 @@ export default async function HomePage() {
 
         {/* ================= 4. BENEFITS 4-GRID ================= */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          {[
-            {
-              icon: CreditCard,
-              title: "پرداخت امن",
-              desc: "درگاه معتبر بانکی و تسویه آنلاین",
-            },
-            {
-              icon: Headphones,
-              title: "پشتیبانی تخصصی",
-              desc: "قبل و بعد از خرید در تمام ساعات",
-            },
-            {
-              icon: ShieldCheck,
-              title: "ضمانت اصالت",
-              desc: "محصولات اصلی با فرمولاسیون آکما",
-            },
-            {
-              icon: Truck,
-              title: "ارسال سریع",
-              desc: "به سراسر کشور با تیپاکس و پست",
-            },
-          ].map((item, idx) => (
+          {features.slice(0, 4).map((item, idx) => {
+            const iconMap = { CreditCard, Headphones, ShieldCheck, Truck };
+            const FeatureIcon = iconMap[item.icon as keyof typeof iconMap] ?? ShieldCheck;
+            return (
             <div
               key={idx}
               className="flex flex-col items-center text-center p-6 rounded-2xl bg-white border border-[#E7E3DC] shadow-xs"
             >
               <span className="grid size-14 place-items-center rounded-2xl bg-[#8E111E]/10 text-[#8E111E] mb-3">
-                <item.icon size={26} strokeWidth={2.2} />
+                <FeatureIcon size={26} strokeWidth={2.2} />
               </span>
-              <h3 className="text-sm font-black text-[#1C1816]">{item.title}</h3>
-              <p className="text-[11px] font-medium text-[#8C827A] mt-1">{item.desc}</p>
+              <h3 className="text-sm font-black text-[#1C1816]"><RichText value={item.titleRichText} fallback={item.title} /></h3>
+              <RichText as="p" className="text-[11px] font-medium text-[#8C827A] mt-1" value={item.descRichText} fallback={item.desc} />
             </div>
-          ))}
+          )})}
         </section>
 
         {/* ================= 5. CATEGORIES SECTION (MATCHING REFERENCE) ================= */}
         <section className="space-y-6">
           <div className="text-center space-y-1">
             <h2 className="text-2xl sm:text-3xl font-black text-[#1C1816]">
-              دسته‌بندی محصولات
+              <RichText value={sectionTitles.categoriesTitleRichText} fallback={sectionTitles.categoriesTitle} />
             </h2>
             <p className="text-xs text-[#8C827A] font-bold">
-              همه آنچه برای مراقبت از کفش نیاز دارید
+              <RichText value={sectionTitles.categoriesSubtitleRichText} fallback={sectionTitles.categoriesSubtitle} />
             </p>
           </div>
 
@@ -270,7 +259,7 @@ export default async function HomePage() {
                 <ResponsiveBannerMedia settings={cat} fallback="/images/redesign/cat-packs.jpg" alt="" />
                 <ResponsiveTextRegionBackdrop settings={cat} desktopFallback="bottom" mobileFallback="bottom" />
                 <ResponsiveBannerContent settings={cat} desktopFallback="bottom" mobileFallback="bottom" className="min-h-full p-3">
-                  <span className="block w-full px-3 py-2 text-xs font-black text-white drop-shadow-md transition-colors group-hover:text-[#FFD6DA]">{cat.label}</span>
+                  <RichText as="span" className="block w-full px-3 py-2 text-xs font-black text-white drop-shadow-md transition-colors group-hover:text-[#FFD6DA]" value={cat.labelRichText} fallback={cat.label} />
                 </ResponsiveBannerContent>
               </Link>
             ))}
@@ -285,9 +274,9 @@ export default async function HomePage() {
                 <ResponsiveTextRegionBackdrop settings={banner} />
                 <ResponsiveBannerContent settings={banner} className="min-h-[340px] p-6 md:min-h-[300px]">
                 <span className="block text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.65)]">
-                  <strong className="block text-xl font-black">{banner.title}</strong>
-                  <span className="mt-2 block text-xs leading-6 text-white/85">{banner.subtitle}</span>
-                  <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-5 py-2 text-xs font-black text-[#8E111E]">{banner.cta}<ArrowLeft size={14} /></span>
+                  <RichText as="span" className="block text-xl font-black" value={banner.titleRichText} fallback={banner.title} />
+                  <RichText as="span" className="mt-2 block text-xs leading-6 text-white/85" value={banner.subtitleRichText} fallback={banner.subtitle} />
+                  <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-5 py-2 text-xs font-black text-[#8E111E]"><RichText value={banner.ctaRichText} fallback={banner.cta} /><ArrowLeft size={14} /></span>
                 </span>
                 </ResponsiveBannerContent>
               </Link>
@@ -299,7 +288,7 @@ export default async function HomePage() {
         <section className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl sm:text-3xl font-black text-[#1C1816]">
-              محصولات پرفروش آکما
+              <RichText value={sectionTitles.featuredTitleRichText} fallback={sectionTitles.featuredTitle} />
             </h2>
             <Link
               href="/products"
@@ -324,10 +313,10 @@ export default async function HomePage() {
           <ResponsiveBannerContent settings={wholesalePromo} className="min-h-[390px] p-7 sm:p-12 md:min-h-[360px]">
             <div className="space-y-4 drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)]">
               <h2 className="text-2xl sm:text-4xl font-black leading-tight">
-                {wholesalePromo.title}
+                <RichText value={wholesalePromo.titleRichText} fallback={wholesalePromo.title} />
               </h2>
               <p className="text-sm text-white/80 max-w-2xl font-medium">
-                {wholesalePromo.subtitle}
+                <RichText value={wholesalePromo.subtitleRichText} fallback={wholesalePromo.subtitle} />
               </p>
 
               {/* Tags */}
@@ -338,7 +327,7 @@ export default async function HomePage() {
                     className="flex items-center gap-1.5 text-xs font-bold text-white/90 bg-black/20 px-3.5 py-1.5 rounded-full border border-white/10"
                   >
                     <CheckCircle2 size={14} className="text-[#FF6B78]" />
-                    <span>{tag}</span>
+                    <RichText value={wholesalePromo.tagsRichTextList?.[idx]} fallback={tag} />
                   </span>
                 ))}
               </div>
@@ -349,7 +338,7 @@ export default async function HomePage() {
                   className="inline-flex items-center gap-2.5 rounded-full bg-white text-[#8E111E] hover:bg-[#FAF8F5] px-8 py-3.5 text-xs font-black shadow-lg transition-transform active:scale-95"
                 >
                   <ArrowRight size={15} className="rotate-180 text-[#8E111E]" />
-                  <span>{wholesalePromo.buttonText}</span>
+                  <RichText value={wholesalePromo.buttonTextRichText} fallback={wholesalePromo.buttonText} />
                 </Link>
               </div>
             </div>
@@ -363,7 +352,7 @@ export default async function HomePage() {
                 <ResponsiveBannerMedia settings={banner} fallback="/images/craft.png" alt="" />
                 <ResponsiveTextRegionBackdrop settings={banner} desktopFallback="bottom" mobileFallback="bottom" />
                 <ResponsiveBannerContent settings={banner} desktopFallback="bottom" mobileFallback="bottom" className="min-h-[280px] p-5 md:min-h-[220px]">
-                  <span className="px-4 py-3 text-sm font-black text-white drop-shadow-md">{banner.alt}</span>
+                  <RichText as="span" className="px-4 py-3 text-sm font-black text-white drop-shadow-md" value={banner.altRichText} fallback={banner.alt} />
                 </ResponsiveBannerContent>
               </Link>
             ))}

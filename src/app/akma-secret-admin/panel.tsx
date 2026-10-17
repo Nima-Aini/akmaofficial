@@ -16,6 +16,7 @@ import {
   Lightbulb,
   Newspaper,
   LayoutGrid,
+  Gem,
 } from "lucide-react";
 import {
   ContactSection,
@@ -30,6 +31,7 @@ import { ProductsSection, type AdminProduct } from "./products-section";
 import { OrdersSection } from "./orders-section";
 import { CartSuggestionsSection } from "./cart-suggestions-section";
 import { BlogSection } from "./blog-section";
+import { BrandingSection } from "./branding-section";
 
 const TABS = [
   { key: "dashboard", label: "داشبورد", icon: Gauge },
@@ -40,6 +42,7 @@ const TABS = [
   { key: "blog", label: "وبلاگ", icon: Newspaper },
   { key: "hero", label: "هیرو و بنرها", icon: ImageIcon },
   { key: "theme", label: "تم و ظاهر", icon: Paintbrush },
+  { key: "branding", label: "لوگو و هویت برند", icon: Gem },
   { key: "contact", label: "تماس با ما", icon: PhoneCall },
   { key: "content", label: "محتوای متنی", icon: MessageSquareText },
   { key: "security", label: "امنیت", icon: ShieldCheck },
@@ -173,6 +176,7 @@ export function AdminPanel() {
           {tab === "theme" && (
             <ThemeSection settings={settings} setKey={setKey} saveKey={saveKey} saving={saving} />
           )}
+          {tab === "branding" && <BrandingSection settings={settings} setKey={setKey} saveKey={saveKey} saving={saving} />}
           {tab === "contact" && (
             <ContactSection settings={settings} setKey={setKey} saveKey={saveKey} saving={saving} />
           )}

@@ -33,7 +33,8 @@ import {
   type WholesalePromoSettings,
 } from "@/lib/defaults";
 import { ICON_CHOICES, DynIcon } from "@/components/icon";
-import { SectionCard, Field, ImageUploader, Textarea, Toggle, Select, ColorField, ListEditor, ResponsiveBannerDesign } from "./fields";
+import { SectionCard, Field, ImageUploader, Textarea, Toggle, Select, ColorField, ListEditor, ResponsiveBannerDesign, RichTextEditor } from "./fields";
+import type { RichTextValue } from "@/lib/rich-text";
 
 type Settings = Record<string, unknown>;
 export type SetKey = (key: string, value: unknown) => void;
@@ -49,6 +50,12 @@ const PRESET_ACCENTS: [string, string, string][] = [
   ["#f97316", "#fdba74", "#2b1203"],
   ["#2dd4bf", "#99f6e4", "#04241f"],
 ];
+
+function CopyEditor<T extends object>({ label, object, field, set, rows = 1, hint }: { label: string; object: T; field: string; set: (patch: Partial<T>) => void; rows?: number; hint?: string }) {
+  const record = object as Record<string, unknown>;
+  const richKey = `${field}RichText`;
+  return <RichTextEditor label={label} value={typeof record[field] === "string" ? record[field] as string : ""} richValue={record[richKey] as RichTextValue | undefined} rows={rows} hint={hint} onChange={(plain, rich) => set({ [field]: plain, [richKey]: rich } as Partial<T>)} />;
+}
 
 /* ---------------- داشبورد ---------------- */
 export function DashboardSection({
@@ -217,6 +224,7 @@ export function HeroBannersSection({
 }) {
   const hero = { ...DEFAULT_HERO, ...(settings.hero as Partial<HeroSettings>) };
   const marquee = (settings.marquee as string[]) ?? DEFAULT_MARQUEE;
+  const marqueeFormatting = (settings.marqueeFormatting as RichTextValue[]) ?? marquee.map((text) => ({ segments: [{ text }] }));
   const banners = (settings.banners as Banner[]) ?? DEFAULT_BANNERS;
   const bottomBanners = (settings.bottomBanners as BottomBanner[]) ?? DEFAULT_BOTTOM_BANNERS;
   const setHero = (patch: Partial<HeroSettings>) => setKey("hero", { ...hero, ...patch });
@@ -233,38 +241,21 @@ export function HeroBannersSection({
         onSave={() => saveKey("hero")}
         saving={saving}
       >
-        <Field label="متن بج بالای تیتر" value={hero.badge} onChange={(v) => setHero({ badge: v })} />
+        <CopyEditor label="متن بج بالای تیتر" object={hero} field="badge" set={setHero} />
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="تیتر (بخش اول)" value={hero.title} onChange={(v) => setHero({ title: v })} />
-          <Field
-            label="تیتر (بخش رنگی)"
-            value={hero.highlight}
-            onChange={(v) => setHero({ highlight: v })}
-          />
+          <CopyEditor label="تیتر (بخش اول)" object={hero} field="title" set={setHero} />
+          <CopyEditor label="تیتر (بخش رنگی)" object={hero} field="highlight" set={setHero} />
         </div>
-        <Textarea
-          label="متن توضیح"
-          value={hero.subtitle}
-          onChange={(v) => setHero({ subtitle: v })}
-          rows={3}
-        />
+        <CopyEditor label="متن توضیح" object={hero} field="subtitle" set={setHero} rows={3} />
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field
-            label="متن دکمه اصلی"
-            value={hero.primaryCta.label}
-            onChange={(v) => setHero({ primaryCta: { ...hero.primaryCta, label: v } })}
-          />
+          <RichTextEditor label="متن دکمه اصلی" value={hero.primaryCta.label} richValue={hero.primaryCta.labelRichText} onChange={(label, labelRichText) => setHero({ primaryCta: { ...hero.primaryCta, label, labelRichText } })} />
           <Field
             label="لینک دکمه اصلی"
             value={hero.primaryCta.href}
             onChange={(v) => setHero({ primaryCta: { ...hero.primaryCta, href: v } })}
             dir="ltr"
           />
-          <Field
-            label="متن دکمه دوم"
-            value={hero.secondaryCta.label}
-            onChange={(v) => setHero({ secondaryCta: { ...hero.secondaryCta, label: v } })}
-          />
+          <RichTextEditor label="متن دکمه دوم" value={hero.secondaryCta.label} richValue={hero.secondaryCta.labelRichText} onChange={(label, labelRichText) => setHero({ secondaryCta: { ...hero.secondaryCta, label, labelRichText } })} />
           <Field
             label="لینک دکمه دوم"
             value={hero.secondaryCta.href}
@@ -281,6 +272,8 @@ export function HeroBannersSection({
           previewTitle={`${hero.title} ${hero.highlight}`}
           previewSubtitle={hero.subtitle}
           previewCta={hero.primaryCta.label}
+          previewSubtitleRichText={hero.subtitleRichText}
+          previewCtaRichText={hero.primaryCta.labelRichText}
           fallback="/images/redesign/hero.jpg"
         />
         <div>
@@ -334,7 +327,7 @@ export function HeroBannersSection({
       <SectionCard
         title="نوار متحرک (Marquee)"
         desc="جملاتی که به‌صورت متحرک زیر هیرو نمایش داده می‌شوند."
-        onSave={() => saveKey("marquee")}
+        onSave={async () => { await saveKey("marquee"); await saveKey("marqueeFormatting"); }}
         saving={saving}
       >
         <ListEditor
@@ -342,6 +335,8 @@ export function HeroBannersSection({
           items={marquee}
           onChange={(v) => setKey("marquee", v)}
           placeholder="مثلاً: ارسال به سراسر کشور"
+          richItems={marqueeFormatting}
+          onRichChange={(value) => setKey("marqueeFormatting", value)}
         />
       </SectionCard>
 
@@ -378,18 +373,13 @@ export function HeroBannersSection({
                 </div>
               </div>
               <div className="mt-4">
-                <Field label="عنوان" value={b.title} onChange={(v) => setBanner(i, { title: v })} />
+                <CopyEditor label="عنوان" object={b} field="title" set={(patch) => setBanner(i, patch)} />
               </div>
               <div className="mt-4">
-                <Textarea
-                  label="متن"
-                  value={b.subtitle}
-                  onChange={(v) => setBanner(i, { subtitle: v })}
-                  rows={2}
-                />
+                <CopyEditor label="متن" object={b} field="subtitle" set={(patch) => setBanner(i, patch)} rows={2} />
               </div>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <Field label="متن دکمه" value={b.cta} onChange={(v) => setBanner(i, { cta: v })} />
+                <CopyEditor label="متن دکمه" object={b} field="cta" set={(patch) => setBanner(i, patch)} />
                 <Field
                   label="لینک دکمه"
                   value={b.href}
@@ -398,7 +388,7 @@ export function HeroBannersSection({
                 />
               </div>
               <div className="mt-5">
-                <ResponsiveBannerDesign value={b} onChange={(patch) => setBanner(i, patch)} desktopGuideline="banner" mobileGuideline="bannerMobile" previewTitle={b.title} previewSubtitle={b.subtitle} previewCta={b.cta} fallback="/images/hero.png" />
+                <ResponsiveBannerDesign value={b} onChange={(patch) => setBanner(i, patch)} desktopGuideline="banner" mobileGuideline="bannerMobile" previewTitle={b.title} previewSubtitle={b.subtitle} previewCta={b.cta} previewTitleRichText={b.titleRichText} previewSubtitleRichText={b.subtitleRichText} previewCtaRichText={b.ctaRichText} fallback="/images/hero.png" />
               </div>
             </div>
           ))}
@@ -480,16 +470,7 @@ export function HeroBannersSection({
                     dir="ltr"
                     hint="مثلاً /products یا لینک مستقیم"
                   />
-                  <Field
-                    label="توضیح تصویر (Alt)"
-                    value={bb.alt || ""}
-                    onChange={(v) =>
-                      setKey(
-                        "bottomBanners",
-                        bottomBanners.map((x, j) => (j === i ? { ...x, alt: v } : x)),
-                      )
-                    }
-                  />
+                  <CopyEditor label="توضیح تصویر / متن بنر" object={bb} field="alt" set={(patch) => setKey("bottomBanners", bottomBanners.map((x, j) => (j === i ? { ...x, ...patch } : x)))} />
                 </div>
               </div>
               <div className="mt-4">
@@ -621,23 +602,11 @@ export function HomePageCardsSection({
               </span>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field
-                label="عنوان کارت"
-                value={dualCards.retail.title}
-                onChange={(v) => setDualRetail({ title: v })}
-              />
-              <Field
-                label="زیرعنوان کارت"
-                value={dualCards.retail.subtitle}
-                onChange={(v) => setDualRetail({ subtitle: v })}
-              />
+              <CopyEditor label="عنوان کارت" object={dualCards.retail} field="title" set={setDualRetail} />
+              <CopyEditor label="زیرعنوان کارت" object={dualCards.retail} field="subtitle" set={setDualRetail} />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field
-                label="متن دکمه"
-                value={dualCards.retail.buttonText}
-                onChange={(v) => setDualRetail({ buttonText: v })}
-              />
+              <CopyEditor label="متن دکمه" object={dualCards.retail} field="buttonText" set={setDualRetail} />
               <Field
                 label="لینک دکمه"
                 value={dualCards.retail.buttonHref}
@@ -650,8 +619,10 @@ export function HomePageCardsSection({
               items={dualCards.retail.checklist}
               onChange={(items) => setDualRetail({ checklist: items })}
               placeholder="مثلاً: سفارش از ۱ عدد"
+              richItems={dualCards.retail.checklistRichTextList ?? dualCards.retail.checklist.map((text) => ({ segments: [{ text }] }))}
+              onRichChange={(checklistRichTextList) => setDualRetail({ checklistRichTextList })}
             />
-            <ResponsiveBannerDesign value={dualCards.retail} onChange={setDualRetail} desktopGuideline="mediumBanner" mobileGuideline="mediumBannerMobile" previewTitle={dualCards.retail.title} previewSubtitle={dualCards.retail.subtitle} previewCta={dualCards.retail.buttonText} fallback="/images/redesign/retail-card.jpg" />
+            <ResponsiveBannerDesign value={dualCards.retail} onChange={setDualRetail} desktopGuideline="mediumBanner" mobileGuideline="mediumBannerMobile" previewTitle={dualCards.retail.title} previewSubtitle={dualCards.retail.subtitle} previewCta={dualCards.retail.buttonText} previewTitleRichText={dualCards.retail.titleRichText} previewSubtitleRichText={dualCards.retail.subtitleRichText} previewCtaRichText={dualCards.retail.buttonTextRichText} fallback="/images/redesign/retail-card.jpg" />
           </div>
 
           {/* Wholesale Card */}
@@ -663,23 +634,11 @@ export function HomePageCardsSection({
               </span>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field
-                label="عنوان کارت"
-                value={dualCards.wholesale.title}
-                onChange={(v) => setDualWholesale({ title: v })}
-              />
-              <Field
-                label="زیرعنوان کارت"
-                value={dualCards.wholesale.subtitle}
-                onChange={(v) => setDualWholesale({ subtitle: v })}
-              />
+              <CopyEditor label="عنوان کارت" object={dualCards.wholesale} field="title" set={setDualWholesale} />
+              <CopyEditor label="زیرعنوان کارت" object={dualCards.wholesale} field="subtitle" set={setDualWholesale} />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field
-                label="متن دکمه"
-                value={dualCards.wholesale.buttonText}
-                onChange={(v) => setDualWholesale({ buttonText: v })}
-              />
+              <CopyEditor label="متن دکمه" object={dualCards.wholesale} field="buttonText" set={setDualWholesale} />
               <Field
                 label="لینک دکمه"
                 value={dualCards.wholesale.buttonHref}
@@ -692,8 +651,10 @@ export function HomePageCardsSection({
               items={dualCards.wholesale.checklist}
               onChange={(items) => setDualWholesale({ checklist: items })}
               placeholder="مثلاً: قیمت همکاری و تخفیف عمده"
+              richItems={dualCards.wholesale.checklistRichTextList ?? dualCards.wholesale.checklist.map((text) => ({ segments: [{ text }] }))}
+              onRichChange={(checklistRichTextList) => setDualWholesale({ checklistRichTextList })}
             />
-            <ResponsiveBannerDesign value={dualCards.wholesale} onChange={setDualWholesale} desktopGuideline="mediumBanner" mobileGuideline="mediumBannerMobile" previewTitle={dualCards.wholesale.title} previewSubtitle={dualCards.wholesale.subtitle} previewCta={dualCards.wholesale.buttonText} fallback="/images/redesign/wholesale-boxes.jpg" />
+            <ResponsiveBannerDesign value={dualCards.wholesale} onChange={setDualWholesale} desktopGuideline="mediumBanner" mobileGuideline="mediumBannerMobile" previewTitle={dualCards.wholesale.title} previewSubtitle={dualCards.wholesale.subtitle} previewCta={dualCards.wholesale.buttonText} previewTitleRichText={dualCards.wholesale.titleRichText} previewSubtitleRichText={dualCards.wholesale.subtitleRichText} previewCtaRichText={dualCards.wholesale.buttonTextRichText} fallback="/images/redesign/wholesale-boxes.jpg" />
           </div>
         </div>
       </SectionCard>
@@ -738,11 +699,7 @@ export function HomePageCardsSection({
               </div>
 
               <div className="grid flex-1 gap-3 sm:grid-cols-3">
-                <Field
-                  label="عنوان دسته"
-                  value={cat.label}
-                  onChange={(v) => setCategoryItem(idx, { label: v })}
-                />
+                <CopyEditor label="عنوان دسته" object={cat} field="label" set={(patch) => setCategoryItem(idx, patch)} />
                 <Field
                   label="شناسه (Slug / Key)"
                   value={cat.key}
@@ -789,24 +746,11 @@ export function HomePageCardsSection({
         saving={saving}
       >
         <div>
-          <Field
-            label="عنوان بنر همکاری"
-            value={wholesalePromo.title}
-            onChange={(v) => setPromo({ title: v })}
-          />
+          <CopyEditor label="عنوان بنر همکاری" object={wholesalePromo} field="title" set={setPromo} />
         </div>
-        <Textarea
-          label="توضیحات بنر همکاری"
-          value={wholesalePromo.subtitle}
-          onChange={(v) => setPromo({ subtitle: v })}
-          rows={3}
-        />
+        <CopyEditor label="توضیحات بنر همکاری" object={wholesalePromo} field="subtitle" set={setPromo} rows={3} />
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field
-            label="متن دکمه"
-            value={wholesalePromo.buttonText}
-            onChange={(v) => setPromo({ buttonText: v })}
-          />
+          <CopyEditor label="متن دکمه" object={wholesalePromo} field="buttonText" set={setPromo} />
           <Field
             label="لینک دکمه"
             value={wholesalePromo.buttonHref}
@@ -819,8 +763,10 @@ export function HomePageCardsSection({
           items={wholesalePromo.tags}
           onChange={(tags) => setPromo({ tags })}
           placeholder="مثلاً: قیمت ویژه همکاری"
+          richItems={wholesalePromo.tagsRichTextList ?? wholesalePromo.tags.map((text) => ({ segments: [{ text }] }))}
+          onRichChange={(tagsRichTextList) => setPromo({ tagsRichTextList })}
         />
-        <ResponsiveBannerDesign value={wholesalePromo} onChange={setPromo} desktopGuideline="banner" mobileGuideline="bannerMobile" previewTitle={wholesalePromo.title} previewSubtitle={wholesalePromo.subtitle} previewCta={wholesalePromo.buttonText} fallback="/images/redesign/wholesale-banner.jpg" />
+        <ResponsiveBannerDesign value={wholesalePromo} onChange={setPromo} desktopGuideline="banner" mobileGuideline="bannerMobile" previewTitle={wholesalePromo.title} previewSubtitle={wholesalePromo.subtitle} previewCta={wholesalePromo.buttonText} previewTitleRichText={wholesalePromo.titleRichText} previewSubtitleRichText={wholesalePromo.subtitleRichText} previewCtaRichText={wholesalePromo.buttonTextRichText} fallback="/images/redesign/wholesale-banner.jpg" />
       </SectionCard>
     </div>
   );
@@ -855,9 +801,9 @@ export function ContactSection({
       />
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label="ایمیل" value={contact.email} onChange={(v) => set({ email: v })} dir="ltr" />
-        <Field label="ساعات پاسخگویی" value={contact.hours} onChange={(v) => set({ hours: v })} />
+        <CopyEditor label="ساعات پاسخگویی" object={contact} field="hours" set={set} />
       </div>
-      <Field label="آدرس / توضیح ارسال" value={contact.address} onChange={(v) => set({ address: v })} />
+      <CopyEditor label="آدرس / توضیح ارسال" object={contact} field="address" set={set} />
       <div className="grid gap-5 sm:grid-cols-3">
         <Field
           label="اینستاگرام (آیدی)"
@@ -878,12 +824,7 @@ export function ContactSection({
           dir="ltr"
         />
       </div>
-      <Textarea
-        label="پیام راهنمای سفارش"
-        value={contact.note}
-        onChange={(v) => set({ note: v })}
-        rows={2}
-      />
+      <CopyEditor label="پیام راهنمای سفارش" object={contact} field="note" set={set} rows={2} />
     </SectionCard>
   );
 }
@@ -925,75 +866,42 @@ export function ContentSection({
           <div className="rounded-2xl border border-line p-4 space-y-4">
             <h4 className="text-xs font-black text-accent">بخش چرا آکما؟ (معرفی و مزایای برند)</h4>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field
-                label="متن بج بالای بخش"
-                value={sectionTitles.whyAkmaBadge}
-                onChange={(v) => setTitles({ whyAkmaBadge: v })}
-                hint="مثلاً: چرا آکما؟"
-              />
-              <Field
-                label="عنوان اصلی بخش"
-                value={sectionTitles.whyAkmaTitle}
-                onChange={(v) => setTitles({ whyAkmaTitle: v })}
-                hint="مثلاً: آکما؛ انتخاب فروشگاه‌های حرفه‌ای"
-              />
+              <CopyEditor label="متن بج بالای بخش" object={sectionTitles} field="whyAkmaBadge" set={setTitles} hint="مثلاً: چرا آکما؟" />
+              <CopyEditor label="عنوان اصلی بخش" object={sectionTitles} field="whyAkmaTitle" set={setTitles} hint="مثلاً: آکما؛ انتخاب فروشگاه‌های حرفه‌ای" />
             </div>
-            <Textarea
-              label="متن معرفی و توضیحات بخش چرا آکما"
-              value={sectionTitles.whyAkmaSubtitle}
-              onChange={(v) => setTitles({ whyAkmaSubtitle: v })}
-              rows={3}
-            />
+            <CopyEditor label="متن معرفی و توضیحات بخش چرا آکما" object={sectionTitles} field="whyAkmaSubtitle" set={setTitles} rows={3} />
+          </div>
+
+          {/* Featured Products */}
+          <div className="rounded-2xl border border-line p-4 space-y-4">
+            <h4 className="text-xs font-black text-accent">بخش دسته‌بندی محصولات</h4>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <CopyEditor label="متن بج بالای بخش" object={sectionTitles} field="categoriesBadge" set={setTitles} />
+              <CopyEditor label="عنوان دسته‌بندی‌ها" object={sectionTitles} field="categoriesTitle" set={setTitles} />
+            </div>
+            <CopyEditor label="توضیح زیر عنوان" object={sectionTitles} field="categoriesSubtitle" set={setTitles} />
           </div>
 
           {/* Featured Products */}
           <div className="rounded-2xl border border-line p-4 space-y-4">
             <h4 className="text-xs font-black text-accent">بخش محصولات ویژه (اسلایدر صفحه اصلی)</h4>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field
-                label="متن بج بالای بخش"
-                value={sectionTitles.featuredBadge}
-                onChange={(v) => setTitles({ featuredBadge: v })}
-              />
-              <Field
-                label="عنوان اصلی بخش"
-                value={sectionTitles.featuredTitle}
-                onChange={(v) => setTitles({ featuredTitle: v })}
-              />
+              <CopyEditor label="متن بج بالای بخش" object={sectionTitles} field="featuredBadge" set={setTitles} />
+              <CopyEditor label="عنوان اصلی بخش" object={sectionTitles} field="featuredTitle" set={setTitles} />
             </div>
-            <Field
-              label="توضیح زیر عنوان"
-              value={sectionTitles.featuredSubtitle}
-              onChange={(v) => setTitles({ featuredSubtitle: v })}
-            />
+            <CopyEditor label="توضیح زیر عنوان" object={sectionTitles} field="featuredSubtitle" set={setTitles} />
           </div>
 
           {/* Promo / Akma offers */}
           <div className="rounded-2xl border border-line p-4 space-y-4">
             <h4 className="text-xs font-black text-accent">بخش پیشنهاد و استندهای ویژه</h4>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field
-                label="متن بج بالای بخش"
-                value={sectionTitles.promoBadge}
-                onChange={(v) => setTitles({ promoBadge: v })}
-              />
-              <Field
-                label="عنوان بخش"
-                value={sectionTitles.promoTitle}
-                onChange={(v) => setTitles({ promoTitle: v })}
-              />
+              <CopyEditor label="متن بج بالای بخش" object={sectionTitles} field="promoBadge" set={setTitles} />
+              <CopyEditor label="عنوان بخش" object={sectionTitles} field="promoTitle" set={setTitles} />
             </div>
-            <Field
-              label="توضیح زیر عنوان"
-              value={sectionTitles.promoSubtitle}
-              onChange={(v) => setTitles({ promoSubtitle: v })}
-            />
+            <CopyEditor label="توضیح زیر عنوان" object={sectionTitles} field="promoSubtitle" set={setTitles} />
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field
-                label="متن دکمه زیر بنرها"
-                value={sectionTitles.promoCtaLabel}
-                onChange={(v) => setTitles({ promoCtaLabel: v })}
-              />
+              <CopyEditor label="متن دکمه زیر بنرها" object={sectionTitles} field="promoCtaLabel" set={setTitles} />
               <Field
                 label="لینک دکمه زیر بنرها"
                 value={sectionTitles.promoCtaHref}
@@ -1007,76 +915,33 @@ export function ContentSection({
           <div className="rounded-2xl border border-line p-4 space-y-4">
             <h4 className="text-xs font-black text-accent">بخش جدول قیمت واحد محصولات</h4>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field
-                label="متن بج بالای جدول"
-                value={sectionTitles.priceTableBadge}
-                onChange={(v) => setTitles({ priceTableBadge: v })}
-              />
-              <Field
-                label="عنوان بخش قیمت واحد"
-                value={sectionTitles.priceTableTitle}
-                onChange={(v) => setTitles({ priceTableTitle: v })}
-              />
+              <CopyEditor label="متن بج بالای جدول" object={sectionTitles} field="priceTableBadge" set={setTitles} />
+              <CopyEditor label="عنوان بخش قیمت واحد" object={sectionTitles} field="priceTableTitle" set={setTitles} />
             </div>
-            <Field
-              label="توضیح زیر عنوان قیمت واحد"
-              value={sectionTitles.priceTableSubtitle}
-              onChange={(v) => setTitles({ priceTableSubtitle: v })}
-            />
+            <CopyEditor label="توضیح زیر عنوان قیمت واحد" object={sectionTitles} field="priceTableSubtitle" set={setTitles} />
           </div>
 
           {/* Steps */}
           <div className="rounded-2xl border border-line p-4 space-y-4">
             <h4 className="text-xs font-black text-accent">بخش مراحل ثبت سفارش</h4>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field
-                label="متن بج بالای بخش"
-                value={sectionTitles.stepsBadge}
-                onChange={(v) => setTitles({ stepsBadge: v })}
-              />
-              <Field
-                label="عنوان بخش مراحل سفارش"
-                value={sectionTitles.stepsTitle}
-                onChange={(v) => setTitles({ stepsTitle: v })}
-              />
+              <CopyEditor label="متن بج بالای بخش" object={sectionTitles} field="stepsBadge" set={setTitles} />
+              <CopyEditor label="عنوان بخش مراحل سفارش" object={sectionTitles} field="stepsTitle" set={setTitles} />
             </div>
-            <Field
-              label="توضیح زیر عنوان مراحل"
-              value={sectionTitles.stepsSubtitle}
-              onChange={(v) => setTitles({ stepsSubtitle: v })}
-            />
+            <CopyEditor label="توضیح زیر عنوان مراحل" object={sectionTitles} field="stepsSubtitle" set={setTitles} />
           </div>
         </div>
       </SectionCard>
       <SectionCard title="هویت و محتوای سایت" onSave={() => saveKey("site")} saving={saving}>
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="نام فروشگاه" value={site.name} onChange={(v) => setSite({ name: v })} />
-          <Field
-            label="نام لاتین"
-            value={site.latinName}
-            onChange={(v) => setSite({ latinName: v })}
-            dir="ltr"
-          />
+          <CopyEditor label="نام فروشگاه" object={site} field="name" set={setSite} />
+          <CopyEditor label="نام لاتین" object={site} field="latinName" set={setSite} />
         </div>
-        <Field label="شعار" value={site.tagline} onChange={(v) => setSite({ tagline: v })} />
-        <Textarea
-          label="متن فوتر"
-          value={site.footerText}
-          onChange={(v) => setSite({ footerText: v })}
-          rows={2}
-        />
+        <CopyEditor label="شعار" object={site} field="tagline" set={setSite} />
+        <CopyEditor label="متن فوتر" object={site} field="footerText" set={setSite} rows={2} />
         <div className="grid gap-5">
-          <Field
-            label="تیتر بخش «چرا ما»"
-            value={site.aboutTitle}
-            onChange={(v) => setSite({ aboutTitle: v })}
-          />
-          <Textarea
-            label="متن بخش «چرا ما»"
-            value={site.aboutText}
-            onChange={(v) => setSite({ aboutText: v })}
-            rows={4}
-          />
+          <CopyEditor label="تیتر بخش «چرا ما»" object={site} field="aboutTitle" set={setSite} />
+          <CopyEditor label="متن بخش «چرا ما»" object={site} field="aboutText" set={setSite} rows={4} />
         </div>
         <div className="grid gap-5 border-t border-line pt-5 sm:grid-cols-2">
           <Field
@@ -1100,20 +965,8 @@ export function ContentSection({
         <div className="space-y-4">
           {features.map((f, i) => (
             <div key={i} className="grid items-end gap-3 rounded-2xl border border-line p-4 sm:grid-cols-[1fr_1fr_150px_44px]">
-              <Field
-                label="عنوان"
-                value={f.title}
-                onChange={(v) =>
-                  setKey("features", features.map((x, j) => (j === i ? { ...x, title: v } : x)))
-                }
-              />
-              <Field
-                label="توضیح"
-                value={f.desc}
-                onChange={(v) =>
-                  setKey("features", features.map((x, j) => (j === i ? { ...x, desc: v } : x)))
-                }
-              />
+              <CopyEditor label="عنوان" object={f} field="title" set={(patch) => setKey("features", features.map((x, j) => (j === i ? { ...x, ...patch } : x)))} />
+              <CopyEditor label="توضیح" object={f} field="desc" set={(patch) => setKey("features", features.map((x, j) => (j === i ? { ...x, ...patch } : x)))} />
               <div>
                 <span className="mb-1.5 flex items-center gap-2 text-xs font-bold text-muted">
                   <DynIcon name={f.icon} size={15} /> آیکون
@@ -1160,20 +1013,8 @@ export function ContentSection({
         <div className="space-y-4">
           {priceTable.map((r, i) => (
             <div key={i} className="grid items-end gap-3 rounded-2xl border border-line p-4 sm:grid-cols-[1.4fr_1fr_1fr_44px]">
-              <Field
-                label="نام محصول"
-                value={r.name}
-                onChange={(v) =>
-                  setKey("priceTable", priceTable.map((x, j) => (j === i ? { ...x, name: v } : x)))
-                }
-              />
-              <Field
-                label="توضیح کوتاه"
-                value={r.note}
-                onChange={(v) =>
-                  setKey("priceTable", priceTable.map((x, j) => (j === i ? { ...x, note: v } : x)))
-                }
-              />
+              <CopyEditor label="نام محصول" object={r} field="name" set={(patch) => setKey("priceTable", priceTable.map((x, j) => (j === i ? { ...x, ...patch } : x)))} />
+              <CopyEditor label="توضیح کوتاه" object={r} field="note" set={(patch) => setKey("priceTable", priceTable.map((x, j) => (j === i ? { ...x, ...patch } : x)))} />
               <Field
                 label="قیمت (تومان)"
                 type="number"
@@ -1210,21 +1051,8 @@ export function ContentSection({
         <div className="space-y-4">
           {steps.map((st, i) => (
             <div key={i} className="grid items-start gap-3 rounded-2xl border border-line p-4 sm:grid-cols-[200px_1fr_44px]">
-              <Field
-                label={`مرحله ${i + 1} — عنوان`}
-                value={st.title}
-                onChange={(v) =>
-                  setKey("steps", steps.map((x, j) => (j === i ? { ...x, title: v } : x)))
-                }
-              />
-              <Textarea
-                label="توضیح"
-                rows={2}
-                value={st.desc}
-                onChange={(v) =>
-                  setKey("steps", steps.map((x, j) => (j === i ? { ...x, desc: v } : x)))
-                }
-              />
+              <CopyEditor label={`مرحله ${i + 1} — عنوان`} object={st} field="title" set={(patch) => setKey("steps", steps.map((x, j) => (j === i ? { ...x, ...patch } : x)))} />
+              <CopyEditor label="توضیح" object={st} field="desc" set={(patch) => setKey("steps", steps.map((x, j) => (j === i ? { ...x, ...patch } : x)))} rows={2} />
               <button
                 type="button"
                 onClick={() => setKey("steps", steps.filter((_, j) => j !== i))}

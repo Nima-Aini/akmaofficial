@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { getProductPricePresentation, getWholesalePackConfig, type WholesaleTierItem } from "@/lib/pricing";
-import { getProductImages } from "@/lib/product-media";
+import { getResponsiveProductImages } from "@/lib/product-media";
 
 export type CartItem = {
   productId: number;
@@ -44,6 +44,8 @@ type CartContextType = {
       wholesaleMinQty?: number;
       retailImages?: string[];
       wholesaleImages?: string[];
+      retailMobileImages?: string[];
+      wholesaleMobileImages?: string[];
       /** @deprecated Accepted only for compatibility with older callers; ignored for pricing. */
       unitPrice?: string;
     },
@@ -148,6 +150,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       wholesaleMinQty?: number;
       retailImages?: string[];
       wholesaleImages?: string[];
+      retailMobileImages?: string[];
+      wholesaleMobileImages?: string[];
       /** @deprecated Accepted only for compatibility with older callers; ignored for pricing. */
       unitPrice?: string;
     },
@@ -175,7 +179,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const newItem: CartItem = {
         productId: product.id,
         productName: product.name,
-        productImage: getProductImages(product, targetMode)[0],
+        productImage: getResponsiveProductImages(product, targetMode, window.matchMedia("(max-width: 767px)").matches ? "mobile" : "desktop")[0],
         price: pricing.unitPrice,
         retailPrice: product.retailPrice,
         wholesalePrice: product.wholesalePrice,

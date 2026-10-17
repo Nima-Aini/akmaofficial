@@ -10,6 +10,7 @@ import {
   Send,
 } from "lucide-react";
 import { getSettings } from "@/lib/store";
+import { RichText } from "@/components/rich-text";
 import { DEFAULT_CONTACT, type ContactSettings } from "@/lib/defaults";
 import { Reveal } from "@/components/effects";
 import { telHref, toFa } from "@/lib/format";
@@ -27,7 +28,7 @@ export default async function ContactPage() {
           <p className="text-xs font-bold text-accent">همیشه پاسخگو هستیم</p>
           <h1 className="mt-3 text-3xl font-black leading-snug sm:text-5xl">تماس با آکما</h1>
           <p className="mx-auto mt-5 max-w-2xl text-sm leading-8 text-muted">
-            {contact.note}
+            <RichText value={contact.noteRichText} fallback={contact.note} />
           </p>
         </header>
       </Reveal>
@@ -61,7 +62,7 @@ export default async function ContactPage() {
             </span>
             <span>
               <span className="block text-xs text-muted">ساعات پاسخگویی</span>
-              <span className="mt-2 block text-base font-extrabold leading-8">{contact.hours}</span>
+              <RichText as="span" className="mt-2 block text-base font-extrabold leading-8" value={contact.hoursRichText} fallback={contact.hours} />
             </span>
           </div>
         </Reveal>
@@ -95,7 +96,7 @@ export default async function ContactPage() {
             </span>
             <span>
               <span className="block font-extrabold">آدرس و نحوه ارسال</span>
-              <span className="mt-2.5 block text-sm leading-8 text-muted">{contact.address}</span>
+              <RichText as="span" className="mt-2.5 block text-sm leading-8 text-muted" value={contact.addressRichText} fallback={contact.address} />
             </span>
           </div>
         </Reveal>

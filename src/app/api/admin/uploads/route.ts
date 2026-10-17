@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     }
 
     const kind =
-      rawKind === "banners" || rawKind === "hero" || rawKind === "products" || rawKind === "blog"
+      rawKind === "banners" || rawKind === "hero" || rawKind === "products" || rawKind === "blog" || rawKind === "branding"
         ? rawKind
         : "products";
 

@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Bold, ImageIcon, Italic, Link2, List, ListOrdered, Minus, Pilcrow, Plus, Quote, Trash2, Type } from "lucide-react";
+import { ArrowDown, ArrowUp, ImageIcon, List, ListOrdered, Minus, Pilcrow, Plus, Quote, Trash2, Type } from "lucide-react";
 import type { BlogContentBlock } from "@/db/schema";
-import { ImageUploader } from "./fields";
+import { ImageUploader, ListEditor, RichTextEditor } from "./fields";
 
 const blockOptions: { type: BlogContentBlock["type"]; label: string; icon: typeof Pilcrow }[] = [
   { type: "paragraph", label: "پاراگراف", icon: Pilcrow },
@@ -28,7 +28,6 @@ export function BlogEditor({ value, onChange }: { value: BlogContentBlock[]; onC
     [next[index], next[target]] = [next[target], next[index]];
     onChange(next);
   };
-  const appendMarkup = (index: number, markup: string) => update(index, { text: `${value[index].text ?? ""}${value[index].text ? " " : ""}${markup}` });
 
   return (
     <div>
@@ -39,10 +38,9 @@ export function BlogEditor({ value, onChange }: { value: BlogContentBlock[]; onC
           return (
             <div key={block.id} className="rounded-2xl border border-line bg-surface/40 p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><span className="flex items-center gap-2 text-xs font-black text-accent"><info.icon size={14} />{info.label}</span><div className="flex gap-1"><button type="button" onClick={() => move(index, -1)} className="grid size-8 place-items-center rounded-lg border border-line" aria-label="انتقال به بالا"><ArrowUp size={13} /></button><button type="button" onClick={() => move(index, 1)} className="grid size-8 place-items-center rounded-lg border border-line" aria-label="انتقال به پایین"><ArrowDown size={13} /></button><button type="button" onClick={() => onChange(value.filter((_, i) => i !== index))} className="grid size-8 place-items-center rounded-lg border border-line text-rose-400" aria-label="حذف بلوک"><Trash2 size={13} /></button></div></div>
-              {(block.type === "paragraph" || block.type === "quote") && <div className="mb-2 flex flex-wrap gap-1"><button type="button" onClick={() => appendMarkup(index, "**متن پررنگ**")} className="grid size-8 place-items-center rounded-lg border border-line" aria-label="افزودن متن پررنگ"><Bold size={13} /></button><button type="button" onClick={() => appendMarkup(index, "*متن ایتالیک*")} className="grid size-8 place-items-center rounded-lg border border-line" aria-label="افزودن متن ایتالیک"><Italic size={13} /></button><button type="button" onClick={() => appendMarkup(index, "[عنوان لینک](/products)")} className="grid size-8 place-items-center rounded-lg border border-line" aria-label="افزودن لینک"><Link2 size={13} /></button></div>}
-              {(block.type === "paragraph" || block.type === "h2" || block.type === "h3" || block.type === "quote") && <textarea className="field min-h-24 resize-y leading-7" value={block.text ?? ""} onChange={(event) => update(index, { text: event.target.value })} aria-label={info.label} placeholder={block.type === "paragraph" ? "متن مقاله؛ برای Bold و Italic از دکمه‌های بالا استفاده کنید." : info.label} />}
-              {(block.type === "bulletList" || block.type === "numberedList") && <textarea className="field min-h-28 resize-y leading-7" value={(block.items ?? []).join("\n")} onChange={(event) => update(index, { items: event.target.value.split("\n") })} aria-label={info.label} placeholder="هر مورد را در یک خط بنویسید" />}
-              {block.type === "image" && <div className="space-y-4"><ImageUploader label="تصویر داخل مقاله" value={block.url ?? ""} onChange={(url) => update(index, { url: typeof url === "string" ? url : url[0] ?? "" })} kind="blog" guideline="blogInline" /><label><span className="mb-1.5 block text-xs font-bold text-muted">متن جایگزین تصویر (Alt)</span><input className="field" value={block.alt ?? ""} onChange={(event) => update(index, { alt: event.target.value })} /></label><label><span className="mb-1.5 block text-xs font-bold text-muted">زیرنویس اختیاری</span><input className="field" value={block.caption ?? ""} onChange={(event) => update(index, { caption: event.target.value })} /></label></div>}
+              {(block.type === "paragraph" || block.type === "h2" || block.type === "h3" || block.type === "quote") && <RichTextEditor label={info.label} value={block.text ?? ""} richValue={block.richText} onChange={(text, richText) => update(index, { text, richText })} rows={block.type === "paragraph" || block.type === "quote" ? 5 : 2} />}
+              {(block.type === "bulletList" || block.type === "numberedList") && <ListEditor label={info.label} items={block.items ?? []} richItems={block.itemsRichText ?? []} onChange={(items) => update(index, { items })} onRichChange={(itemsRichText) => update(index, { itemsRichText })} placeholder="متن مورد" />}
+              {block.type === "image" && <div className="space-y-4"><ImageUploader label="تصویر داخل مقاله" value={block.url ?? ""} onChange={(url) => update(index, { url: typeof url === "string" ? url : url[0] ?? "" })} kind="blog" guideline="blogInline" /><label><span className="mb-1.5 block text-xs font-bold text-muted">متن جایگزین تصویر (Alt)</span><input className="field" value={block.alt ?? ""} onChange={(event) => update(index, { alt: event.target.value })} /></label><RichTextEditor label="زیرنویس اختیاری" value={block.caption ?? ""} richValue={block.captionRichText} onChange={(caption, captionRichText) => update(index, { caption, captionRichText })} /></div>}
               {block.type === "divider" && <hr className="my-5 border-line" />}
             </div>
           );

@@ -17,6 +17,8 @@ import {
 import { asc, desc, eq, or } from "drizzle-orm";
 import { DEFAULT_SETTINGS, PRODUCT_SEEDS } from "./defaults";
 import { toEnDigits } from "./format";
+import { normalizeFocalPoint, sanitizeImageUrl, type ImageFocalPoint } from "./responsive-image";
+import { sanitizeRichTextMap, type RichTextMap } from "./rich-text";
 
 const globalForStore = globalThis as typeof globalThis & {
   __memorySettings?: Map<string, unknown>;
@@ -83,6 +85,11 @@ export function getMemoryStore() {
       images: p.images,
       retailImages: p.retailImages ?? [],
       wholesaleImages: p.wholesaleImages ?? [],
+      retailMobileImages: p.retailMobileImages ?? [],
+      wholesaleMobileImages: p.wholesaleMobileImages ?? [],
+      desktopObjectPosition: p.desktopObjectPosition ?? { x: 50, y: 50 },
+      mobileObjectPosition: p.mobileObjectPosition ?? { x: 50, y: 50 },
+      textFormatting: p.textFormatting ?? {},
       cardTextRegionPosition: p.cardTextRegionPosition ?? "bottom",
       badge: p.badge,
       inStock: true,
@@ -213,6 +220,11 @@ export async function ensureSeeded() {
         images: p.images,
         retailImages: p.retailImages ?? [],
         wholesaleImages: p.wholesaleImages ?? [],
+        retailMobileImages: p.retailMobileImages ?? [],
+        wholesaleMobileImages: p.wholesaleMobileImages ?? [],
+        desktopObjectPosition: p.desktopObjectPosition ?? { x: 50, y: 50 },
+        mobileObjectPosition: p.mobileObjectPosition ?? { x: 50, y: 50 },
+        textFormatting: p.textFormatting ?? {},
         cardTextRegionPosition: p.cardTextRegionPosition ?? "bottom",
         badge: p.badge,
         inStock: true,
@@ -395,6 +407,11 @@ export type ProductInput = {
   images: string[];
   retailImages: string[];
   wholesaleImages: string[];
+  retailMobileImages: string[];
+  wholesaleMobileImages: string[];
+  desktopObjectPosition: ImageFocalPoint;
+  mobileObjectPosition: ImageFocalPoint;
+  textFormatting: RichTextMap;
   cardTextRegionPosition: "right" | "left" | "bottom" | "center";
   badge: string;
   inStock: boolean;
@@ -497,7 +514,9 @@ export async function deleteProduct(id: number) {
 export function sanitizeProduct(body: Record<string, unknown>): ProductInput {
   const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
   const arr = (v: unknown) =>
-    Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").map(sanitizeImageUrl).filter(Boolean).slice(0, 12) : [];
+  const textArr = (v: unknown) =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").map((x) => x.trim().slice(0, 2_000)).slice(0, 100) : [];
   const name = str(body.name) || "محصول بدون نام";
   const positiveIntOrNull = (value: unknown) => {
     if (value === null || value === undefined || value === "") return null;
@@ -522,8 +541,8 @@ export function sanitizeProduct(body: Record<string, unknown>): ProductInput {
     slug: str(body.slug) ? slugify(str(body.slug)) : slugify(name),
     subtitle: str(body.subtitle),
     description: str(body.description),
-    features: arr(body.features),
-    contents: arr(body.contents),
+    features: textArr(body.features),
+    contents: textArr(body.contents),
     price,
     retailPrice,
     retailUnitLabel: str(body.retailUnitLabel) || "عدد",
@@ -542,6 +561,11 @@ export function sanitizeProduct(body: Record<string, unknown>): ProductInput {
     images: arr(body.images),
     retailImages: arr(body.retailImages),
     wholesaleImages: arr(body.wholesaleImages),
+    retailMobileImages: arr(body.retailMobileImages),
+    wholesaleMobileImages: arr(body.wholesaleMobileImages),
+    desktopObjectPosition: normalizeFocalPoint(body.desktopObjectPosition),
+    mobileObjectPosition: normalizeFocalPoint(body.mobileObjectPosition),
+    textFormatting: sanitizeRichTextMap(body.textFormatting),
     cardTextRegionPosition: (() => {
       const value = str(body.cardTextRegionPosition);
       return value === "right" || value === "left" || value === "center" ? value : "bottom";

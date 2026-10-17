@@ -1,7 +1,7 @@
 "use client";
 
-import { ImagePlus, Loader2, Monitor, Plus, RotateCcw, Smartphone, Trash2, X } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { Bold, ImagePlus, Loader2, Monitor, Palette, Plus, Redo2, RotateCcw, Smartphone, Trash2, Undo2, X } from "lucide-react";
+import { useRef, useState, type ReactNode } from "react";
 import { IMAGE_GUIDELINES, type ImageGuidelineKey } from "@/lib/image-guidelines";
 import {
   TEXT_REGION_BACKDROP_CLASSES,
@@ -20,6 +20,106 @@ import {
   ResponsiveBannerMedia,
   ResponsiveTextRegionBackdrop,
 } from "@/components/responsive-banner";
+import { RichText } from "@/components/rich-text";
+import {
+  applyRichTextMark,
+  normalizeRichTextValue,
+  replaceRichTextPlainText,
+  RICH_TEXT_COLORS,
+  richTextToPlainText,
+  type RichTextValue,
+} from "@/lib/rich-text";
+
+export function RichTextEditor({
+  label,
+  value,
+  richValue,
+  onChange,
+  rows = 1,
+  placeholder,
+  hint,
+}: {
+  label: string;
+  value: string;
+  richValue?: RichTextValue;
+  onChange: (plain: string, rich: RichTextValue) => void;
+  rows?: number;
+  placeholder?: string;
+  hint?: string;
+}) {
+  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+  const [customColor, setCustomColor] = useState("#780B18");
+  const [history, setHistory] = useState<RichTextValue[]>([]);
+  const [future, setFuture] = useState<RichTextValue[]>([]);
+  const normalized = normalizeRichTextValue(richValue, value);
+
+  function selection() {
+    const node = inputRef.current;
+    return { start: node?.selectionStart ?? 0, end: node?.selectionEnd ?? value.length };
+  }
+
+  function apply(mark: { bold?: boolean | null; color?: string | null }) {
+    const { start, end } = selection();
+    const effectiveEnd = start === end ? value.length : end;
+    const effectiveStart = start === end ? 0 : start;
+    const next = applyRichTextMark(normalized, effectiveStart, effectiveEnd, mark);
+    setHistory((items) => [...items.slice(-29), normalized]);
+    setFuture([]);
+    onChange(richTextToPlainText(next), next);
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.setSelectionRange(effectiveStart, effectiveEnd);
+    });
+  }
+
+  function restore(next: RichTextValue, direction: "undo" | "redo") {
+    if (direction === "undo") {
+      setHistory((items) => items.slice(0, -1));
+      setFuture((items) => [normalized, ...items].slice(0, 30));
+    } else {
+      setFuture((items) => items.slice(1));
+      setHistory((items) => [...items.slice(-29), normalized]);
+    }
+    onChange(richTextToPlainText(next), next);
+  }
+
+  const shared = {
+    ref: inputRef as never,
+    className: `field ${rows > 1 ? "resize-y leading-7" : ""}`,
+    value,
+    placeholder,
+    dir: "rtl" as const,
+    onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      const plain = event.target.value;
+      setHistory((items) => [...items.slice(-29), normalized]);
+      setFuture([]);
+      onChange(plain, replaceRichTextPlainText(normalized, plain));
+    },
+  };
+
+  return (
+    <div className="space-y-2 rounded-2xl border border-line bg-bg/40 p-3" data-rich-text-editor>
+      <span className="block text-xs font-bold text-muted">{label}</span>
+      <div className="flex flex-wrap items-center gap-1.5" role="toolbar" aria-label={`قالب‌بندی ${label}`}>
+        <button type="button" title="بولد کردن" aria-label="بولد کردن" onMouseDown={(event) => event.preventDefault()} onClick={() => apply({ bold: true })} className="grid size-9 place-items-center rounded-lg border border-line hover:border-accent hover:text-accent"><Bold size={15} /></button>
+        <div className="flex items-center gap-1 rounded-lg border border-line px-2 py-1" title="انتخاب رنگ متن">
+          <Palette size={14} className="text-muted" />
+          {RICH_TEXT_COLORS.map((color) => <button key={color.value} type="button" title={color.label} aria-label={`رنگ ${color.label}`} onMouseDown={(event) => event.preventDefault()} onClick={() => apply({ color: color.value })} className="size-5 rounded-full border border-black/15" style={{ backgroundColor: color.value }} />)}
+          <input type="color" aria-label="رنگ سفارشی" value={customColor} onChange={(event) => { setCustomColor(event.target.value); apply({ color: event.target.value }); }} className="size-6 cursor-pointer rounded border-0 bg-transparent p-0" />
+        </div>
+        <button type="button" title="حذف قالب‌بندی" aria-label="حذف قالب‌بندی" onMouseDown={(event) => event.preventDefault()} onClick={() => apply({ bold: null, color: null })} className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-line px-3 text-[10px] font-bold text-muted hover:border-accent hover:text-accent"><RotateCcw size={13} /> حذف قالب‌بندی</button>
+        <button type="button" title="واگرد" aria-label="واگرد" disabled={!history.length} onMouseDown={(event) => event.preventDefault()} onClick={() => history.at(-1) && restore(history.at(-1)!, "undo")} className="grid size-9 place-items-center rounded-lg border border-line disabled:opacity-30"><Undo2 size={14} /></button>
+        <button type="button" title="انجام مجدد" aria-label="انجام مجدد" disabled={!future.length} onMouseDown={(event) => event.preventDefault()} onClick={() => future[0] && restore(future[0], "redo")} className="grid size-9 place-items-center rounded-lg border border-line disabled:opacity-30"><Redo2 size={14} /></button>
+      </div>
+      {rows > 1 ? <textarea {...shared} rows={rows} /> : <input {...shared} type="text" />}
+      <div className="rounded-xl border border-line bg-surface px-3 py-2 text-sm leading-7" aria-label={`پیش‌نمایش ${label}`}>
+        <RichText value={normalized} fallback={value || "پیش‌نمایش متن"} />
+      </div>
+      <p className="text-[10px] leading-5 text-muted">بخشی از متن را انتخاب کنید؛ اگر انتخابی وجود نداشته باشد، قالب‌بندی روی کل متن اعمال می‌شود.</p>
+      {hint ? <span className="block text-[10px] text-muted">{hint}</span> : null}
+    </div>
+  );
+}
 
 export function Field({
   label,
@@ -238,6 +338,9 @@ export function ResponsiveBannerDesign({
   previewTitle,
   previewSubtitle,
   previewCta,
+  previewTitleRichText,
+  previewSubtitleRichText,
+  previewCtaRichText,
   fallback,
   desktopTextFallback = "right",
   mobileTextFallback = "bottom",
@@ -251,6 +354,9 @@ export function ResponsiveBannerDesign({
   previewTitle: string;
   previewSubtitle?: string;
   previewCta?: string;
+  previewTitleRichText?: RichTextValue;
+  previewSubtitleRichText?: RichTextValue;
+  previewCtaRichText?: RichTextValue;
   fallback: string;
   desktopTextFallback?: TextRegionPosition;
   mobileTextFallback?: TextRegionPosition;
@@ -303,9 +409,9 @@ export function ResponsiveBannerDesign({
             {showSafeRegion ? <span aria-hidden="true" className={`pointer-events-none absolute z-20 border-2 border-dashed border-amber-300/90 ${TEXT_REGION_BACKDROP_CLASSES[textPosition]}`}><span className="absolute right-3 top-3 rounded-full bg-amber-300 px-3 py-1 text-[10px] font-black text-stone-900">ناحیه مخصوص متن</span></span> : null}
             <div className={`relative z-10 flex size-full p-5 ${getPreviewTextLayoutClass(textPosition)}`}>
               <div className={`${textPosition === "right" || textPosition === "left" ? "w-[58%]" : "w-full max-w-[680px]"} space-y-3 drop-shadow-[0_2px_10px_rgba(0,0,0,.7)]`}>
-                <strong className={`${viewport === "mobile" ? "text-2xl" : "text-4xl"} block font-black leading-tight`}>{previewTitle || "عنوان بنر"}</strong>
-                {previewSubtitle ? <p className={`${viewport === "mobile" ? "text-xs" : "text-sm"} leading-6 text-white/90`}>{previewSubtitle}</p> : null}
-                {previewCta ? <span className="inline-flex min-h-10 items-center rounded-full bg-white px-5 text-xs font-black text-[#8E111E]">{previewCta}</span> : null}
+                <strong className={`${viewport === "mobile" ? "text-2xl" : "text-4xl"} block font-black leading-tight`}><RichText value={previewTitleRichText} fallback={previewTitle || "عنوان بنر"} /></strong>
+                {previewSubtitle ? <RichText as="p" className={`${viewport === "mobile" ? "text-xs" : "text-sm"} leading-6 text-white/90`} value={previewSubtitleRichText} fallback={previewSubtitle} /> : null}
+                {previewCta ? <span className="inline-flex min-h-10 items-center rounded-full bg-white px-5 text-xs font-black text-[#8E111E]"><RichText value={previewCtaRichText} fallback={previewCta} /></span> : null}
               </div>
             </div>
           </div>
@@ -350,19 +456,26 @@ export function ListEditor({
   items,
   onChange,
   placeholder,
+  richItems,
+  onRichChange,
 }: {
   label: string;
   items: string[];
   onChange: (items: string[]) => void;
   placeholder?: string;
+  richItems?: RichTextValue[];
+  onRichChange?: (items: RichTextValue[]) => void;
 }) {
   return (
     <div>
       <span className="mb-1.5 block text-xs font-bold text-muted">{label}</span>
       <div className="space-y-2">
         {items.map((it, i) => (
-          <div key={i} className="flex gap-2">
-            <input
+          <div key={i} className="flex items-start gap-2">
+            {richItems && onRichChange ? <div className="flex-1"><RichTextEditor label={`${label} ${i + 1}`} value={it} richValue={richItems[i]} placeholder={placeholder} onChange={(plain, rich) => {
+              const next = [...items]; next[i] = plain; onChange(next);
+              const nextRich = [...richItems]; nextRich[i] = rich; onRichChange(nextRich);
+            }} /></div> : <input
               className="field flex-1"
               value={it}
               placeholder={placeholder}
@@ -371,10 +484,10 @@ export function ListEditor({
                 next[i] = e.target.value;
                 onChange(next);
               }}
-            />
+            />}
             <button
               type="button"
-              onClick={() => onChange(items.filter((_, j) => j !== i))}
+              onClick={() => { onChange(items.filter((_, j) => j !== i)); if (richItems && onRichChange) onRichChange(richItems.filter((_, j) => j !== i)); }}
               className="grid size-10 shrink-0 place-items-center rounded-xl border border-line text-rose-400 transition-colors hover:border-rose-400"
               aria-label="حذف"
             >
@@ -384,7 +497,7 @@ export function ListEditor({
         ))}
         <button
           type="button"
-          onClick={() => onChange([...items, ""])}
+          onClick={() => { onChange([...items, ""]); if (richItems && onRichChange) onRichChange([...richItems, { segments: [] }]); }}
           className="btn btn-ghost h-10 w-full text-xs"
         >
           <Plus size={14} /> افزودن مورد
@@ -407,7 +520,7 @@ export function ImageUploader({
   label: string;
   value: string | string[];
   onChange: (value: string | string[]) => void;
-  kind?: "products" | "banners" | "hero" | "blog";
+  kind?: "products" | "banners" | "hero" | "blog" | "branding";
   multiple?: boolean;
   hint?: string;
   guideline?: ImageGuidelineKey;
@@ -467,6 +580,20 @@ export function ImageUploader({
     onChange(Array.isArray(value) ? next : (next[0] ?? ""));
   }
 
+  function moveItem(index: number, delta: number) {
+    const target = index + delta;
+    if (target < 0 || target >= items.length) return;
+    const next = [...items];
+    [next[index], next[target]] = [next[target], next[index]];
+    onChange(Array.isArray(value) ? next : (next[0] ?? ""));
+  }
+
+  function makeCover(index: number) {
+    if (index === 0) return;
+    const next = [items[index], ...items.filter((_, itemIndex) => itemIndex !== index)];
+    onChange(Array.isArray(value) ? next : (next[0] ?? ""));
+  }
+
   return (
     <div>
       <span className="mb-1.5 block text-xs font-bold text-muted">{label}</span>
@@ -482,9 +609,9 @@ export function ImageUploader({
       {dimensionWarning && <p className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-[10px] leading-5 text-amber-800" role="status">{dimensionWarning} آپلود مجاز است.</p>}
       <div className="flex flex-wrap gap-2.5">
         {items.map((src, i) => (
-          <div key={`${src}-${i}`} className="relative">
+          <div key={`${src}-${i}`} className="relative rounded-xl border border-line bg-surface p-1.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={src} alt="" className={`size-20 rounded-xl border border-line ${guide.fit === "contain" ? "object-contain bg-surface p-1" : "object-cover"}`} />
+            <img src={src} alt="" className={`size-20 rounded-lg ${guide.fit === "contain" ? "object-contain bg-surface p-1" : "object-cover"}`} />
             <button
               type="button"
               onClick={() => removeItem(i)}
@@ -493,6 +620,11 @@ export function ImageUploader({
             >
               <X size={12} />
             </button>
+            {multiple ? <div className="mt-1 flex items-center justify-center gap-1">
+              <button type="button" onClick={() => moveItem(i, -1)} disabled={i === 0} className="min-h-7 rounded border border-line px-1.5 text-[9px] disabled:opacity-30" aria-label="انتقال تصویر به ابتدا">→</button>
+              <button type="button" onClick={() => makeCover(i)} disabled={i === 0} className="min-h-7 rounded border border-line px-1.5 text-[9px] font-bold disabled:opacity-50">{i === 0 ? "کاور" : "کاور کن"}</button>
+              <button type="button" onClick={() => moveItem(i, 1)} disabled={i === items.length - 1} className="min-h-7 rounded border border-line px-1.5 text-[9px] disabled:opacity-30" aria-label="انتقال تصویر به انتها">←</button>
+            </div> : null}
           </div>
         ))}
         {(!items.length || multiple) && (

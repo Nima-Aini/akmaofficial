@@ -22,6 +22,7 @@ import { formatPrice, telHref, toFa } from "@/lib/format";
 import { ProductGallery } from "@/components/product-gallery";
 import { ProductModeProvider } from "@/context/product-mode-context";
 import { getProductImages } from "@/lib/product-media";
+import { RichText } from "@/components/rich-text";
 
 type ProductPageProps = {
   params: Promise<{ slug: string }>;
@@ -112,7 +113,7 @@ export default async function ProductPage({
       <div className="mt-8 grid gap-10 lg:grid-cols-2 lg:gap-14">
         {/* gallery */}
         <Reveal className="relative">
-          <ProductGallery images={product.images} retailImages={product.retailImages} wholesaleImages={product.wholesaleImages} productName={product.name} badge={product.badge} />
+          <ProductGallery images={product.images} retailImages={product.retailImages} wholesaleImages={product.wholesaleImages} retailMobileImages={product.retailMobileImages} wholesaleMobileImages={product.wholesaleMobileImages} desktopObjectPosition={product.desktopObjectPosition} mobileObjectPosition={product.mobileObjectPosition} productName={product.name} badge={product.badge} />
         </Reveal>
 
         {/* info */}
@@ -122,10 +123,10 @@ export default async function ProductPage({
               {product.categoryLabel}
             </span>
             <h1 className="mt-4 text-2xl font-black leading-snug sm:text-4xl">
-              {product.name}
+              <RichText value={product.textFormatting?.name} fallback={product.name} />
             </h1>
             {product.subtitle && (
-              <p className="mt-2 text-sm text-muted">{product.subtitle}</p>
+              <RichText as="p" className="mt-2 text-sm text-muted" value={product.textFormatting?.subtitle} fallback={product.subtitle} />
             )}
           </Reveal>
 
@@ -203,7 +204,7 @@ export default async function ProductPage({
                   {product.contents.map((c, i) => (
                     <li key={i} className="flex items-center gap-2.5 text-[13px] text-muted">
                       <CircleCheck size={15} className="shrink-0 text-accent" />
-                      {c}
+                      <RichText value={product.textFormatting?.[`contents.${i}`]} fallback={c} />
                     </li>
                   ))}
                 </ul>
@@ -219,7 +220,7 @@ export default async function ProductPage({
                   {product.features.map((f, i) => (
                     <li key={i} className="flex items-start gap-2.5 text-[13px] leading-6 text-muted">
                       <CircleCheck size={15} className="mt-1 shrink-0 text-accent" />
-                      {f}
+                      <RichText value={product.textFormatting?.[`features.${i}`]} fallback={f} />
                     </li>
                   ))}
                 </ul>
@@ -238,13 +239,7 @@ export default async function ProductPage({
               <span className="h-6 w-1.5 rounded-full bg-gradient-to-b from-accent2 to-accent" />
               توضیحات محصول
             </h2>
-            <div className="mt-6 space-y-5 text-[14px] leading-8 text-muted">
-              {paragraphs.map((p, i) => (
-                <p key={i} className="whitespace-pre-line">
-                  {p}
-                </p>
-              ))}
-            </div>
+            <RichText as="div" className="mt-6 whitespace-pre-line text-[14px] leading-8 text-muted" value={product.textFormatting?.description} fallback={product.description} />
           </div>
         </Reveal>
       )}
