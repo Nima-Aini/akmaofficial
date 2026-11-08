@@ -3,7 +3,7 @@
  * Tests pricing logic, tier calculations, phone masking, OTP formatting, and wholesale quantity validation.
  */
 import assert from "node:assert";
-import { generateSecureOtp, sendMelliPattern } from "../src/lib/sms.ts";
+import { generateSecureOtp, sendMelliPattern, sendOtpSms } from "../src/lib/sms.ts";
 import { calculateProductPricing, getProductPricePresentation, getWholesalePackConfig, isPositiveSafeInteger } from "../src/lib/pricing.ts";
 import { getProductImages, getResponsiveProductImages } from "../src/lib/product-media.ts";
 import { applyRichTextMark, normalizeRichTextValue, replaceRichTextPlainText, richTextToPlainText, sanitizeRichTextMap, sanitizeTextColor } from "../src/lib/rich-text.ts";
@@ -439,27 +439,110 @@ await runAsyncTest("Missing Zarinpal merchant ID fails closed in production", as
   }
 });
 
-await runAsyncTest("Melli pattern uses ordered parameters and validates receipt", async () => {
-  const previous = globalThis.fetch;
-  const env = ["MELLIPAYAMAK_USERNAME", "MELLIPAYAMAK_PASSWORD", "AKMA_INTEGRATION_TEST"].map(key => [key, process.env[key]]);
-  process.env.MELLIPAYAMAK_USERNAME = "test-user";
-  process.env.MELLIPAYAMAK_PASSWORD = "test-pass";
+await runAsyncTest("Console API accepts a real receipt and ordered template args", async () => {
+  const savedFetch = globalThis.fetch;
+  const envKeys = ["MELLIPAYAMAK_CONSOLE_API_KEY", "SMS_PROVIDER", "AKMA_INTEGRATION_TEST"];
+  const saved = envKeys.map(key => [key, process.env[key]]);
+  process.env.MELLIPAYAMAK_CONSOLE_API_KEY = "unit-test-key";
+  process.env.SMS_PROVIDER = "mellipayamak";
   delete process.env.AKMA_INTEGRATION_TEST;
-  let calls = 0;
-  globalThis.fetch = async (_url, options) => {
-    calls++;
-    const payload = new URLSearchParams(options.body);
-    assert.equal(payload.get("bodyId"), "556154");
-    assert.equal(payload.get("text"), "مشتری;AKM-1;100000");
-    return { ok: true, json: async () => calls === 1 ? { RetStatus: 1, Value: "123456" } : { RetStatus: 0, Value: "123456" } };
-  };
   try {
-    assert.equal((await sendMelliPattern("09121111111", 556154, ["مشتری", "AKM-1", "100000"])).success, true);
-    assert.equal((await sendMelliPattern("09121111111", 556154, ["مشتری", "AKM-1", "100000"])).success, false);
-    assert.equal((await sendMelliPattern("invalid", 556154, ["x"])).success, false);
+    globalThis.fetch = async (url, options) => {
+      assert.equal(url, "https://console.melipayamak.com/api/send/shared/unit-test-key");
+      assert.equal(options.headers["Content-Type"], "application/json");
+      assert.deepEqual(JSON.parse(options.body), { to: "09121111111", bodyId: 556154, args: ["مشتری", "AKM-1", "100000"] });
+      return { ok: true, status: 200, json: async () => ({ recId: "3741437414", status: "عملیات موفق" }) };
+    };
+    assert.deepEqual(await sendMelliPattern("09121111111", 556154, ["مشتری", "AKM-1", "100000"]), { success: true, messageId: "3741437414" });
+    globalThis.fetch = async (_url, options) => {
+      assert.deepEqual(JSON.parse(options.body), { to: "09121111111", bodyId: 556149, args: ["12345"] });
+      return { ok: true, status: 200, json: async () => ({ recId: "3741437415", status: "عملیات موفق" }) };
+    };
+    assert.equal((await sendOtpSms("09121111111", "12345")).success, true);
   } finally {
-    globalThis.fetch = previous;
-    for (const [key, value] of env) if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    globalThis.fetch = savedFetch;
+    for (const [key, value] of saved) if (value === undefined) delete process.env[key]; else process.env[key] = value;
+  }
+});
+
+await runAsyncTest("Console API classifies provider errors, HTTP errors, and uncertain acceptance", async () => {
+  const savedFetch = globalThis.fetch;
+  const savedKey = process.env.MELLIPAYAMAK_CONSOLE_API_KEY;
+  const savedIntegration = process.env.AKMA_INTEGRATION_TEST;
+  process.env.MELLIPAYAMAK_CONSOLE_API_KEY = "unit-test-key";
+  delete process.env.AKMA_INTEGRATION_TEST;
+  const send = () => sendMelliPattern("09121111111", 556160, ["AKM-1", "POST-123"]);
+  try {
+    globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ recId: null, status: "InvalidData" }) });
+    assert.deepEqual(await send(), { success: false, error: "sms_provider_rejected", retryable: false });
+    globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ recId: "123456", status: "InvalidData" }) });
+    assert.equal((await send()).uncertain, true);
+    for (const status of [400, 401, 429, 500]) {
+      globalThis.fetch = async () => ({ ok: false, status });
+      const result = await send();
+      assert.equal(result.success, false);
+      if (status === 429) assert.equal(result.retryable, true);
+      else assert.equal(result.retryable, status === 500 ? undefined : false);
+      if (status === 500) assert.equal(result.uncertain, true);
+    }
+    globalThis.fetch = async () => { throw new Error("timeout with secret unit-test-key"); };
+    assert.deepEqual(await send(), { success: false, error: "sms_response_unknown", uncertain: true });
+    globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => { throw new Error("invalid JSON"); } });
+    assert.equal((await send()).uncertain, true);
+  } finally {
+    globalThis.fetch = savedFetch;
+    if (savedKey === undefined) delete process.env.MELLIPAYAMAK_CONSOLE_API_KEY; else process.env.MELLIPAYAMAK_CONSOLE_API_KEY = savedKey;
+    if (savedIntegration === undefined) delete process.env.AKMA_INTEGRATION_TEST; else process.env.AKMA_INTEGRATION_TEST = savedIntegration;
+  }
+});
+
+await runAsyncTest("Console API rejects invalid templates and OTP delivery failure without leaking key", async () => {
+  const savedFetch = globalThis.fetch;
+  const savedKey = process.env.MELLIPAYAMAK_CONSOLE_API_KEY;
+  const savedProvider = process.env.SMS_PROVIDER;
+  const savedIntegration = process.env.AKMA_INTEGRATION_TEST;
+  process.env.MELLIPAYAMAK_CONSOLE_API_KEY = "unit-test-key";
+  process.env.SMS_PROVIDER = "mellipayamak";
+  delete process.env.AKMA_INTEGRATION_TEST;
+  let requests = 0;
+  globalThis.fetch = async () => { requests++; return { ok: false, status: 401 }; };
+  try {
+    assert.equal((await sendMelliPattern("invalid", 556149, ["12345"])).success, false);
+    assert.equal((await sendMelliPattern("09121111111", 556154, ["name", "order"])).success, false);
+    assert.equal((await sendMelliPattern("09121111111", 556149, ["12;345"])).success, false);
+    assert.equal((await sendMelliPattern("09121111111", 556162, ["order\nspoof"])).success, false);
+    assert.equal((await sendMelliPattern("09121111111", 999999, ["x"])).success, false);
+    assert.equal(requests, 0);
+    const failure = await sendOtpSms("09121111111", "12345");
+    assert.equal(failure.success, false);
+    assert.equal(failure.error, "sms_http_401");
+    assert.ok(!JSON.stringify(failure).includes("unit-test-key"));
+  } finally {
+    globalThis.fetch = savedFetch;
+    if (savedKey === undefined) delete process.env.MELLIPAYAMAK_CONSOLE_API_KEY; else process.env.MELLIPAYAMAK_CONSOLE_API_KEY = savedKey;
+    if (savedProvider === undefined) delete process.env.SMS_PROVIDER; else process.env.SMS_PROVIDER = savedProvider;
+    if (savedIntegration === undefined) delete process.env.AKMA_INTEGRATION_TEST; else process.env.AKMA_INTEGRATION_TEST = savedIntegration;
+  }
+});
+
+await runAsyncTest("Console mode never falls back to legacy credentials or production mocks", async () => {
+  const keys = ["MELLIPAYAMAK_CONSOLE_API_KEY", "MELLIPAYAMAK_USERNAME", "MELLIPAYAMAK_PASSWORD", "AKMA_INTEGRATION_TEST", "AKMA_TEST_TRANSPORT", "NODE_ENV"];
+  const saved = keys.map(key => [key, process.env[key]]);
+  const savedFetch = globalThis.fetch;
+  try {
+    delete process.env.MELLIPAYAMAK_CONSOLE_API_KEY;
+    process.env.MELLIPAYAMAK_USERNAME = "old-user";
+    process.env.MELLIPAYAMAK_PASSWORD = "old-pass";
+    delete process.env.AKMA_INTEGRATION_TEST;
+    globalThis.fetch = async () => { throw new Error("Legacy transport must not be called"); };
+    assert.equal((await sendMelliPattern("09121111111", 556149, ["12345"])).error, "sms_console_key_not_configured");
+    process.env.AKMA_INTEGRATION_TEST = "1";
+    process.env.AKMA_TEST_TRANSPORT = "mock";
+    process.env.NODE_ENV = "production";
+    await assert.rejects(() => sendMelliPattern("09121111111", 556149, ["12345"]), /Mock SMS transport unavailable/);
+  } finally {
+    globalThis.fetch = savedFetch;
+    for (const [key, value] of saved) if (value === undefined) delete process.env[key]; else process.env[key] = value;
   }
 });
 

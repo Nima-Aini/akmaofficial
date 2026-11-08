@@ -121,16 +121,24 @@ After the new release passes its health check, the deployment starts or restarts
 `akma-sms-worker`. It polls the PostgreSQL outbox every 20 seconds and periodically reconciles pending payment attempts with the stored gateway provider. The worker
 loads `/etc/akma/akma.env` server-side and uses the current release. Check with
 `pm2 status akma-sms-worker` and `pm2 logs akma-sms-worker --lines 100 --nostream`.
-A missing credential or rejected template is recorded as a permanent failure.
+A missing Console API key or rejected template is recorded as a permanent failure.
 Network interruptions after a request is issued are quarantined as `failed`
 for reconciliation, with no automatic resend. Authorized administrators may retry
 only definite permanent failures through the order notification API.
 
-Set `SMS_PROVIDER=mellipayamak`, `MELLIPAYAMAK_USERNAME`,
-`MELLIPAYAMAK_PASSWORD`, `MELLIPAYAMAK_BODY_ID=556149`,
+Set `SMS_PROVIDER=mellipayamak`, `MELLIPAYAMAK_CONSOLE_API_KEY`,
+`MELLIPAYAMAK_BODY_ID=556149`,
 `MELLIPAYAMAK_BODY_ID_PAYMENT_SUCCESS=556154`,
 `MELLIPAYAMAK_BODY_ID_ORDER_SHIPPED=556160`,
 `MELLIPAYAMAK_BODY_ID_PAYMENT_FAILED=556162`, and optionally
 `SMS_MAX_RETRIES=5` in the protected environment. Restart only the two AKMA
 PM2 entries after changing the environment. Never run the worker against a
 production database from a local test shell.
+
+The Console key must be present in `/etc/akma/akma.env`: both the Next.js
+application and `akma-sms-worker` load that file. The old
+`MELLIPAYAMAK_USERNAME` and `MELLIPAYAMAK_PASSWORD` REST credentials are not
+used for this provider. The transport posts JSON to the Console shared-template
+API with positional `args` and records its `recId` only after provider acceptance.
+A receipt does not establish handset delivery. Do not print the key or the full
+provider URL in diagnostics.

@@ -12,58 +12,86 @@ export interface SmsSendResult {
 
 export type PatternSendResult = SmsSendResult & { retryable?: boolean; uncertain?: boolean };
 
-/** Provider accepted means RetStatus=1 and an actual positive receipt ID. */
-export async function sendMelliPattern(phone: string, bodyId: number, parameters: string[]): Promise<PatternSendResult> {
+const CONSOLE_SHARED_SEND_URL = "https://console.melipayamak.com/api/send/shared/";
+
+function validPatternArgs(bodyId: number, args: string[]): boolean {
+  if (!Number.isSafeInteger(bodyId) || bodyId < 1 || !Array.isArray(args) || args.length < 1 || args.length > 3 ||
+      args.some(arg => typeof arg !== "string" || !arg.trim() || arg.length > 100 || /[\r\n\x00-\x1f]/.test(arg))) return false;
+  const configured = [
+    [Number(process.env.MELLIPAYAMAK_BODY_ID || process.env.SMS_BODY_ID || 556149), 1],
+    [Number(process.env.MELLIPAYAMAK_BODY_ID_PAYMENT_SUCCESS || 556154), 3],
+    [Number(process.env.MELLIPAYAMAK_BODY_ID_ORDER_SHIPPED || 556160), 2],
+    [Number(process.env.MELLIPAYAMAK_BODY_ID_PAYMENT_FAILED || 556162), 1],
+  ];
+  const expected = configured.find(([id]) => id === bodyId)?.[1];
+  if (!expected || args.length !== expected) return false;
+  if (bodyId === configured[0][0] && !/^\d{5}$/.test(args[0])) return false;
+  if (bodyId === configured[1][0] && (!/^\d+$/.test(args[2]) || Number(args[2]) <= 0)) return false;
+  return true;
+}
+
+/** A receipt confirms provider acceptance, not handset delivery. */
+export async function sendMelliPattern(phone: string, bodyId: number, args: string[]): Promise<PatternSendResult> {
+  if (!/^09\d{9}$/.test(phone) || !validPatternArgs(bodyId, args)) {
+    return { success: false, error: "invalid_sms_parameters", retryable: false };
+  }
   if (process.env.AKMA_INTEGRATION_TEST === "1") {
     if (process.env.NODE_ENV === "production" || process.env.AKMA_TEST_TRANSPORT !== "mock") throw new Error("Mock SMS transport unavailable");
     return { success: true, messageId: "mock-pattern-receipt" };
   }
-  const username = process.env.MELLIPAYAMAK_USERNAME || process.env.SMS_USERNAME || "";
-  const password = process.env.MELLIPAYAMAK_PASSWORD || process.env.SMS_PASSWORD || "";
-  if (!username || !password || !Number.isSafeInteger(bodyId) || bodyId < 1 || !/^09\d{9}$/.test(phone) || !parameters.length || parameters.some(p => !p || p.includes(";"))) {
-    return { success: false, error: "invalid_sms_configuration_or_parameters", retryable: false };
+  const apiKey = process.env.MELLIPAYAMAK_CONSOLE_API_KEY?.trim();
+  if (!apiKey || !/^[A-Za-z0-9_-]+$/.test(apiKey)) {
+    return { success: false, error: "sms_console_key_not_configured", retryable: false };
   }
+  let response: Response;
   try {
-    const res = await fetch("https://rest.payamak-panel.com/api/SendSMS/BaseServiceNumber", {
-      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ username, password, text: parameters.join(";"), to: phone, bodyId: String(bodyId) }),
+    response = await fetch(`${CONSOLE_SHARED_SEND_URL}${encodeURIComponent(apiKey)}`, {
+      method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ to: phone, bodyId, args }),
       signal: AbortSignal.timeout(10000),
     });
-    if (!res.ok) return { success: false, error: `http_${res.status}`, retryable: res.status >= 500 };
-    const data = await res.json();
-    if (Number(data?.RetStatus) === 1 && /^\d+$/.test(String(data?.Value)) && Number(data.Value) > 15) {
-      return { success: true, messageId: String(data.Value) };
-    }
-    return { success: false, error: `provider_${Number(data?.RetStatus) || "invalid_response"}`, retryable: false };
   } catch {
-    // Request may have been accepted before the connection failed: quarantine for review.
-    return { success: false, error: "provider_response_unknown", uncertain: true };
+    // A timeout or disconnect can occur after the provider accepted the SMS.
+    return { success: false, error: "sms_response_unknown", uncertain: true };
   }
+  if (!response.ok) {
+    if (response.status === 429) return { success: false, error: "sms_rate_limited", retryable: true };
+    if (response.status >= 500) return { success: false, error: "sms_server_response_unknown", uncertain: true };
+    return { success: false, error: `sms_http_${response.status}`, retryable: false };
+  }
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch {
+    return { success: false, error: "sms_invalid_response", uncertain: true };
+  }
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    return { success: false, error: "sms_invalid_response", uncertain: true };
+  }
+  const payload = data as Record<string, unknown>;
+  const receipt = payload.recId;
+  const validReceipt = (typeof receipt === "string" && /^[1-9]\d*$/.test(receipt)) ||
+    (typeof receipt === "number" && Number.isSafeInteger(receipt) && receipt > 0);
+  const status = payload.status;
+  const statusText = typeof status === "string" ? status.trim().toLowerCase() : "";
+  const validStatus = status === undefined || status === null || statusText === "" ||
+    ["عملیات موفق", "success", "ok"].includes(statusText) || status === 1 || status === 200;
+  if (validReceipt && validStatus) return { success: true, messageId: String(receipt) };
+  if (!validReceipt && !validStatus) return { success: false, error: "sms_provider_rejected", retryable: false };
+  return { success: false, error: "sms_acceptance_unknown", uncertain: true };
 }
 
 export async function sendOtpSms(phone: string, otpCode: string): Promise<SmsSendResult> {
-  if (process.env.AKMA_INTEGRATION_TEST === "1") {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("Integration mock SMS transport is forbidden in production.");
-    }
-    if (process.env.AKMA_TEST_TRANSPORT !== "mock") {
-      throw new Error("Integration tests require AKMA_TEST_TRANSPORT=mock; real SMS transport is disabled.");
-    }
-    return { success: true, messageId: `mock-sms-${phone.slice(-4)}` };
-  }
   const provider = (process.env.SMS_PROVIDER || "mellipayamak").toLowerCase();
 
-  // 1. MelliPayamak Provider (ملی پیامک)
-  const mellipayamakUser = process.env.MELLIPAYAMAK_USERNAME || process.env.SMS_USERNAME || "";
-  const mellipayamakPass = process.env.MELLIPAYAMAK_PASSWORD || process.env.SMS_PASSWORD || "";
-  const mellipayamakBodyId = process.env.MELLIPAYAMAK_BODY_ID || process.env.SMS_BODY_ID || "";
-
-  if (mellipayamakUser && mellipayamakPass && (provider === "mellipayamak" || provider === "melli" || mellipayamakBodyId)) {
-    if (mellipayamakBodyId) {
-      const result = await sendMelliPattern(phone, Number(mellipayamakBodyId), [otpCode]);
-      return { success: result.success, messageId: result.messageId, error: result.error };
-    }
-    return { success: false, error: "MELLIPAYAMAK_BODY_ID is required" };
+  if (provider === "mellipayamak" || provider === "melli") {
+    const result = await sendMelliPattern(phone, Number(process.env.MELLIPAYAMAK_BODY_ID || process.env.SMS_BODY_ID || 556149), [otpCode]);
+    return { success: result.success, messageId: result.messageId, error: result.error };
+  }
+  // Non-Melli OTP providers retain their existing transport and test mock.
+  if (process.env.AKMA_INTEGRATION_TEST === "1") {
+    if (process.env.NODE_ENV === "production" || process.env.AKMA_TEST_TRANSPORT !== "mock") throw new Error("Mock SMS transport unavailable");
+    return { success: true, messageId: `mock-sms-${phone.slice(-4)}` };
   }
 
   // 2. Kavenegar Provider (Lookup / Pattern OTP)
