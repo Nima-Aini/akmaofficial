@@ -460,6 +460,23 @@ try {
     assert.equal((await db.select().from(smsNotifications).where(eq(smsNotifications.orderId, order.id))).length, 2);
   });
 
+  await test("concurrent dispatchers claim each SMS once and quarantine abandoned sends", async () => {
+    const row = (await db.insert(smsNotifications).values({ idempotencyKey: "worker-sent-proof", kind: "payment_success", recipient: customerA.phone, bodyId: 556154, parameters: [customerA.name, "AKM-WORKER", "100000"] }).returning())[0];
+    const abandoned = (await db.insert(smsNotifications).values({ idempotencyKey: "worker-abandoned-proof", kind: "payment_success", recipient: customerA.phone, bodyId: 556154, parameters: [customerA.name, "AKM-ABANDONED", "100000"], status: "processing", lastAttemptAt: new Date(Date.now() - 180000) }).returning())[0];
+    const runWorker = () => new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, ["--import", "tsx", "scripts/dispatch-sms.mjs"], { cwd: process.cwd(), env: { ...process.env, DATABASE_URL: dbUrl, AKMA_INTEGRATION_TEST: "1", AKMA_TEST_TRANSPORT: "mock" } });
+      let output = "";
+      child.stdout.on("data", (part) => { output += part; });
+      child.stderr.on("data", (part) => { output += part; });
+      child.once("exit", (code) => code === 0 ? resolve(output) : reject(new Error(output)));
+    });
+    await Promise.all([runWorker(), runWorker()]);
+    const sent = (await db.select().from(smsNotifications).where(eq(smsNotifications.id, row.id)))[0];
+    const uncertain = (await db.select().from(smsNotifications).where(eq(smsNotifications.id, abandoned.id)))[0];
+    assert.equal(sent.status, "sent"); assert.equal(sent.retryCount, 1);
+    assert.equal(uncertain.status, "failed"); assert.equal(uncertain.retryCount, 0);
+  });
+
   await test("application writes prove no memory fallback", async () => {
     assert.ok((await db.select().from(orders)).length); assert.ok((await db.select().from(paymentAttempts)).length);
     assert.ok((await db.select().from(customerUsers)).length); assert.ok((await db.select().from(settings)).length); assert.ok((await db.select().from(products)).length);
