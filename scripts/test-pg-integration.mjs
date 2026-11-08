@@ -355,12 +355,12 @@ try {
     }
   });
 
-  await test("canceled callback records failed attempt", async () => {
+  await test("untrusted canceled callback keeps attempt pending", async () => {
     const order = (await db.insert(orders).values(orderValues(customerA, "AKM-CANCELED", { paymentTrackId: "TRACK-CANCELED" })).returning())[0];
     await db.insert(paymentAttempts).values({ orderId: order.id, trackId: "TRACK-CANCELED", amount: 100000, amountRials: 1000000 });
     assert.equal((await fetch(`${baseUrl}/api/payment/verify?orderId=AKM-CANCELED&trackId=TRACK-CANCELED&success=0`, { redirect: "manual" })).status, 307);
-    assert.equal((await db.select().from(paymentAttempts).where(eq(paymentAttempts.trackId, "TRACK-CANCELED")))[0].status, "failed");
-    assert.equal((await db.select().from(orders).where(eq(orders.id, order.id)))[0].paymentStatus, "failed");
+    assert.equal((await db.select().from(paymentAttempts).where(eq(paymentAttempts.trackId, "TRACK-CANCELED")))[0].status, "pending");
+    assert.equal((await db.select().from(orders).where(eq(orders.id, order.id)))[0].paymentStatus, "pending");
   });
 
   await test("unknown Zarinpal callback fails closed", async () => {
