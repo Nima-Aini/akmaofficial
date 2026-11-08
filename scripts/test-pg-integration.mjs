@@ -62,7 +62,7 @@ async function reset() {
 async function startServer() {
   server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "-p", String(port), "-H", "127.0.0.1"], {
     cwd: process.cwd(),
-    env: { ...process.env, DATABASE_URL: dbUrl, AKMA_INTEGRATION_TEST: "1", AKMA_TEST_TRANSPORT: "mock", AKMA_TEST_OTP_CODE: "54321", PAYMENT_PROVIDER: "zarinpal", APP_URL: baseUrl },
+    env: { ...process.env, DATABASE_URL: dbUrl, AKMA_INTEGRATION_TEST: "1", AKMA_TEST_TRANSPORT: "mock", AKMA_TEST_OTP_CODE: "54321", PAYMENT_PROVIDER: "zarinpal", APP_URL: "https://akmaofficial.ir" },
     stdio: ["ignore", "pipe", "pipe"],
   });
   server.stdout.on("data", (chunk) => process.stdout.write(`[next] ${chunk}`));
@@ -358,15 +358,37 @@ try {
   await test("untrusted canceled callback keeps attempt pending", async () => {
     const order = (await db.insert(orders).values(orderValues(customerA, "AKM-CANCELED", { paymentTrackId: "TRACK-CANCELED" })).returning())[0];
     await db.insert(paymentAttempts).values({ orderId: order.id, trackId: "TRACK-CANCELED", amount: 100000, amountRials: 1000000 });
-    assert.equal((await fetch(`${baseUrl}/api/payment/verify?orderId=AKM-CANCELED&trackId=TRACK-CANCELED&success=0`, { redirect: "manual" })).status, 307);
+    const response = await fetch(`${baseUrl}/api/payment/verify?orderId=AKM-CANCELED&trackId=TRACK-CANCELED&success=0`, { redirect: "manual", headers: { Host: "localhost:3010" } });
+    assert.equal(response.status, 307);
+    const destination = new URL(response.headers.get("location"));
+    assert.equal(destination.origin, "https://akmaofficial.ir");
+    assert.equal(destination.pathname, "/checkout/result");
+    assert.equal(destination.searchParams.get("trackingCode"), "AKM-CANCELED");
+    assert.equal(destination.searchParams.get("status"), "canceled");
     assert.equal((await db.select().from(paymentAttempts).where(eq(paymentAttempts.trackId, "TRACK-CANCELED")))[0].status, "pending");
     assert.equal((await db.select().from(orders).where(eq(orders.id, order.id)))[0].paymentStatus, "pending");
   });
 
   await test("unknown Zarinpal callback fails closed", async () => {
-    const response = await fetch(`${baseUrl}/api/payment/verify?orderId=AKM-UNKNOWN&Authority=UNKNOWN-AUTH&Status=OK`, { redirect: "manual" });
+    const response = await fetch(`${baseUrl}/api/payment/verify?orderId=AKM-UNKNOWN&Authority=UNKNOWN-AUTH&Status=OK&next=https://evil.example`, { redirect: "manual", headers: { Host: "evil.example" } });
     assert.equal(response.status, 307);
-    assert.match(response.headers.get("location") || "", /status=failed/);
+    const destination = new URL(response.headers.get("location"));
+    assert.equal(destination.origin, "https://akmaofficial.ir");
+    assert.equal(destination.pathname, "/checkout/result");
+    assert.equal(destination.searchParams.get("trackingCode"), "AKM-UNKNOWN");
+    assert.equal(destination.searchParams.get("status"), "failed");
+    assert.ok(destination.searchParams.get("error"));
+    assert.equal(destination.searchParams.has("next"), false);
+  });
+
+  await test("invalid payment callback redirects only to the public checkout", async () => {
+    const response = await fetch(`${baseUrl}/api/payment/verify?next=https://evil.example`, { redirect: "manual", headers: { Host: "localhost:3010" } });
+    assert.equal(response.status, 307);
+    const destination = new URL(response.headers.get("location"));
+    assert.equal(destination.origin, "https://akmaofficial.ir");
+    assert.equal(destination.pathname, "/checkout");
+    assert.equal(destination.searchParams.get("error"), "invalid_track_or_order_id");
+    assert.equal(destination.searchParams.has("next"), false);
   });
 
   const orderB = (await db.insert(orders).values(orderValues(customerB, "AKM-USER-B")).returning())[0];

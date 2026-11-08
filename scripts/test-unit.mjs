@@ -4,6 +4,7 @@
  */
 import assert from "node:assert";
 import { generateSecureOtp, sendMelliPattern, sendOtpSms } from "../src/lib/sms.ts";
+import { paymentResultUrl } from "../src/lib/payment-result-url.ts";
 import { calculateProductPricing, getProductPricePresentation, getWholesalePackConfig, isPositiveSafeInteger } from "../src/lib/pricing.ts";
 import { getProductImages, getResponsiveProductImages } from "../src/lib/product-media.ts";
 import { applyRichTextMark, normalizeRichTextValue, replaceRichTextPlainText, richTextToPlainText, sanitizeRichTextMap, sanitizeTextColor } from "../src/lib/rich-text.ts";
@@ -576,6 +577,29 @@ await runAsyncTest("Console mode never falls back to legacy credentials or produ
   } finally {
     globalThis.fetch = savedFetch;
     for (const [key, value] of saved) if (value === undefined) delete process.env[key]; else process.env[key] = value;
+  }
+});
+
+runTest("Payment result URL uses the public origin and preserves callback fields", () => {
+  const result = new URL(paymentResultUrl("/checkout/result", {
+    trackingCode: "AKM-123", status: "success", ref: "REF/123", trackId: "A-MOCK+123",
+  }, "https://akmaofficial.ir", true));
+  assert.equal(result.origin, "https://akmaofficial.ir");
+  assert.equal(result.pathname, "/checkout/result");
+  assert.deepEqual(Object.fromEntries(result.searchParams), {
+    trackingCode: "AKM-123", status: "success", ref: "REF/123", trackId: "A-MOCK+123",
+  });
+  for (const status of ["failed", "canceled"]) {
+    const redirect = new URL(paymentResultUrl("/checkout/result", { trackingCode: "AKM-123", status }, undefined, true));
+    assert.equal(redirect.origin, "https://akmaofficial.ir");
+    assert.equal(redirect.searchParams.get("status"), status);
+  }
+  assert.equal(new URL(paymentResultUrl("/checkout", { error: "invalid_track_or_order_id" }, undefined, true)).origin, "https://akmaofficial.ir");
+});
+
+runTest("Payment result URL rejects invalid configured and internal origins", () => {
+  for (const raw of ["http://localhost:3010", "https://localhost:3010", "https://127.0.0.1", "http://akmaofficial.ir", "https://evil.example", "https://akmaofficial.ir.evil.example", "https://akmaofficial.ir@evil.example", "https://akmaofficial.ir/path", "https://akmaofficial.ir?next=https://evil.example", "not a URL"]) {
+    assert.throws(() => paymentResultUrl("/checkout/result", { status: "failed" }, raw, true), /Invalid public APP_URL/);
   }
 });
 
