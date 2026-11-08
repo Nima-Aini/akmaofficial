@@ -13,6 +13,13 @@ export interface SmsSendResult {
 export type PatternSendResult = SmsSendResult & { retryable?: boolean; uncertain?: boolean };
 
 const CONSOLE_SHARED_SEND_URL = "https://console.melipayamak.com/api/send/shared/";
+const MAX_RECEIPT = "18446744073709551615";
+
+function parseConsoleReceipt(value: unknown): string | null {
+  // Numeric JSON tokens are converted to their original source text by the reviver below.
+  if (typeof value !== "string" || !/^[1-9]\d{0,19}$/.test(value)) return null;
+  return value.length < MAX_RECEIPT.length || value <= MAX_RECEIPT ? value : null;
+}
 
 function validPatternArgs(bodyId: number, args: string[]): boolean {
   if (!Number.isSafeInteger(bodyId) || bodyId < 1 || !Array.isArray(args) || args.length < 1 || args.length > 3 ||
@@ -61,7 +68,10 @@ export async function sendMelliPattern(phone: string, bodyId: number, args: stri
   }
   let data: unknown;
   try {
-    data = await response.json();
+    // JSON.parse's source context keeps 64-bit numeric recId tokens lossless.
+    // response.json() would round them before we could validate the receipt.
+    data = JSON.parse(await response.text(), (key: string, value: unknown, context?: { source?: string }) =>
+      key === "recId" && typeof value === "number" ? context?.source : value);
   } catch {
     return { success: false, error: "sms_invalid_response", uncertain: true };
   }
@@ -69,15 +79,13 @@ export async function sendMelliPattern(phone: string, bodyId: number, args: stri
     return { success: false, error: "sms_invalid_response", uncertain: true };
   }
   const payload = data as Record<string, unknown>;
-  const receipt = payload.recId;
-  const validReceipt = (typeof receipt === "string" && /^[1-9]\d*$/.test(receipt)) ||
-    (typeof receipt === "number" && Number.isSafeInteger(receipt) && receipt > 0);
+  const receipt = parseConsoleReceipt(payload.recId);
   const status = payload.status;
   const statusText = typeof status === "string" ? status.trim().toLowerCase() : "";
   const validStatus = status === undefined || status === null || statusText === "" ||
     ["عملیات موفق", "success", "ok"].includes(statusText) || status === 1 || status === 200;
-  if (validReceipt && validStatus) return { success: true, messageId: String(receipt) };
-  if (!validReceipt && !validStatus) return { success: false, error: "sms_provider_rejected", retryable: false };
+  if (receipt && validStatus) return { success: true, messageId: receipt };
+  if (!receipt && !validStatus) return { success: false, error: "sms_provider_rejected", retryable: false };
   return { success: false, error: "sms_acceptance_unknown", uncertain: true };
 }
 
