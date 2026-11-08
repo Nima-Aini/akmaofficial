@@ -143,6 +143,7 @@ if [[ "$worker_start_ok" != true || "$worker_status" != "online" ]]; then
   fi
   exit 1
 fi
+echo "SMS worker PM2 status: $worker_status"
 pm2 save --force >/dev/null
 health_response="$(curl --fail --silent --show-error --max-time 3 "$HEALTH_URL")"
 echo "Production health: $health_response"
