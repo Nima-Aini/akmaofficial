@@ -469,10 +469,13 @@ try {
   });
 
   await test("concurrent dispatchers claim each SMS once and quarantine abandoned sends", async () => {
+    const oldDate = new Date(Date.now() - 10 * 60 * 1000);
+    const oldOrder = (await db.insert(orders).values(orderValues(customerA, "AKM-OLD-RECONCILIATION")).returning())[0];
+    const oldAttempt = (await db.insert(paymentAttempts).values({ orderId: oldOrder.id, provider: "zibal", trackId: "OLD-RECONCILIATION", amount: 100000, amountRials: 1000000, createdAt: oldDate, updatedAt: oldDate }).returning())[0];
     const row = (await db.insert(smsNotifications).values({ idempotencyKey: "worker-sent-proof", kind: "payment_success", recipient: customerA.phone, bodyId: 556154, parameters: [customerA.name, "AKM-WORKER", "100000"] }).returning())[0];
     const abandoned = (await db.insert(smsNotifications).values({ idempotencyKey: "worker-abandoned-proof", kind: "payment_success", recipient: customerA.phone, bodyId: 556154, parameters: [customerA.name, "AKM-ABANDONED", "100000"], status: "processing", lastAttemptAt: new Date(Date.now() - 180000) }).returning())[0];
-    const runWorker = () => new Promise((resolve, reject) => {
-      const child = spawn(process.execPath, ["--import", "tsx", "scripts/dispatch-sms.mjs"], { cwd: process.cwd(), env: { ...process.env, DATABASE_URL: dbUrl, AKMA_INTEGRATION_TEST: "1", AKMA_TEST_TRANSPORT: "mock" } });
+    const runWorker = (reconciliationEnabled = "false") => new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, ["--import", "tsx", "scripts/dispatch-sms.mjs"], { cwd: process.cwd(), env: { ...process.env, DATABASE_URL: dbUrl, AKMA_INTEGRATION_TEST: "1", AKMA_TEST_TRANSPORT: "mock", AKMA_PAYMENT_RECONCILIATION_ENABLED: reconciliationEnabled } });
       let output = "";
       child.stdout.on("data", (part) => { output += part; });
       child.stderr.on("data", (part) => { output += part; });
@@ -483,6 +486,11 @@ try {
     const uncertain = (await db.select().from(smsNotifications).where(eq(smsNotifications.id, abandoned.id)))[0];
     assert.equal(sent.status, "sent"); assert.equal(sent.retryCount, 1);
     assert.equal(uncertain.status, "failed"); assert.equal(uncertain.retryCount, 0);
+    const untouched = (await db.select().from(paymentAttempts).where(eq(paymentAttempts.id, oldAttempt.id)))[0];
+    assert.equal(untouched.updatedAt.getTime(), oldDate.getTime(), "historical attempt changed while reconciliation disabled");
+    await runWorker("true");
+    const claimed = (await db.select().from(paymentAttempts).where(eq(paymentAttempts.id, oldAttempt.id)))[0];
+    assert.ok(claimed.updatedAt.getTime() > oldDate.getTime(), "opt-in reconciliation did not claim pending attempt");
   });
 
   await test("application writes prove no memory fallback", async () => {

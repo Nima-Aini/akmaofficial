@@ -14,8 +14,16 @@ export NVM_DIR="/root/.nvm"
 source "$NVM_DIR/nvm.sh"
 nvm use default --silent >/dev/null
 export NODE_ENV=production
+if [[ -z "${DATABASE_URL:-}" || -z "${MELLIPAYAMAK_CONSOLE_API_KEY:-}" ]]; then
+  echo "AKMA SMS worker requires DATABASE_URL and MELLIPAYAMAK_CONSOLE_API_KEY." >&2
+  exit 1
+fi
+cd /srv/akma/current
+if ! node --import tsx -e 'import("pg").then(async ({ default: pg }) => { const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL }); try { await pool.query("SELECT 1 FROM sms_notifications LIMIT 1"); } finally { await pool.end(); } }).catch(() => process.exit(1))'; then
+  echo "AKMA SMS worker cannot load dependencies or access the notification table." >&2
+  exit 1
+fi
 while true; do
-  cd /srv/akma/current
-  pnpm sms:dispatch || echo "AKMA SMS dispatcher failed; retrying" >&2
+  node --import tsx scripts/dispatch-sms.mjs
   sleep 20
 done

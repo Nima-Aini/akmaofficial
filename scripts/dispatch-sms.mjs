@@ -20,20 +20,22 @@ async function claim() {
   finally { client.release(); }
 }
 try {
-  // Reconcile pending bank attempts even if the buyer closed the browser before redirect.
-  // Each claim delays another inquiry by five minutes; reconciliation never sends SMS directly.
-  const { rows: pending } = await pool.query(`WITH due AS (
-    SELECT a.id FROM payment_attempts a JOIN orders o ON o.id=a.order_id
-    WHERE a.status='pending' AND o.payment_status<>'paid' AND a.created_at < now()-interval '2 minutes'
-      AND a.updated_at < now()-interval '5 minutes'
-    ORDER BY a.id FOR UPDATE OF a SKIP LOCKED LIMIT 10
-  ) UPDATE payment_attempts a SET updated_at=now() FROM due WHERE a.id=due.id
-  RETURNING a.order_id, a.track_id, a.provider`);
-  for (const attempt of pending) {
-    try {
-      const { rows: [order] } = await pool.query(`SELECT tracking_code FROM orders WHERE id=$1`, [attempt.order_id]);
-      if (order) await processOrderPaymentVerification(order.tracking_code, attempt.track_id, undefined, attempt.provider);
-    } catch (error) { console.error('[SMS] payment reconciliation failed', { orderId: attempt.order_id, error: error instanceof Error ? error.message : 'unknown' }); }
+  if (process.env.AKMA_PAYMENT_RECONCILIATION_ENABLED === "true") {
+    // Reconcile pending bank attempts even if the buyer closed the browser before redirect.
+    // Each claim delays another inquiry by five minutes; reconciliation never sends SMS directly.
+    const { rows: pending } = await pool.query(`WITH due AS (
+      SELECT a.id FROM payment_attempts a JOIN orders o ON o.id=a.order_id
+      WHERE a.status='pending' AND o.payment_status<>'paid' AND a.created_at < now()-interval '2 minutes'
+        AND a.updated_at < now()-interval '5 minutes'
+      ORDER BY a.id FOR UPDATE OF a SKIP LOCKED LIMIT 10
+    ) UPDATE payment_attempts a SET updated_at=now() FROM due WHERE a.id=due.id
+    RETURNING a.order_id, a.track_id, a.provider`);
+    for (const attempt of pending) {
+      try {
+        const { rows: [order] } = await pool.query(`SELECT tracking_code FROM orders WHERE id=$1`, [attempt.order_id]);
+        if (order) await processOrderPaymentVerification(order.tracking_code, attempt.track_id, undefined, attempt.provider);
+      } catch (error) { console.error('[SMS] payment reconciliation failed', { orderId: attempt.order_id, error: error instanceof Error ? error.message : 'unknown' }); }
+    }
   }
   // A crash during the provider call is ambiguous: never automatically resend.
   await pool.query(`UPDATE sms_notifications SET status='failed', last_error='uncertain_processing_interruption' WHERE status='processing' AND last_attempt_at < now() - interval '2 minutes'`);

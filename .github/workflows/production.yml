@@ -51,7 +51,10 @@ jobs:
           cache: pnpm
 
       - name: Install exact dependencies
-        run: pnpm install --frozen-lockfile
+        run: NODE_ENV=production pnpm install --frozen-lockfile --prod=false
+
+      - name: Check worker runtime dependencies
+        run: NODE_ENV=production node --import tsx -e 'import("pg").then(() => console.log("SMS worker runtime imports available"))'
 
       - name: Reject unsafe automatic migrations
         run: pnpm check:migrations

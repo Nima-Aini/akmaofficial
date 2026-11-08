@@ -118,7 +118,7 @@ separate reviewed maintenance plan.
 ## SMS notification worker
 
 After the new release passes its health check, the deployment starts or restarts only
-`akma-sms-worker`. It polls the PostgreSQL outbox every 20 seconds and periodically reconciles pending payment attempts with the stored gateway provider. The worker
+`akma-sms-worker`. It polls the PostgreSQL outbox every 20 seconds. Payment reconciliation is disabled by default and runs only when `AKMA_PAYMENT_RECONCILIATION_ENABLED=true`. Keep it `false` for the initial rollout; no historical pending payment attempts are touched by the worker. The worker
 loads `/etc/akma/akma.env` server-side and uses the current release. Check with
 `pm2 status akma-sms-worker` and `pm2 logs akma-sms-worker --lines 100 --nostream`.
 A missing Console API key or rejected template is recorded as a permanent failure.
@@ -142,3 +142,10 @@ used for this provider. The transport posts JSON to the Console shared-template
 API with positional `args` and records its `recId` only after provider acceptance.
 A receipt does not establish handset delivery. Do not print the key or the full
 provider URL in diagnostics.
+
+The deploy uses `pnpm install --frozen-lockfile --prod=false` so the build
+and the SMS worker have `tsx` even with `NODE_ENV=production`. The worker
+checks the Console key, database connection, notification table and runtime
+imports before processing jobs. A dispatcher failure exits the wrapper so PM2
+reports it; it is not swallowed by an endless retry loop. The deploy checks
+the initial PM2 worker status after starting it.

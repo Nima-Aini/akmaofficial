@@ -54,11 +54,16 @@ set -a
 # shellcheck disable=SC1090
 source "$ENV_FILE"
 set +a
+# Fail before building, backing up, migrating or switching the release.
+if [[ "${SMS_PROVIDER:-mellipayamak}" == "mellipayamak" && -z "${MELLIPAYAMAK_CONSOLE_API_KEY:-}" ]]; then
+  echo "MELLIPAYAMAK_CONSOLE_API_KEY is missing from the AKMA environment file." >&2
+  exit 1
+fi
 
 cd "$release"
 corepack enable
 corepack prepare pnpm@11.19.0 --activate
-pnpm install --frozen-lockfile
+pnpm install --frozen-lockfile --prod=false
 pnpm check:migrations
 pnpm typecheck
 pnpm lint
@@ -113,10 +118,30 @@ if [[ "$healthy" != true ]]; then
 fi
 
 # The outbox worker starts only after the new application passes health checks.
+worker_start_ok=true
+worker_existed=false
 if pm2 describe akma-sms-worker >/dev/null 2>&1; then
-  pm2 restart akma-sms-worker
+  worker_existed=true
+  pm2 restart akma-sms-worker || worker_start_ok=false
 else
-  pm2 start /usr/local/sbin/akma-sms-worker --name akma-sms-worker --interpreter bash
+  pm2 start /usr/local/sbin/akma-sms-worker --name akma-sms-worker --interpreter bash --max-restarts 5 --restart-delay 10000 || worker_start_ok=false
+fi
+sleep 2
+worker_status="$(pm2 jlist | node -e 'let s="";process.stdin.on("data",x=>s+=x);process.stdin.on("end",()=>{const p=JSON.parse(s).find(x=>x.name==="akma-sms-worker");console.log(p?.pm2_env?.status ?? "missing")})')"
+if [[ "$worker_start_ok" != true || "$worker_status" != "online" ]]; then
+  echo "AKMA SMS worker startup failed (PM2: $worker_status)." >&2
+  pm2 logs akma-sms-worker --lines 30 --nostream >&2 || true
+  if [[ -n "$previous" && -d "$previous" ]]; then
+    ln -sfn "$previous" "$CURRENT.next"
+    mv -Tf "$CURRENT.next" "$CURRENT"
+    restart_app
+    if [[ "$worker_existed" == true ]]; then
+      pm2 restart akma-sms-worker || true
+    else
+      pm2 delete akma-sms-worker || true
+    fi
+  fi
+  exit 1
 fi
 pm2 save --force >/dev/null
 health_response="$(curl --fail --silent --show-error --max-time 3 "$HEALTH_URL")"
