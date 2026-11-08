@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Vazirmatn } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { getSettings } from "@/lib/store";
 import {
@@ -18,9 +18,10 @@ import { FloatingCallBar } from "@/components/floating-call-bar";
 import { CartProvider } from "@/context/cart-context";
 import { CartDrawer } from "@/components/cart-drawer";
 
-const vazirmatn = Vazirmatn({
-  subsets: ["arabic", "latin"],
-  weight: ["300", "400", "500", "600", "700", "800", "900"],
+const vazirmatn = localFont({
+  src: "./fonts/Vazirmatn[wght].woff2",
+  weight: "100 900",
+  style: "normal",
   display: "swap",
   variable: "--font-vazirmatn",
 });
