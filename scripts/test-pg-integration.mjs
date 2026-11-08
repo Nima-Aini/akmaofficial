@@ -435,6 +435,14 @@ try {
     assert.deepEqual(messages[0].parameters, [customerA.name, order.trackingCode, "100000"]);
   });
 
+  await test("failed SMS delivery cannot undo a settled payment", async () => {
+    const order = (await db.select().from(orders).where(eq(orders.trackingCode, "AKM-SMS-SUCCESS")))[0];
+    const notification = (await db.select().from(smsNotifications).where(eq(smsNotifications.orderId, order.id)))[0];
+    await db.update(smsNotifications).set({ status: "permanently_failed", lastError: "provider_rejected" }).where(eq(smsNotifications.id, notification.id));
+    assert.equal((await db.select().from(orders).where(eq(orders.id, order.id)))[0].paymentStatus, "paid");
+    assert.equal((await db.select().from(paymentAttempts).where(eq(paymentAttempts.orderId, order.id)))[0].status, "paid");
+  });
+
   await test("definitive failed attempt queues one event, transport error queues none", async () => {
     const order = (await db.insert(orders).values(orderValues(customerA, "AKM-SMS-FAILURE")).returning())[0];
     await db.insert(paymentAttempts).values({ orderId: order.id, provider: "zibal", trackId: "SMS-FAIL", amount: 100000, amountRials: 1000000 });
