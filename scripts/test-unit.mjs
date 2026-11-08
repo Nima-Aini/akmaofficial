@@ -451,12 +451,12 @@ await runAsyncTest("Console API accepts a real receipt and ordered template args
       assert.equal(url, "https://console.melipayamak.com/api/send/shared/unit-test-key");
       assert.equal(options.headers["Content-Type"], "application/json");
       assert.deepEqual(JSON.parse(options.body), { to: "09121111111", bodyId: 556154, args: ["مشتری", "AKM-1", "100000"] });
-      return { ok: true, status: 200, json: async () => ({ recId: "3741437414", status: "عملیات موفق" }) };
+      return { ok: true, status: 200, text: async () => '{"recId":"3741437414","status":"عملیات موفق"}' };
     };
     assert.deepEqual(await sendMelliPattern("09121111111", 556154, ["مشتری", "AKM-1", "100000"]), { success: true, messageId: "3741437414" });
     globalThis.fetch = async (_url, options) => {
       assert.deepEqual(JSON.parse(options.body), { to: "09121111111", bodyId: 556149, args: ["12345"] });
-      return { ok: true, status: 200, json: async () => ({ recId: "3741437415", status: "عملیات موفق" }) };
+      return { ok: true, status: 200, text: async () => '{"recId":3741437415,"status":"عملیات موفق"}' };
     };
     assert.equal((await sendOtpSms("09121111111", "12345")).success, true);
   } finally {
@@ -473,9 +473,9 @@ await runAsyncTest("Console API classifies provider errors, HTTP errors, and unc
   delete process.env.AKMA_INTEGRATION_TEST;
   const send = () => sendMelliPattern("09121111111", 556160, ["AKM-1", "POST-123"]);
   try {
-    globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ recId: null, status: "InvalidData" }) });
+    globalThis.fetch = async () => ({ ok: true, status: 200, text: async () => '{"recId":null,"status":"InvalidData"}' });
     assert.deepEqual(await send(), { success: false, error: "sms_provider_rejected", retryable: false });
-    globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ recId: "123456", status: "InvalidData" }) });
+    globalThis.fetch = async () => ({ ok: true, status: 200, text: async () => '{"recId":"123456","status":"InvalidData"}' });
     assert.equal((await send()).uncertain, true);
     for (const status of [400, 401, 429, 500]) {
       globalThis.fetch = async () => ({ ok: false, status });
@@ -487,8 +487,41 @@ await runAsyncTest("Console API classifies provider errors, HTTP errors, and unc
     }
     globalThis.fetch = async () => { throw new Error("timeout with secret unit-test-key"); };
     assert.deepEqual(await send(), { success: false, error: "sms_response_unknown", uncertain: true });
-    globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => { throw new Error("invalid JSON"); } });
+    globalThis.fetch = async () => ({ ok: true, status: 200, text: async () => { throw new Error("invalid JSON"); } });
     assert.equal((await send()).uncertain, true);
+  } finally {
+    globalThis.fetch = savedFetch;
+    if (savedKey === undefined) delete process.env.MELLIPAYAMAK_CONSOLE_API_KEY; else process.env.MELLIPAYAMAK_CONSOLE_API_KEY = savedKey;
+    if (savedIntegration === undefined) delete process.env.AKMA_INTEGRATION_TEST; else process.env.AKMA_INTEGRATION_TEST = savedIntegration;
+  }
+});
+
+await runAsyncTest("Console API preserves 64-bit receipts and rejects invalid receipt shapes", async () => {
+  const savedFetch = globalThis.fetch;
+  const savedKey = process.env.MELLIPAYAMAK_CONSOLE_API_KEY;
+  const savedIntegration = process.env.AKMA_INTEGRATION_TEST;
+  process.env.MELLIPAYAMAK_CONSOLE_API_KEY = "unit-test-key";
+  delete process.env.AKMA_INTEGRATION_TEST;
+  const send = () => sendMelliPattern("09121111111", 556162, ["AKM-1"]);
+  try {
+    for (const [raw, receipt] of [
+      ['{"recId":123,"status":"عملیات موفق"}', "123"],
+      ['{"recId":9223372036854775807,"status":"عملیات موفق"}', "9223372036854775807"],
+      ['{"recId":"18446744073709551615","status":"success"}', "18446744073709551615"],
+      ['{"recId":9223372036854775807}', "9223372036854775807"],
+    ]) {
+      globalThis.fetch = async () => ({ ok: true, status: 200, text: async () => raw });
+      assert.deepEqual(await send(), { success: true, messageId: receipt });
+    }
+    for (const raw of [
+      '{"status":"عملیات موفق"}', '{"recId":0,"status":"عملیات موفق"}',
+      '{"recId":-123,"status":"عملیات موفق"}', '{"recId":"1x2","status":"عملیات موفق"}',
+      '{"recId":1.5,"status":"عملیات موفق"}', '{"recId":18446744073709551616,"status":"عملیات موفق"}',
+      '{"recId":{"id":123},"status":"عملیات موفق"}',
+    ]) {
+      globalThis.fetch = async () => ({ ok: true, status: 200, text: async () => raw });
+      assert.equal((await send()).uncertain, true, raw);
+    }
   } finally {
     globalThis.fetch = savedFetch;
     if (savedKey === undefined) delete process.env.MELLIPAYAMAK_CONSOLE_API_KEY; else process.env.MELLIPAYAMAK_CONSOLE_API_KEY = savedKey;

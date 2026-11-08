@@ -242,7 +242,7 @@ export async function sendCustomerOtp(
       // Send real SMS
       const smsResult = await sendOtpSms(phone, code);
       if (!smsResult.success) {
-        return { ok: false, error: smsResult.error || "خطا در ارسال پیامک کد تأیید" };
+        return { ok: false, error: "ارسال کد تأیید با مشکل مواجه شد. اگر کد را دریافت کرده‌اید، کمی بعد دوباره تلاش کنید." };
       }
 
       return { ok: true };
@@ -293,7 +293,7 @@ export async function sendCustomerOtp(
 
   const smsResult = await sendOtpSms(phone, code);
   if (!smsResult.success) {
-    return { ok: false, error: smsResult.error || "خطا در ارسال پیامک کد تأیید" };
+    return { ok: false, error: "ارسال کد تأیید با مشکل مواجه شد. اگر کد را دریافت کرده‌اید، کمی بعد دوباره تلاش کنید." };
   }
 
   return { ok: true };
