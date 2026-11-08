@@ -172,6 +172,25 @@ export const paymentAttempts = pgTable(
   ],
 );
 
+export const smsNotifications = pgTable("sms_notifications", {
+  id: serial("id").primaryKey(),
+  idempotencyKey: text("idempotency_key").notNull().unique(),
+  kind: text("kind").notNull(),
+  orderId: integer("order_id").references(() => orders.id, { onDelete: "restrict" }),
+  paymentAttemptId: integer("payment_attempt_id").references(() => paymentAttempts.id, { onDelete: "restrict" }),
+  recipient: text("recipient").notNull(),
+  bodyId: integer("body_id").notNull(),
+  parameters: jsonb("parameters").$type<string[]>().notNull(),
+  status: text("status").notNull().default("pending"),
+  retryCount: integer("retry_count").notNull().default(0),
+  providerMessageId: text("provider_message_id"),
+  lastError: text("last_error"),
+  nextAttemptAt: timestamp("next_attempt_at").notNull().defaultNow(),
+  lastAttemptAt: timestamp("last_attempt_at"),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const cartProductSuggestions = pgTable(
   "cart_product_suggestions",
   {

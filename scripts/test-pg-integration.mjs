@@ -33,7 +33,7 @@ function validatedDatabaseUrl() {
 
 const dbUrl = validatedDatabaseUrl();
 const schema = await import("../src/db/schema.ts");
-const { orders, paymentAttempts, customerUsers, customerOtps, adminUsers, settings, products, cartProductSuggestions } = schema;
+const { orders, paymentAttempts, smsNotifications, customerUsers, customerOtps, adminUsers, settings, products, cartProductSuggestions } = schema;
 const { atomicUpdateOrderPaymentRetry, createPayment, processOrderPaymentVerification } = await import("../src/lib/payment.ts");
 const { createCustomerToken, sendCustomerOtp } = await import("../src/lib/customer-auth.ts");
 const { createSessionToken, hashPassword } = await import("../src/lib/auth.ts");
@@ -57,7 +57,7 @@ async function migrate() {
   for (const file of (await readdir(dir)).filter((f) => f.endsWith(".sql")).sort()) await pool.query(await readFile(path.join(dir, file), "utf8"));
 }
 async function reset() {
-  await pool.query("TRUNCATE TABLE payment_attempts, orders, customer_users, customer_otps, admin_users, cart_product_suggestions, blog_posts, settings, products RESTART IDENTITY CASCADE");
+  await pool.query("TRUNCATE TABLE sms_notifications, payment_attempts, orders, customer_users, customer_otps, admin_users, cart_product_suggestions, blog_posts, settings, products RESTART IDENTITY CASCADE");
 }
 async function startServer() {
   server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "-p", String(port), "-H", "127.0.0.1"], {
@@ -355,12 +355,12 @@ try {
     }
   });
 
-  await test("canceled callback records failed attempt", async () => {
+  await test("untrusted canceled callback keeps attempt pending", async () => {
     const order = (await db.insert(orders).values(orderValues(customerA, "AKM-CANCELED", { paymentTrackId: "TRACK-CANCELED" })).returning())[0];
     await db.insert(paymentAttempts).values({ orderId: order.id, trackId: "TRACK-CANCELED", amount: 100000, amountRials: 1000000 });
     assert.equal((await fetch(`${baseUrl}/api/payment/verify?orderId=AKM-CANCELED&trackId=TRACK-CANCELED&success=0`, { redirect: "manual" })).status, 307);
-    assert.equal((await db.select().from(paymentAttempts).where(eq(paymentAttempts.trackId, "TRACK-CANCELED")))[0].status, "failed");
-    assert.equal((await db.select().from(orders).where(eq(orders.id, order.id)))[0].paymentStatus, "failed");
+    assert.equal((await db.select().from(paymentAttempts).where(eq(paymentAttempts.trackId, "TRACK-CANCELED")))[0].status, "pending");
+    assert.equal((await db.select().from(orders).where(eq(orders.id, order.id)))[0].paymentStatus, "pending");
   });
 
   await test("unknown Zarinpal callback fails closed", async () => {
@@ -423,6 +423,74 @@ try {
     const responses = await Promise.all([post("/api/customer/auth", { action: "verify_otp", phone, code: "54321", name: "OTP" }), post("/api/customer/auth", { action: "verify_otp", phone, code: "54321", name: "OTP" })]);
     assert.deepEqual(responses.map((r) => r.status).sort(), [200, 400]);
     assert.equal((await db.select().from(customerOtps).where(eq(customerOtps.phone, phone))).length, 0);
+  });
+
+  await test("settlement and repeated callback create one durable success event", async () => {
+    const order = (await db.insert(orders).values(orderValues(customerA, "AKM-SMS-SUCCESS")).returning())[0];
+    await db.insert(paymentAttempts).values({ orderId: order.id, provider: "zarinpal", trackId: "SMS-AUTH", amount: 100000, amountRials: 1000000 });
+    const verify = async () => ({ success: true, resultCode: 100, refNumber: "SMS-REF", rawAmountRials: 1000000 });
+    await Promise.all([processOrderPaymentVerification(order.trackingCode, "SMS-AUTH", verify, "zarinpal"), processOrderPaymentVerification(order.trackingCode, "SMS-AUTH", verify, "zarinpal")]);
+    const messages = await db.select().from(smsNotifications).where(eq(smsNotifications.orderId, order.id));
+    assert.equal(messages.length, 1); assert.equal(messages[0].bodyId, 556154);
+    assert.deepEqual(messages[0].parameters, [customerA.name, order.trackingCode, "100000"]);
+  });
+
+  await test("failed SMS delivery cannot undo a settled payment", async () => {
+    const order = (await db.select().from(orders).where(eq(orders.trackingCode, "AKM-SMS-SUCCESS")))[0];
+    const notification = (await db.select().from(smsNotifications).where(eq(smsNotifications.orderId, order.id)))[0];
+    await db.update(smsNotifications).set({ status: "permanently_failed", lastError: "provider_rejected" }).where(eq(smsNotifications.id, notification.id));
+    assert.equal((await db.select().from(orders).where(eq(orders.id, order.id)))[0].paymentStatus, "paid");
+    assert.equal((await db.select().from(paymentAttempts).where(eq(paymentAttempts.orderId, order.id)))[0].status, "paid");
+  });
+
+  await test("definitive failed attempt queues one event, transport error queues none", async () => {
+    const order = (await db.insert(orders).values(orderValues(customerA, "AKM-SMS-FAILURE")).returning())[0];
+    await db.insert(paymentAttempts).values({ orderId: order.id, provider: "zibal", trackId: "SMS-FAIL", amount: 100000, amountRials: 1000000 });
+    const transient = await processOrderPaymentVerification(order.trackingCode, "SMS-FAIL", async () => ({ success: false, resultCode: -1 }), "zibal");
+    assert.equal(transient.success, false);
+    assert.equal((await db.select().from(smsNotifications).where(eq(smsNotifications.orderId, order.id))).length, 0);
+    const definitive = async () => ({ success: false, resultCode: 202, confirmedFailure: true });
+    await processOrderPaymentVerification(order.trackingCode, "SMS-FAIL", definitive, "zibal");
+    await processOrderPaymentVerification(order.trackingCode, "SMS-FAIL", definitive, "zibal");
+    const messages = await db.select().from(smsNotifications).where(eq(smsNotifications.orderId, order.id));
+    assert.equal(messages.length, 1); assert.equal(messages[0].bodyId, 556162);
+  });
+
+  await test("shipping requires tracking and repeated save is idempotent", async () => {
+    const order = (await db.insert(orders).values(orderValues(customerA, "AKM-SMS-SHIPPING")).returning())[0];
+    const cookie = `akma_admin_session=${createSessionToken(admin.username)}`;
+    const put = (patch) => fetch(`${baseUrl}/api/admin/orders/${order.id}`, { method: "PUT", headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify(patch) });
+    assert.equal((await put({ status: "shipped" })).status, 400);
+    assert.equal((await put({ status: "shipped", shippingCode: "POST-12345" })).status, 200);
+    assert.equal((await put({ status: "shipped", shippingCode: "POST-12345" })).status, 200);
+    assert.equal((await db.select().from(smsNotifications).where(eq(smsNotifications.orderId, order.id))).length, 1);
+    assert.equal((await put({ status: "shipped", shippingCode: "POST-54321" })).status, 200);
+    assert.equal((await db.select().from(smsNotifications).where(eq(smsNotifications.orderId, order.id))).length, 2);
+  });
+
+  await test("concurrent dispatchers claim each SMS once and quarantine abandoned sends", async () => {
+    const oldDate = new Date(Date.now() - 10 * 60 * 1000);
+    const oldOrder = (await db.insert(orders).values(orderValues(customerA, "AKM-OLD-RECONCILIATION")).returning())[0];
+    const oldAttempt = (await db.insert(paymentAttempts).values({ orderId: oldOrder.id, provider: "zibal", trackId: "OLD-RECONCILIATION", amount: 100000, amountRials: 1000000, createdAt: oldDate, updatedAt: oldDate }).returning())[0];
+    const row = (await db.insert(smsNotifications).values({ idempotencyKey: "worker-sent-proof", kind: "payment_success", recipient: customerA.phone, bodyId: 556154, parameters: [customerA.name, "AKM-WORKER", "100000"] }).returning())[0];
+    const abandoned = (await db.insert(smsNotifications).values({ idempotencyKey: "worker-abandoned-proof", kind: "payment_success", recipient: customerA.phone, bodyId: 556154, parameters: [customerA.name, "AKM-ABANDONED", "100000"], status: "processing", lastAttemptAt: new Date(Date.now() - 180000) }).returning())[0];
+    const runWorker = (reconciliationEnabled = "false") => new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, ["--import", "tsx", "scripts/dispatch-sms.mjs"], { cwd: process.cwd(), env: { ...process.env, DATABASE_URL: dbUrl, AKMA_INTEGRATION_TEST: "1", AKMA_TEST_TRANSPORT: "mock", AKMA_PAYMENT_RECONCILIATION_ENABLED: reconciliationEnabled } });
+      let output = "";
+      child.stdout.on("data", (part) => { output += part; });
+      child.stderr.on("data", (part) => { output += part; });
+      child.once("exit", (code) => code === 0 ? resolve(output) : reject(new Error(output)));
+    });
+    await Promise.all([runWorker(), runWorker()]);
+    const sent = (await db.select().from(smsNotifications).where(eq(smsNotifications.id, row.id)))[0];
+    const uncertain = (await db.select().from(smsNotifications).where(eq(smsNotifications.id, abandoned.id)))[0];
+    assert.equal(sent.status, "sent"); assert.equal(sent.retryCount, 1);
+    assert.equal(uncertain.status, "failed"); assert.equal(uncertain.retryCount, 0);
+    const untouched = (await db.select().from(paymentAttempts).where(eq(paymentAttempts.id, oldAttempt.id)))[0];
+    assert.equal(untouched.updatedAt.getTime(), oldDate.getTime(), "historical attempt changed while reconciliation disabled");
+    await runWorker("true");
+    const claimed = (await db.select().from(paymentAttempts).where(eq(paymentAttempts.id, oldAttempt.id)))[0];
+    assert.ok(claimed.updatedAt.getTime() > oldDate.getTime(), "opt-in reconciliation did not claim pending attempt");
   });
 
   await test("application writes prove no memory fallback", async () => {

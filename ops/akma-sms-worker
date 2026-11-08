@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+ENV_FILE="/etc/akma/akma.env"
+if [[ ! -r "$ENV_FILE" ]]; then
+  echo "AKMA environment file unavailable" >&2
+  exit 1
+fi
+set -a
+# shellcheck disable=SC1090
+source "$ENV_FILE"
+set +a
+export NVM_DIR="/root/.nvm"
+# shellcheck disable=SC1091
+source "$NVM_DIR/nvm.sh"
+nvm use default --silent >/dev/null
+export NODE_ENV=production
+if [[ -z "${DATABASE_URL:-}" || -z "${MELLIPAYAMAK_CONSOLE_API_KEY:-}" ]]; then
+  echo "AKMA SMS worker requires DATABASE_URL and MELLIPAYAMAK_CONSOLE_API_KEY." >&2
+  exit 1
+fi
+cd /srv/akma/current
+if ! node --import tsx -e 'import("pg").then(async ({ default: pg }) => { const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL }); try { await pool.query("SELECT 1 FROM sms_notifications LIMIT 1"); } finally { await pool.end(); } }).catch(() => process.exit(1))'; then
+  echo "AKMA SMS worker cannot load dependencies or access the notification table." >&2
+  exit 1
+fi
+while true; do
+  node --import tsx scripts/dispatch-sms.mjs
+  sleep 20
+done
