@@ -112,6 +112,12 @@ if [[ "$healthy" != true ]]; then
   exit 1
 fi
 
+# The outbox worker starts only after the new application passes health checks.
+if pm2 describe akma-sms-worker >/dev/null 2>&1; then
+  pm2 restart akma-sms-worker
+else
+  pm2 start /usr/local/sbin/akma-sms-worker --name akma-sms-worker --interpreter bash
+fi
 pm2 save --force >/dev/null
 health_response="$(curl --fail --silent --show-error --max-time 3 "$HEALTH_URL")"
 echo "Production health: $health_response"

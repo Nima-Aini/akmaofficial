@@ -15,6 +15,7 @@ if (!currentDirectory.startsWith(releaseRoot) || process.getuid?.() !== 0) {
 
 const launchers = [
   ["ops/akma-server", "/usr/local/sbin/akma-server"],
+  ["ops/akma-sms-worker", "/usr/local/sbin/akma-sms-worker"],
   ["ops/akma-deploy", "/usr/local/sbin/akma-deploy"],
 ];
 

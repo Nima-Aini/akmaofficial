@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+ENV_FILE="/etc/akma/akma.env"
+if [[ ! -r "$ENV_FILE" ]]; then
+  echo "AKMA environment file unavailable" >&2
+  exit 1
+fi
+set -a
+# shellcheck disable=SC1090
+source "$ENV_FILE"
+set +a
+export NVM_DIR="/root/.nvm"
+# shellcheck disable=SC1091
+source "$NVM_DIR/nvm.sh"
+nvm use default --silent >/dev/null
+export NODE_ENV=production
+while true; do
+  cd /srv/akma/current
+  pnpm sms:dispatch || echo "AKMA SMS dispatcher failed; retrying" >&2
+  sleep 20
+done

@@ -9,6 +9,7 @@ import { assertMemoryStoreAllowed, db } from "@/db";
 import { orders, paymentAttempts, type OrderRow, type PaymentAttemptRow } from "@/db/schema";
 import { and, eq, ne } from "drizzle-orm";
 import { getMemoryStore, getMemoryPaymentAttempts, getOrderByTrackingCode } from "./store";
+import { enqueueOrderSms } from "./sms-outbox";
 
 function integrationMockEnabled(): boolean {
   if (process.env.AKMA_INTEGRATION_TEST !== "1") return false;
@@ -56,6 +57,7 @@ export interface PaymentVerifyResult {
   cardNumber?: string;
   paidAt?: Date;
   alreadyVerified?: boolean;
+  confirmedFailure?: boolean;
   error?: string;
 }
 
@@ -286,6 +288,7 @@ export async function verifyZibalPayment(trackId: string): Promise<PaymentVerify
     return {
       success: false,
       resultCode,
+      confirmedFailure: resultCode === 202 && [3, 4, 5, 6, 8, 9, 10, 11, 12].includes(Number(data?.status)),
       error: data?.message || `تراکنش ناموفق بود یا لغو گردید (کد: ${resultCode})`,
     };
   } catch (err: unknown) {
@@ -713,20 +716,22 @@ export async function processOrderPaymentVerification(
     : await verifyPayment(provider, cleanTrackId, order.totalAmount);
 
   if (!verifyRes.success) {
-    // Record failed attempt
+    // Transport errors and ambiguous provider codes remain pending for later verification.
+    if (!verifyRes.confirmedFailure) {
+      return { success: false, error: verifyRes.error || "خطا در استعلام وضعیت پرداخت" };
+    }
     if (db || process.env.DATABASE_URL) {
-      await db!
-        .update(paymentAttempts)
-        .set({ status: "failed", rawGatewayResponse: safeGatewayMetadata(verifyRes), updatedAt: new Date() })
-        .where(eq(paymentAttempts.id, attempt.id));
+      await db!.transaction(async (tx: any) => {
+        const freshOrder = (await tx.select().from(orders).where(eq(orders.id, order.id)).for("update").limit(1))[0];
+        const freshAttempt = (await tx.select().from(paymentAttempts).where(eq(paymentAttempts.id, attempt!.id)).for("update").limit(1))[0];
+        if (!freshOrder || !freshAttempt || freshOrder.paymentStatus === "paid" || freshAttempt.status === "paid" || freshAttempt.status === "duplicate_paid") return;
+        await tx.update(paymentAttempts).set({ status: "failed", rawGatewayResponse: safeGatewayMetadata(verifyRes), updatedAt: new Date() }).where(eq(paymentAttempts.id, freshAttempt.id));
+        await enqueueOrderSms(tx, "payment_failed", freshOrder, `payment-failed:${freshAttempt.id}`, freshAttempt.id);
+      });
     } else {
       assertMemoryStoreAllowed("failed payment verification");
       const memoryAttempt = getMemoryPaymentAttempts().find((item) => item.id === attempt!.id);
-      if (memoryAttempt) {
-        memoryAttempt.status = "failed";
-        memoryAttempt.rawGatewayResponse = safeGatewayMetadata(verifyRes);
-        memoryAttempt.updatedAt = new Date();
-      }
+      if (memoryAttempt) { memoryAttempt.status = "failed"; memoryAttempt.rawGatewayResponse = safeGatewayMetadata(verifyRes); memoryAttempt.updatedAt = new Date(); }
     }
     return {
       success: false,
@@ -850,6 +855,10 @@ export async function processOrderPaymentVerification(
             updatedAt: now,
           })
           .where(eq(orders.id, freshOrder.id));
+
+        if (freshOrder.status !== "cancelled") {
+          await enqueueOrderSms(tx, "payment_success", { ...freshOrder, paymentStatus: "paid" }, `payment-success:${freshOrder.id}`, freshAttempt.id);
+        }
 
         return {
           success: true,

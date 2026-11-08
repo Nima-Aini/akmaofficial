@@ -3,7 +3,7 @@
  * Tests pricing logic, tier calculations, phone masking, OTP formatting, and wholesale quantity validation.
  */
 import assert from "node:assert";
-import { generateSecureOtp } from "../src/lib/sms.ts";
+import { generateSecureOtp, sendMelliPattern } from "../src/lib/sms.ts";
 import { calculateProductPricing, getProductPricePresentation, getWholesalePackConfig, isPositiveSafeInteger } from "../src/lib/pricing.ts";
 import { getProductImages, getResponsiveProductImages } from "../src/lib/product-media.ts";
 import { applyRichTextMark, normalizeRichTextValue, replaceRichTextPlainText, richTextToPlainText, sanitizeRichTextMap, sanitizeTextColor } from "../src/lib/rich-text.ts";
@@ -436,6 +436,30 @@ await runAsyncTest("Missing Zarinpal merchant ID fails closed in production", as
     if (previousMerchant === undefined) delete process.env.ZARINPAL_MERCHANT_ID; else process.env.ZARINPAL_MERCHANT_ID = previousMerchant;
     if (previousNodeEnv === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = previousNodeEnv;
     if (previousIntegration === undefined) delete process.env.AKMA_INTEGRATION_TEST; else process.env.AKMA_INTEGRATION_TEST = previousIntegration;
+  }
+});
+
+await runAsyncTest("Melli pattern uses ordered parameters and validates receipt", async () => {
+  const previous = globalThis.fetch;
+  const env = ["MELLIPAYAMAK_USERNAME", "MELLIPAYAMAK_PASSWORD", "AKMA_INTEGRATION_TEST"].map(key => [key, process.env[key]]);
+  process.env.MELLIPAYAMAK_USERNAME = "test-user";
+  process.env.MELLIPAYAMAK_PASSWORD = "test-pass";
+  delete process.env.AKMA_INTEGRATION_TEST;
+  let calls = 0;
+  globalThis.fetch = async (_url, options) => {
+    calls++;
+    const payload = new URLSearchParams(options.body);
+    assert.equal(payload.get("bodyId"), "556154");
+    assert.equal(payload.get("text"), "مشتری;AKM-1;100000");
+    return { ok: true, json: async () => calls === 1 ? { RetStatus: 1, Value: "123456" } : { RetStatus: 0, Value: "123456" } };
+  };
+  try {
+    assert.equal((await sendMelliPattern("09121111111", 556154, ["مشتری", "AKM-1", "100000"])).success, true);
+    assert.equal((await sendMelliPattern("09121111111", 556154, ["مشتری", "AKM-1", "100000"])).success, false);
+    assert.equal((await sendMelliPattern("invalid", 556154, ["x"])).success, false);
+  } finally {
+    globalThis.fetch = previous;
+    for (const [key, value] of env) if (value === undefined) delete process.env[key]; else process.env[key] = value;
   }
 });
 

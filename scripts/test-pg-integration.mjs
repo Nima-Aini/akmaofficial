@@ -33,7 +33,7 @@ function validatedDatabaseUrl() {
 
 const dbUrl = validatedDatabaseUrl();
 const schema = await import("../src/db/schema.ts");
-const { orders, paymentAttempts, customerUsers, customerOtps, adminUsers, settings, products, cartProductSuggestions } = schema;
+const { orders, paymentAttempts, smsNotifications, customerUsers, customerOtps, adminUsers, settings, products, cartProductSuggestions } = schema;
 const { atomicUpdateOrderPaymentRetry, createPayment, processOrderPaymentVerification } = await import("../src/lib/payment.ts");
 const { createCustomerToken, sendCustomerOtp } = await import("../src/lib/customer-auth.ts");
 const { createSessionToken, hashPassword } = await import("../src/lib/auth.ts");
@@ -57,7 +57,7 @@ async function migrate() {
   for (const file of (await readdir(dir)).filter((f) => f.endsWith(".sql")).sort()) await pool.query(await readFile(path.join(dir, file), "utf8"));
 }
 async function reset() {
-  await pool.query("TRUNCATE TABLE payment_attempts, orders, customer_users, customer_otps, admin_users, cart_product_suggestions, blog_posts, settings, products RESTART IDENTITY CASCADE");
+  await pool.query("TRUNCATE TABLE sms_notifications, payment_attempts, orders, customer_users, customer_otps, admin_users, cart_product_suggestions, blog_posts, settings, products RESTART IDENTITY CASCADE");
 }
 async function startServer() {
   server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "-p", String(port), "-H", "127.0.0.1"], {
@@ -423,6 +423,41 @@ try {
     const responses = await Promise.all([post("/api/customer/auth", { action: "verify_otp", phone, code: "54321", name: "OTP" }), post("/api/customer/auth", { action: "verify_otp", phone, code: "54321", name: "OTP" })]);
     assert.deepEqual(responses.map((r) => r.status).sort(), [200, 400]);
     assert.equal((await db.select().from(customerOtps).where(eq(customerOtps.phone, phone))).length, 0);
+  });
+
+  await test("settlement and repeated callback create one durable success event", async () => {
+    const order = (await db.insert(orders).values(orderValues(customerA, "AKM-SMS-SUCCESS")).returning())[0];
+    await db.insert(paymentAttempts).values({ orderId: order.id, provider: "zarinpal", trackId: "SMS-AUTH", amount: 100000, amountRials: 1000000 });
+    const verify = async () => ({ success: true, resultCode: 100, refNumber: "SMS-REF", rawAmountRials: 1000000 });
+    await Promise.all([processOrderPaymentVerification(order.trackingCode, "SMS-AUTH", verify, "zarinpal"), processOrderPaymentVerification(order.trackingCode, "SMS-AUTH", verify, "zarinpal")]);
+    const messages = await db.select().from(smsNotifications).where(eq(smsNotifications.orderId, order.id));
+    assert.equal(messages.length, 1); assert.equal(messages[0].bodyId, 556154);
+    assert.deepEqual(messages[0].parameters, [customerA.name, order.trackingCode, "100000"]);
+  });
+
+  await test("definitive failed attempt queues one event, transport error queues none", async () => {
+    const order = (await db.insert(orders).values(orderValues(customerA, "AKM-SMS-FAILURE")).returning())[0];
+    await db.insert(paymentAttempts).values({ orderId: order.id, provider: "zibal", trackId: "SMS-FAIL", amount: 100000, amountRials: 1000000 });
+    const transient = await processOrderPaymentVerification(order.trackingCode, "SMS-FAIL", async () => ({ success: false, resultCode: -1 }), "zibal");
+    assert.equal(transient.success, false);
+    assert.equal((await db.select().from(smsNotifications).where(eq(smsNotifications.orderId, order.id))).length, 0);
+    const definitive = async () => ({ success: false, resultCode: 202, confirmedFailure: true });
+    await processOrderPaymentVerification(order.trackingCode, "SMS-FAIL", definitive, "zibal");
+    await processOrderPaymentVerification(order.trackingCode, "SMS-FAIL", definitive, "zibal");
+    const messages = await db.select().from(smsNotifications).where(eq(smsNotifications.orderId, order.id));
+    assert.equal(messages.length, 1); assert.equal(messages[0].bodyId, 556162);
+  });
+
+  await test("shipping requires tracking and repeated save is idempotent", async () => {
+    const order = (await db.insert(orders).values(orderValues(customerA, "AKM-SMS-SHIPPING")).returning())[0];
+    const cookie = `akma_admin_session=${createSessionToken(admin.username)}`;
+    const put = (patch) => fetch(`${baseUrl}/api/admin/orders/${order.id}`, { method: "PUT", headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify(patch) });
+    assert.equal((await put({ status: "shipped" })).status, 400);
+    assert.equal((await put({ status: "shipped", shippingCode: "POST-12345" })).status, 200);
+    assert.equal((await put({ status: "shipped", shippingCode: "POST-12345" })).status, 200);
+    assert.equal((await db.select().from(smsNotifications).where(eq(smsNotifications.orderId, order.id))).length, 1);
+    assert.equal((await put({ status: "shipped", shippingCode: "POST-54321" })).status, 200);
+    assert.equal((await db.select().from(smsNotifications).where(eq(smsNotifications.orderId, order.id))).length, 2);
   });
 
   await test("application writes prove no memory fallback", async () => {

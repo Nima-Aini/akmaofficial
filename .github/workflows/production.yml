@@ -61,6 +61,7 @@ jobs:
           bash -n ops/akma-deploy
           bash -n ops/akma-deploy-ssh
           bash -n ops/akma-server
+          bash -n ops/akma-sms-worker
 
       - name: Lint
         run: pnpm lint

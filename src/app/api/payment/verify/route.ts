@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { processOrderPaymentVerification, recordPaymentCallbackFailure } from "@/lib/payment";
+import { processOrderPaymentVerification } from "@/lib/payment";
 import type { PaymentProvider } from "@/lib/payment";
 
 export const dynamic = "force-dynamic";
@@ -20,25 +20,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${baseUrl}/checkout?error=invalid_track_or_order_id`);
   }
 
-  // If user canceled payment on gateway
-  if (
-    success === "0" ||
-    status === "3" ||
-    status.toUpperCase() === "NOK" ||
-    (provider === "zarinpal" && status.toUpperCase() !== "OK")
-  ) {
-    const recorded = await recordPaymentCallbackFailure(orderId, trackId, "gateway_callback_canceled", provider);
-    if (!recorded) {
-      return NextResponse.redirect(
-        `${baseUrl}/checkout/result?trackingCode=${encodeURIComponent(orderId)}&status=failed&error=${encodeURIComponent("شناسه تراکنش معتبر نیست.")}`,
-      );
-    }
-    return NextResponse.redirect(
-      `${baseUrl}/checkout/result?trackingCode=${encodeURIComponent(
-        orderId,
-      )}&status=canceled&error=${encodeURIComponent("پرداخت توسط کاربر لغو گردید.")}`,
-    );
-  }
+  // Callback status is untrusted; always verify the attempt with its stored provider.
+  const callbackCanceled = success === "0" || status === "3" || status.toUpperCase() === "NOK" || (provider === "zarinpal" && status.toUpperCase() !== "OK");
 
   // Strictly process payment verification with order binding & amount check
   const processRes = await processOrderPaymentVerification(orderId, trackId, undefined, provider);
@@ -52,6 +35,10 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // A callback alone cannot prove cancellation; provider verification determines failure.
+  if (callbackCanceled && !processRes.success) {
+    return NextResponse.redirect(`${baseUrl}/checkout/result?trackingCode=${encodeURIComponent(orderId)}&status=canceled`);
+  }
   // Verification failed
   const errorMsg = processRes.error || "تأیید تراکنش با خطا مواجه شد.";
   return NextResponse.redirect(

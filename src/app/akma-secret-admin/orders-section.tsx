@@ -118,7 +118,8 @@ export function OrdersSection({ toast }: { toast: (m: string, ok?: boolean) => v
       });
       const data = await res.json();
       if (res.ok && data.ok) {
-        toast(`سفارش #${id} با موفقیت به‌روزرسانی شد`);
+        const queued = data.notifications?.some((n: { kind: string; status: string }) => n.kind === "order_shipped" && ["pending", "retry_pending"].includes(n.status));
+        toast(queued ? `سفارش #${id} ذخیره شد؛ پیامک ارسال در صف است` : `سفارش #${id} با موفقیت به‌روزرسانی شد`);
         setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, ...draft } : o)));
       } else {
         toast(data.error || "خطا در ذخیره سفارش", false);
@@ -411,7 +412,7 @@ export function OrdersSection({ toast }: { toast: (m: string, ok?: boolean) => v
                 {/* Shipping code & Tipax tracking link inputs */}
                 <div className="mt-5 rounded-2xl border border-accent/20 bg-surface/80 p-4">
                   <p className="mb-3 flex items-center gap-2 text-xs font-extrabold text-accent">
-                    <Truck size={15} /> مشخصات ارسال و رهگیری پستی / تیپاکس
+                    <Truck size={15} /> مشخصات ارسال و رهگیری
                   </p>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
@@ -429,7 +430,7 @@ export function OrdersSection({ toast }: { toast: (m: string, ok?: boolean) => v
                     </div>
                     <div>
                       <label className="mb-1 block text-[11px] font-bold text-muted">
-                        لینک مستقیم رهگیری تیپاکس (مشتری با کلیک روی آن وارد سایت تیپاکس می‌شود)
+                        لینک رهگیری شرکت حمل (اختیاری)
                       </label>
                       <input
                         type="text"

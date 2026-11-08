@@ -14,7 +14,8 @@
     "test:integration": "node --import tsx scripts/test-pg-integration.mjs",
     "db:migrate": "node scripts/migrate.mjs",
     "db:migration:new": "node scripts/new-migration.mjs",
-    "check:migrations": "node scripts/check-migrations.mjs"
+    "check:migrations": "node scripts/check-migrations.mjs",
+    "sms:dispatch": "node --import tsx scripts/dispatch-sms.mjs"
   },
   "dependencies": {
     "dotenv": "17.3.1",

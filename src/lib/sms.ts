@@ -10,6 +10,37 @@ export interface SmsSendResult {
   error?: string;
 }
 
+export type PatternSendResult = SmsSendResult & { retryable?: boolean; uncertain?: boolean };
+
+/** Provider accepted means RetStatus=1 and an actual positive receipt ID. */
+export async function sendMelliPattern(phone: string, bodyId: number, parameters: string[]): Promise<PatternSendResult> {
+  if (process.env.AKMA_INTEGRATION_TEST === "1") {
+    if (process.env.NODE_ENV === "production" || process.env.AKMA_TEST_TRANSPORT !== "mock") throw new Error("Mock SMS transport unavailable");
+    return { success: true, messageId: "mock-pattern-receipt" };
+  }
+  const username = process.env.MELLIPAYAMAK_USERNAME || process.env.SMS_USERNAME || "";
+  const password = process.env.MELLIPAYAMAK_PASSWORD || process.env.SMS_PASSWORD || "";
+  if (!username || !password || !Number.isSafeInteger(bodyId) || bodyId < 1 || !/^09\d{9}$/.test(phone) || !parameters.length || parameters.some(p => !p || p.includes(";"))) {
+    return { success: false, error: "invalid_sms_configuration_or_parameters", retryable: false };
+  }
+  try {
+    const res = await fetch("https://rest.payamak-panel.com/api/SendSMS/BaseServiceNumber", {
+      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ username, password, text: parameters.join(";"), to: phone, bodyId: String(bodyId) }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return { success: false, error: `http_${res.status}`, retryable: res.status >= 500 };
+    const data = await res.json();
+    if (Number(data?.RetStatus) === 1 && /^\d+$/.test(String(data?.Value)) && Number(data.Value) > 15) {
+      return { success: true, messageId: String(data.Value) };
+    }
+    return { success: false, error: `provider_${Number(data?.RetStatus) || "invalid_response"}`, retryable: false };
+  } catch {
+    // Request may have been accepted before the connection failed: quarantine for review.
+    return { success: false, error: "provider_response_unknown", uncertain: true };
+  }
+}
+
 export async function sendOtpSms(phone: string, otpCode: string): Promise<SmsSendResult> {
   if (process.env.AKMA_INTEGRATION_TEST === "1") {
     if (process.env.NODE_ENV === "production") {
@@ -28,50 +59,11 @@ export async function sendOtpSms(phone: string, otpCode: string): Promise<SmsSen
   const mellipayamakBodyId = process.env.MELLIPAYAMAK_BODY_ID || process.env.SMS_BODY_ID || "";
 
   if (mellipayamakUser && mellipayamakPass && (provider === "mellipayamak" || provider === "melli" || mellipayamakBodyId)) {
-    try {
-      if (mellipayamakBodyId) {
-        // Pattern service number API (BaseServiceNumber)
-        const res = await fetch("https://rest.payamak-panel.com/api/SendSMS/BaseServiceNumber", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username: mellipayamakUser,
-            password: mellipayamakPass,
-            text: [otpCode],
-            to: phone,
-            bodyId: Number(mellipayamakBodyId),
-          }),
-        });
-        const data = await res.json();
-        // MelliPayamak returns numeric messageId > 15 on success
-        if (data && (Number(data.Value) > 15 || data.RetStatus === 1)) {
-          return { success: true, messageId: String(data.Value || data.StrRetStatus || "") };
-        }
-        return { success: false, error: data?.StrRetStatus || "خطا در ارسال پیامک خدماتی ملی پیامک" };
-      } else {
-        // Standard SMS API
-        const sender = process.env.MELLIPAYAMAK_SENDER || process.env.SMS_SENDER || "";
-        const res = await fetch("https://rest.payamak-panel.com/api/SendSMS/SendSMS", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username: mellipayamakUser,
-            password: mellipayamakPass,
-            from: sender,
-            to: phone,
-            text: `کد تأیید ورود به فروشگاه آکما: ${otpCode}\nاین کد تا ۲ دقیقه معتبر است.`,
-          }),
-        });
-        const data = await res.json();
-        if (data && (Number(data.Value) > 15 || data.RetStatus === 1)) {
-          return { success: true, messageId: String(data.Value || "") };
-        }
-        return { success: false, error: data?.StrRetStatus || "خطا در ارسال پیامک ملی پیامک" };
-      }
-    } catch (err: unknown) {
-      console.error("[SMS] MelliPayamak send failed:", err instanceof Error ? err.message : String(err));
-      return { success: false, error: "خطا در برقراری ارتباط با سامانه ملی پیامک" };
+    if (mellipayamakBodyId) {
+      const result = await sendMelliPattern(phone, Number(mellipayamakBodyId), [otpCode]);
+      return { success: result.success, messageId: result.messageId, error: result.error };
     }
+    return { success: false, error: "MELLIPAYAMAK_BODY_ID is required" };
   }
 
   // 2. Kavenegar Provider (Lookup / Pattern OTP)

@@ -114,3 +114,23 @@ pnpm db:migration:new -- add-example-field
 Edit only the new SQL file. Never edit a migration already applied in
 production. Destructive SQL is intentionally rejected by CI and requires a
 separate reviewed maintenance plan.
+
+## SMS notification worker
+
+After the new release passes its health check, the deployment starts or restarts only
+`akma-sms-worker`. It polls the PostgreSQL outbox every 20 seconds and periodically reconciles pending payment attempts with the stored gateway provider. The worker
+loads `/etc/akma/akma.env` server-side and uses the current release. Check with
+`pm2 status akma-sms-worker` and `pm2 logs akma-sms-worker --lines 100 --nostream`.
+A missing credential or rejected template is recorded as a permanent failure.
+Network interruptions after a request is issued are quarantined as `failed`
+for reconciliation, with no automatic resend. Authorized administrators may retry
+only definite permanent failures through the order notification API.
+
+Set `SMS_PROVIDER=mellipayamak`, `MELLIPAYAMAK_USERNAME`,
+`MELLIPAYAMAK_PASSWORD`, `MELLIPAYAMAK_BODY_ID=556149`,
+`MELLIPAYAMAK_BODY_ID_PAYMENT_SUCCESS=556154`,
+`MELLIPAYAMAK_BODY_ID_ORDER_SHIPPED=556160`,
+`MELLIPAYAMAK_BODY_ID_PAYMENT_FAILED=556162`, and optionally
+`SMS_MAX_RETRIES=5` in the protected environment. Restart only the two AKMA
+PM2 entries after changing the environment. Never run the worker against a
+production database from a local test shell.
