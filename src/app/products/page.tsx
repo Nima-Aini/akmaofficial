@@ -12,7 +12,7 @@ export default async function ProductsPage() {
   const phone = contact.phones[0] ?? "09033253065";
 
   return (
-    <div className="mx-auto max-w-7xl px-5 py-12 lg:px-8">
+    <div className="mx-auto max-w-7xl px-3 py-8 md:px-5 md:py-12 lg:px-8">
       <header className="text-center">
         <p className="text-xs font-bold text-accent">فروشگاه عمده آکما</p>
         <h1 className="mt-3 text-3xl font-black leading-snug sm:text-5xl">محصولات</h1>

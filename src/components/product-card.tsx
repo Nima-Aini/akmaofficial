@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ShoppingCart, Eye, PackageCheck } from "lucide-react";
-import { formatPrice } from "@/lib/format";
+import { formatPrice, toFa } from "@/lib/format";
 import { useCart } from "@/context/cart-context";
 import { getProductPricePresentation } from "@/lib/pricing";
 import type { ProductRow } from "@/db/schema";
@@ -83,28 +83,28 @@ export function ProductCard({
   };
 
   return (
-    <article className="group relative isolate flex min-h-[330px] cursor-pointer overflow-hidden rounded-2xl border border-white/50 bg-[#eee7dd] shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl focus-within:shadow-xl md:min-h-[390px]">
-      <picture className="absolute inset-0 -z-20 block size-full" data-responsive-product-media="true" data-mobile-source={sources.mobile}>
+    <article className="group relative isolate flex min-w-0 flex-col overflow-hidden rounded-2xl border border-[#E7E3DC] bg-white shadow-sm transition-shadow hover:shadow-md focus-within:shadow-md md:min-h-[390px] md:flex-row md:cursor-pointer md:border-white/50 md:bg-[#eee7dd] md:shadow-md md:transition-all md:duration-300 md:hover:-translate-y-1 md:hover:shadow-xl md:focus-within:shadow-xl">
+      <picture className="relative block aspect-square w-full shrink-0 overflow-hidden bg-white md:absolute md:inset-0 md:-z-20 md:size-full md:aspect-auto" data-responsive-product-media="true" data-mobile-source={sources.mobile}>
         <source media="(max-width: 767px)" srcSet={sources.mobile} />
         <img
           src={sources.desktop}
           alt={product.name}
           loading="lazy"
-          className="responsive-product-media size-full bg-[#eee7dd] object-contain p-2 transition-transform duration-700 group-hover:scale-105 md:object-cover md:p-0"
+          className="responsive-product-media block size-full bg-white object-contain p-2 md:bg-[#eee7dd] md:object-cover md:p-0 md:transition-transform md:duration-700 md:group-hover:scale-105"
           style={{
             "--product-desktop-position": `${desktopPosition.x}% ${desktopPosition.y}%`,
             "--product-mobile-position": `${mobilePosition.x}% ${mobilePosition.y}%`,
           } as React.CSSProperties}
         />
       </picture>
-      <div className="absolute inset-0 -z-10 bg-black/10" />
+      <div className="absolute inset-0 -z-10 hidden bg-black/10 md:block" />
       <span
         aria-hidden="true"
         data-product-text-region={textRegionPosition}
-        className={`pointer-events-none absolute z-0 backdrop-blur-[3px] ${getTextRegionBackdropClass(textRegionPosition, "bottom")}`}
+        className={`pointer-events-none absolute z-0 hidden backdrop-blur-[3px] md:block ${getTextRegionBackdropClass(textRegionPosition, "bottom")}`}
       />
       {/* Top Badge: e.g. "پرفروش" or category */}
-      <div className="pointer-events-none absolute inset-x-2.5 top-2.5 z-20 flex items-center justify-between gap-1 md:inset-x-4 md:top-4 md:gap-2">
+      <div className="pointer-events-none absolute inset-x-4 top-4 z-20 hidden items-center justify-between gap-2 md:flex">
         {product.badge ? (
           <span className="rounded-full bg-[#8E111E] px-2.5 py-0.5 text-[10px] font-black text-white shadow-xs">
             <RichText value={product.textFormatting?.badge} fallback={product.badge} />
@@ -128,8 +128,50 @@ export function ProductCard({
 
       <Link href={productHref} className={PRODUCT_CARD_LINK_CLASS} aria-label={`مشاهده ${product.name}`} />
 
+      {/* Mobile: the image and information occupy separate, unobstructed sections. */}
+      <div className="mobile-product-card-copy pointer-events-none relative z-20 flex min-w-0 flex-1 flex-col border-t border-[#F1EEEA] bg-white p-3 md:hidden">
+        <h3 className="line-clamp-2 min-h-10 text-[13px] font-black leading-5 text-[#1C1816]">
+          <RichText value={product.textFormatting?.name} fallback={product.name} />
+        </h3>
+        {product.subtitle && (
+          <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-[#574F49]">
+            <RichText value={product.textFormatting?.subtitle} fallback={product.subtitle} />
+          </p>
+        )}
+        <div className="mt-2 flex flex-wrap items-center gap-1 text-[11px] font-bold leading-4 text-[#514842]">
+          {mode === "wholesale" ? (
+            <>
+              <span>{pack.packLabel}</span>
+              {pack.minimumPackCount > 1 && <span>· حداقل {toFa(pack.minimumPackCount)} بسته</span>}
+            </>
+          ) : <span>واحد: {pricing.unitLabel}</span>}
+        </div>
+        {product.badge && (
+          <span className="mt-2 w-fit max-w-full truncate rounded-md bg-[#FCEDEF] px-1.5 py-0.5 text-[10px] font-bold text-[#8E111E]">
+            <RichText value={product.textFormatting?.badge} fallback={product.badge} />
+          </span>
+        )}
+        <div className="mt-auto pt-3">
+          <div className="border-t border-[#F1EEEA] pt-2.5">
+            <div className="flex min-w-0 flex-wrap items-baseline gap-x-1 text-[#8E111E]">
+              <bdi className="min-w-0 text-[clamp(0.875rem,4vw,1.0625rem)] font-black leading-6 [overflow-wrap:anywhere]">{formatPrice(pricing.unitPrice)}</bdi>
+              <span className="whitespace-nowrap text-[11px] font-bold">تومان</span>
+            </div>
+            <p className="text-[11px] font-medium leading-4 text-[#574F49]">{pricing.label}</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleQuickAdd}
+            className="pointer-events-auto relative z-30 mt-2.5 flex min-h-11 w-full touch-manipulation items-center justify-center gap-1.5 rounded-xl bg-[#8E111E] px-2 text-[11px] font-black text-white transition-colors active:bg-[#670B15] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E111E] motion-reduce:transition-none"
+            aria-label={`افزودن ${product.name} به سبد خرید`}
+          >
+            <ShoppingCart size={16} aria-hidden="true" /> افزودن به سبد
+          </button>
+        </div>
+      </div>
+
       {/* Product Info */}
-      <div className={`pointer-events-none relative z-20 flex min-h-full w-full p-2.5 pt-14 md:p-4 md:pt-16 ${getTextRegionLayoutClass(textRegionPosition, "bottom")}`}>
+      <div className={`pointer-events-none relative z-20 hidden min-h-full w-full p-4 pt-16 md:flex ${getTextRegionLayoutClass(textRegionPosition, "bottom")}`}>
         <div className={`${PRODUCT_GLASS_OVERLAY_CLASS} ${getTextRegionContentWidthClass(textRegionPosition, "bottom")}`}>
           <div>
             <h3 className="line-clamp-2 text-xs font-black leading-5 text-white transition-colors group-hover:text-[#FFD6DA]">

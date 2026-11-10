@@ -9,10 +9,11 @@ export function FloatingCallBar({ phone }: { phone: string }) {
   const pathname = usePathname();
   const { totalCount, openCart } = useCart();
 
-  if (pathname.startsWith("/akma-secret-admin") || pathname.startsWith("/checkout")) return null;
+  // The header cart stays available; the fixed CTA would cover product cards on phones.
+  if (pathname === "/" || pathname.startsWith("/products") || pathname.startsWith("/akma-secret-admin") || pathname.startsWith("/checkout")) return null;
 
   return (
-    <div className="fixed bottom-5 inset-x-4 z-50 flex items-center justify-between gap-2.5 sm:hidden">
+    <div className="fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] inset-x-4 z-50 flex items-center justify-between gap-2.5 sm:hidden">
       <button
         onClick={openCart}
         className="btn btn-primary pulse-ring flex-1 h-13 rounded-2xl px-4 text-xs font-black shadow-2xl justify-between"

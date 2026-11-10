@@ -339,6 +339,13 @@ select.field option {
   object-position: var(--product-mobile-position, 50% 50%);
  }
 
+ /* CMS color choices for dark desktop overlays must not hide mobile card text. */
+ @media (max-width: 767px) {
+  .mobile-product-card-copy [style*="color"] {
+    color: inherit !important;
+  }
+ }
+
  @media (min-width: 768px) {
   .responsive-product-media {
     object-position: var(--product-desktop-position, 50% 50%);
