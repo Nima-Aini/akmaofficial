@@ -96,33 +96,33 @@ export function CatalogClient({
   }, [products, mode, cat, q, sort]);
 
   return (
-    <div className="mt-8 space-y-6">
+    <div className="mt-6 space-y-5 md:mt-8 md:space-y-6">
       {/* 1. Mode Switcher: Retail (خرید تکی) vs Wholesale (خرید عمده) */}
-      <div className="mx-auto max-w-md rounded-full bg-white p-1.5 border border-[#E7E3DC] shadow-xs flex">
+      <div className="mx-auto flex max-w-md rounded-full border border-[#E7E3DC] bg-white p-1 shadow-xs md:p-1.5">
         <button
           type="button"
           onClick={() => handleModeChange("retail")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full text-xs font-black transition-all ${
+          className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded-full px-1 py-2.5 text-[11px] font-black transition-all md:gap-2 md:text-xs ${
             mode === "retail"
               ? "bg-[#8E111E] text-white shadow-md shadow-[#8E111E]/20"
               : "text-[#4A423D] hover:text-[#1C1816]"
           }`}
         >
           <ShoppingBag size={14} />
-          <span>خرید تکی (مصرف شخصی)</span>
+          <span className="md:hidden">خرید تکی</span><span className="hidden md:inline">خرید تکی (مصرف شخصی)</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleModeChange("wholesale")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full text-xs font-black transition-all ${
+          className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded-full px-1 py-2.5 text-[11px] font-black transition-all md:gap-2 md:text-xs ${
             mode === "wholesale"
               ? "bg-[#8E111E] text-white shadow-md shadow-[#8E111E]/20"
               : "text-[#4A423D] hover:text-[#1C1816]"
           }`}
         >
           <Building2 size={14} />
-          <span>خرید عمده (همکاران و فروشگاه‌ها)</span>
+          <span className="md:hidden">خرید عمده</span><span className="hidden md:inline">خرید عمده (همکاران و فروشگاه‌ها)</span>
         </button>
       </div>
 
@@ -133,14 +133,14 @@ export function CatalogClient({
       )}
 
       {/* 2. Filters & Search Bar */}
-      <div className="rounded-[2rem] border border-[#E7E3DC] bg-white p-4 shadow-xs flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-3 rounded-2xl border border-[#E7E3DC] bg-white p-3 shadow-xs md:gap-4 md:rounded-[2rem] md:p-4 lg:flex-row lg:items-center lg:justify-between">
         {/* Categories Chips */}
         <div className="flex flex-wrap items-center gap-1.5">
           {CATEGORIES.map((c) => (
             <button
               key={c.key}
               onClick={() => setSelectedCat(c.key)}
-              className={`rounded-full px-4 py-2 text-xs font-bold transition-colors ${
+              className={`rounded-full px-3 py-2 text-[11px] font-bold transition-colors md:px-4 md:text-xs ${
                 cat === c.key
                   ? "bg-[#8E111E] text-white shadow-xs"
                   : "bg-[#FAF8F5] text-[#4A423D] hover:bg-[#F3EFEA]"
@@ -152,8 +152,8 @@ export function CatalogClient({
         </div>
 
         {/* Search & Sort */}
-        <div className="flex flex-1 items-center gap-2 lg:max-w-md">
-          <div className="relative flex-1">
+        <div className="flex min-w-0 flex-1 items-center gap-2 lg:max-w-md">
+          <div className="relative min-w-0 flex-1">
             <Search size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#8C827A]" />
             <input
               value={q}
@@ -167,7 +167,7 @@ export function CatalogClient({
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as SortKey)}
-              className="appearance-none rounded-full border border-[#E7E3DC] bg-[#FAF8F5] pr-8 pl-6 py-2 text-xs text-[#1C1816] outline-hidden focus:border-[#8E111E]"
+              className="max-w-28 appearance-none rounded-full border border-[#E7E3DC] bg-[#FAF8F5] py-2 pr-8 pl-2 text-xs text-[#1C1816] outline-hidden focus:border-[#8E111E] md:max-w-none md:pl-6"
             >
               {SORTS.map((s) => (
                 <option key={s.key} value={s.key}>
@@ -181,7 +181,7 @@ export function CatalogClient({
 
       {/* 3. Products Grid */}
       {filtered.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 min-[360px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-6">
           {filtered.map((product) => (
             <ProductCard key={product.id} product={product} mode={mode} phone={phone} />
           ))}

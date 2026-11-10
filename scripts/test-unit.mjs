@@ -3,6 +3,8 @@
  * Tests pricing logic, tier calculations, phone masking, OTP formatting, and wholesale quantity validation.
  */
 import assert from "node:assert";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { generateSecureOtp, sendMelliPattern, sendOtpSms } from "../src/lib/sms.ts";
 import { paymentResultUrl } from "../src/lib/payment-result-url.ts";
 import { calculateProductPricing, getProductPricePresentation, getWholesalePackConfig, isPositiveSafeInteger } from "../src/lib/pricing.ts";
@@ -23,7 +25,9 @@ import {
   sanitizeResponsiveSetting,
 } from "../src/lib/responsive-image.ts";
 import { ResponsiveBannerMedia, getResponsiveTextLayoutClass } from "../src/components/responsive-banner.tsx";
+import { CartProvider } from "../src/context/cart-context.tsx";
 import {
+  ProductCard,
   getProductDetailHref,
   PRODUCT_CARD_LINK_CLASS,
   PRODUCT_GLASS_OVERLAY_CLASS,
@@ -264,6 +268,25 @@ runTest("Product card internal actions cancel card navigation", () => {
   stopProductCardNavigation({ preventDefault: () => { prevented = true; }, stopPropagation: () => { stopped = true; } });
   assert.equal(prevented, true);
   assert.equal(stopped, true);
+});
+
+runTest("Mobile product cards render separate images and correct retail or wholesale prices", () => {
+  const product = {
+    id: 1, slug: "sample-foam", name: "فوم تمیزکننده کفش با نام بلند برای دو خط",
+    subtitle: "تمیزکننده مناسب انواع کفش", categoryLabel: "تمیزکننده", badge: "پرفروش",
+    images: ["/legacy.webp"], retailImages: ["/retail.webp"], retailMobileImages: ["/retail-mobile.webp"],
+    wholesaleImages: ["/wholesale.webp"], wholesaleMobileImages: ["/wholesale-mobile.webp"],
+    price: 190000, retailPrice: 180000, wholesalePrice: 1200000,
+    wholesalePackSize: 10, wholesalePackLabel: "بسته ۱۰ عددی", wholesaleMinPackQty: 2,
+  };
+  const render = (mode) => renderToStaticMarkup(React.createElement(CartProvider, null, React.createElement(ProductCard, { product, mode })));
+  const retail = render("retail");
+  const wholesale = render("wholesale");
+  assert.match(retail, /<source media="\(max-width: 767px\)" srcSet="\/retail-mobile.webp"/);
+  assert.match(wholesale, /<source media="\(max-width: 767px\)" srcSet="\/wholesale-mobile.webp"/);
+  assert.match(retail, /mobile-product-card-copy[^>]*>.*?۱۸۰٬۰۰۰/s);
+  assert.match(wholesale, /mobile-product-card-copy[^>]*>.*?بسته ۱۰ عددی.*?حداقل ۲ بسته.*?۱٬۲۰۰٬۰۰۰/s);
+  assert.equal((retail.match(/<picture/g) || []).length, 1, "only one responsive image is rendered");
 });
 
 runTest("Legacy banners fall back to the right text region", () => {
