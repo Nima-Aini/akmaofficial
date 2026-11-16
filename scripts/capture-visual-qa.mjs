@@ -62,14 +62,18 @@ async function capture(port, name, url, width) {
     await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
     const navigation = await send("Page.navigate", { url });
     assert.ok(!navigation.errorText, `${name}: navigation failed: ${navigation.errorText}`);
+    // The isolated database contains 13 catalog items and 8 featured retail items.
+    // Wait for the streamed page to finish before measuring full-page height.
+    const expectedCards = name.includes("catalog") ? 13 : name === "home" ? 8 : 0;
     let page;
     for (let attempt = 0; attempt < 300; attempt++) {
       const response = await send("Runtime.evaluate", { expression: `({ready:document.readyState,url:location.href,bodyChars:document.body?.innerText.length ?? 0,width:innerWidth,scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,cards:document.querySelectorAll('[data-responsive-product-media]').length,gallery:document.querySelectorAll('[data-responsive-product-gallery]').length})`, returnByValue: true });
       page = response.result?.value;
-      if (page?.ready !== "loading" && page?.url === url && page.bodyChars > 100 && (name === "home" || page.cards > 0 || page.gallery > 0)) break;
+      if (page?.ready !== "loading" && page?.url === url && page.bodyChars > 100 && page.cards >= expectedCards && (name === "home" || page.cards > 0 || page.gallery > 0)) break;
       await new Promise((resolve) => setTimeout(resolve, 150));
     }
     assert.ok(page?.ready !== "loading" && page?.url === url && page.bodyChars > 100, `${name}: page content did not load (${JSON.stringify(page)})`);
+    assert.ok(page.cards >= expectedCards, `${name}: streamed product cards incomplete (${page.cards}/${expectedCards})`);
     assert.equal(page.width, width, `${name}: viewport width mismatch`);
     assert.ok(page.scrollWidth <= width + 2, `${name}: horizontal overflow (${page.scrollWidth}px at ${width}px)`);
     if (name.includes("catalog")) assert.ok(page.cards > 0, `${name}: missing product cards`);
