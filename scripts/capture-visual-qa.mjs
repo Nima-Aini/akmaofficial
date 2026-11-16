@@ -59,11 +59,12 @@ async function capture(port, name, url, width) {
     await send("Page.enable");
     await send("Runtime.enable");
     await send("Emulation.setDeviceMetricsOverride", { width, height: 900, deviceScaleFactor: 1, mobile: width < 768 });
+    await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
     const navigation = await send("Page.navigate", { url });
     assert.ok(!navigation.errorText, `${name}: navigation failed: ${navigation.errorText}`);
     let page;
     for (let attempt = 0; attempt < 300; attempt++) {
-      const response = await send("Runtime.evaluate", { expression: `({ready:document.readyState,url:location.href,bodyChars:document.body?.innerText.length ?? 0,width:innerWidth,scrollWidth:document.documentElement.scrollWidth,cards:document.querySelectorAll('[data-responsive-product-media]').length,gallery:document.querySelectorAll('[data-responsive-product-gallery]').length})`, returnByValue: true });
+      const response = await send("Runtime.evaluate", { expression: `({ready:document.readyState,url:location.href,bodyChars:document.body?.innerText.length ?? 0,width:innerWidth,scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,cards:document.querySelectorAll('[data-responsive-product-media]').length,gallery:document.querySelectorAll('[data-responsive-product-gallery]').length})`, returnByValue: true });
       page = response.result?.value;
       if (page?.ready !== "loading" && page?.url === url && page.bodyChars > 100 && (name === "home" || page.cards > 0 || page.gallery > 0)) break;
       await new Promise((resolve) => setTimeout(resolve, 150));
@@ -74,7 +75,7 @@ async function capture(port, name, url, width) {
     if (name.includes("catalog")) assert.ok(page.cards > 0, `${name}: missing product cards`);
     if (name.includes("detail")) assert.ok(page.gallery > 0, `${name}: missing product gallery`);
     await send("Runtime.evaluate", { expression: "document.fonts.ready.then(() => true)", awaitPromise: true });
-    const { data } = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true });
+    const { data } = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true, clip: { x: 0, y: 0, width, height: page.scrollHeight, scale: 1 } });
     const png = Buffer.from(data, "base64");
     assert.equal(png.readUInt32BE(16), width, `${name}: screenshot viewport mismatch`);
     const filename = `${name}-${width}.png`;
