@@ -101,5 +101,11 @@ try {
   }
 } finally {
   chrome.kill("SIGTERM");
-  await rm(profile, { recursive: true, force: true });
+  if (chrome.exitCode === null) {
+    await Promise.race([
+      new Promise((resolve) => chrome.once("exit", resolve)),
+      new Promise((resolve) => setTimeout(resolve, 5000)),
+    ]);
+  }
+  await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 }
