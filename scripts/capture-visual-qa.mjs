@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -11,7 +11,8 @@ await mkdir(output, { recursive: true });
 const profile = await mkdtemp(path.join(os.tmpdir(), "akma-visual-chrome-"));
 const executable = process.env.CHROME_PATH ?? "google-chrome";
 const chrome = spawn(executable, [
-  "--headless=new", "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage",
+  "--headless=new", "--no-sandbox", "--no-first-run", "--no-default-browser-check",
+  "--disable-gpu", "--disable-dev-shm-usage",
   "--remote-allow-origins=*", "--remote-debugging-port=0", `--user-data-dir=${profile}`,
   "about:blank",
 ], { stdio: ["ignore", "ignore", "pipe"] });
@@ -19,14 +20,14 @@ let startupError = "";
 chrome.stderr.on("data", (chunk) => { startupError = (startupError + chunk.toString()).slice(-2000); });
 
 async function waitForPort() {
-  for (let attempt = 0; attempt < 100; attempt++) {
+  for (let attempt = 0; attempt < 450; attempt++) {
     if (chrome.exitCode !== null) throw new Error(`Chrome exited before DevTools readiness: ${startupError}`);
     try {
       const portFile = await readFile(path.join(profile, "DevToolsActivePort"), "utf8");
       return Number(portFile.split("\n")[0]);
     } catch { await new Promise((resolve) => setTimeout(resolve, 100)); }
   }
-  throw new Error(`Chrome DevTools did not start: ${startupError}`);
+  throw new Error(`Chrome DevTools did not start (exit=${chrome.exitCode}, profile=${(await readdir(profile)).join(",")}): ${startupError}`);
 }
 
 async function capture(port, name, url, width) {
