@@ -344,6 +344,9 @@ try {
       `akma_customer_session=${createCustomerToken(customerA.phone)}`);
     assert.equal(response.status, 400);
     assert.equal((await db.select().from(orders)).length, before);
+    const invalid = await post("/api/orders", { orderType: "unknown", items: [{ productId: product.id, quantity: 1, mode: "retail" }] },
+      `akma_customer_session=${createCustomerToken(customerA.phone)}`);
+    assert.equal(invalid.status, 400);
   });
 
   let wholesaleOrder;

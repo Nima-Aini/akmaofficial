@@ -32,10 +32,10 @@ export async function POST(req: NextRequest) {
     const customerCity = String(body.customerCity || customer.city || "").trim();
     const postalCode = toEnDigits(String(body.postalCode || customer.postalCode || "")).trim();
     const notes = String(body.notes ?? "").trim();
-    if (body.orderType !== "retail" && body.orderType !== "wholesale") {
+    if (body.orderType !== undefined && body.orderType !== "retail" && body.orderType !== "wholesale") {
       return NextResponse.json({ error: "نوع خرید نامعتبر است" }, { status: 400 });
     }
-    const orderType: "retail" | "wholesale" = body.orderType;
+    const orderType: "retail" | "wholesale" = body.orderType === "wholesale" ? "wholesale" : "retail";
     const paymentMethod = body.paymentMethod === "card_to_card" ? "card_to_card" : "online";
     const rawItems = Array.isArray(body.items) ? body.items : [];
 
