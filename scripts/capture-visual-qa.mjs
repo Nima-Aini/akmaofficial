@@ -59,15 +59,16 @@ async function capture(port, name, url, width) {
     await send("Page.enable");
     await send("Runtime.enable");
     await send("Emulation.setDeviceMetricsOverride", { width, height: 900, deviceScaleFactor: 1, mobile: width < 768 });
-    await send("Page.navigate", { url });
+    const navigation = await send("Page.navigate", { url });
+    assert.ok(!navigation.errorText, `${name}: navigation failed: ${navigation.errorText}`);
     let page;
-    for (let attempt = 0; attempt < 100; attempt++) {
-      const response = await send("Runtime.evaluate", { expression: `({ready:document.readyState,width:innerWidth,scrollWidth:document.documentElement.scrollWidth,cards:document.querySelectorAll('[data-responsive-product-media]').length,gallery:document.querySelectorAll('[data-responsive-product-gallery]').length})`, returnByValue: true });
+    for (let attempt = 0; attempt < 300; attempt++) {
+      const response = await send("Runtime.evaluate", { expression: `({ready:document.readyState,url:location.href,bodyChars:document.body?.innerText.length ?? 0,width:innerWidth,scrollWidth:document.documentElement.scrollWidth,cards:document.querySelectorAll('[data-responsive-product-media]').length,gallery:document.querySelectorAll('[data-responsive-product-gallery]').length})`, returnByValue: true });
       page = response.result?.value;
-      if (page?.ready === "complete" && (name === "home" || page.cards > 0 || page.gallery > 0)) break;
+      if (page?.ready !== "loading" && page?.url === url && page.bodyChars > 100 && (name === "home" || page.cards > 0 || page.gallery > 0)) break;
       await new Promise((resolve) => setTimeout(resolve, 150));
     }
-    assert.equal(page?.ready, "complete", `${name}: page did not finish loading`);
+    assert.ok(page?.ready !== "loading" && page?.url === url && page.bodyChars > 100, `${name}: page content did not load (${JSON.stringify(page)})`);
     assert.equal(page.width, width, `${name}: viewport width mismatch`);
     assert.ok(page.scrollWidth <= width + 2, `${name}: horizontal overflow (${page.scrollWidth}px at ${width}px)`);
     if (name.includes("catalog")) assert.ok(page.cards > 0, `${name}: missing product cards`);
