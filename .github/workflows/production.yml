@@ -86,6 +86,35 @@ jobs:
       - name: Build production application
         run: pnpm build
 
+      - name: Capture responsive visual review on isolated test data
+        if: github.event_name == 'pull_request'
+        env:
+          DATABASE_URL: postgresql://akma_test:test_password@127.0.0.1:5432/akma_test_db
+          AKMA_TEST_TRANSPORT: mock
+          AKMA_VISUAL_BASE_URL: http://127.0.0.1:34591
+        run: |
+          CHROME_PATH="$(command -v google-chrome || command -v chromium || true)"
+          test -n "$CHROME_PATH" || { echo 'Chrome is required for responsive visual review'; exit 1; }
+          export CHROME_PATH
+          node node_modules/next/dist/bin/next start -p 34591 -H 127.0.0.1 > /tmp/akma-visual-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 40); do
+            if curl --silent --fail http://127.0.0.1:34591/api/health | grep -q '"database":"connected"'; then break; fi
+            sleep 1
+          done
+          curl --silent --fail http://127.0.0.1:34591/api/health | grep -q '"database":"connected"'
+          node scripts/capture-visual-qa.mjs
+
+      - name: Preserve responsive screenshots for review
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: responsive-visual-review
+          path: visual-screenshots/*.png
+          if-no-files-found: warn
+          retention-days: 7
+
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: verify
