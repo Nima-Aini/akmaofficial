@@ -57,7 +57,7 @@ async function migrate() {
   for (const file of (await readdir(dir)).filter((f) => f.endsWith(".sql")).sort()) await pool.query(await readFile(path.join(dir, file), "utf8"));
 }
 async function reset() {
-  await pool.query("TRUNCATE TABLE sms_notifications, payment_attempts, orders, customer_users, customer_otps, admin_users, cart_product_suggestions, blog_posts, settings, products RESTART IDENTITY CASCADE");
+  await pool.query("TRUNCATE TABLE sms_notifications, payment_attempts, orders, customer_users, customer_otps, admin_users, cart_product_suggestions_by_mode, cart_product_suggestions, blog_posts, settings, products RESTART IDENTITY CASCADE");
 }
 async function startServer() {
   server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "-p", String(port), "-H", "127.0.0.1"], {
@@ -269,7 +269,7 @@ try {
     const listingResponse = await fetch(`${baseUrl}/products`);
     assert.equal(listingResponse.status, 200);
     const listingHtml = await listingResponse.text();
-    assert.match(listingHtml, new RegExp(`href=["']\\/products\\/${configuredProduct.slug}["']`));
+    assert.match(listingHtml, new RegExp(`href=["']\\/products\\/${configuredProduct.slug}\\?mode=retail["']`));
   });
 
   await test("admin persists retail images", async () => {
@@ -294,6 +294,7 @@ try {
       method: "POST",
       headers: { "Content-Type": "application/json", Cookie: `akma_admin_session=${createSessionToken(admin.username)}` },
       body: JSON.stringify({
+        mode: "retail",
         triggerProductId: seededProducts[0].id,
         suggestedProductId: seededProducts[1].id,
         message: "پیشنهاد ویژه آکما",
@@ -308,6 +309,41 @@ try {
     assert.equal(stored.messageRichText.segments[0].bold, true);
     assert.equal(stored.messageRichText.segments[0].color, "#780B18");
     assert.equal(stored.messageRichText.segments[1].color, undefined);
+  });
+
+  await test("recommendations isolate retail and wholesale rules for the same pair", async () => {
+    const response = await fetch(`${baseUrl}/api/admin/cart-suggestions`, {
+      method: "POST", headers: { "Content-Type": "application/json", Cookie: `akma_admin_session=${createSessionToken(admin.username)}` },
+      body: JSON.stringify({ mode: "wholesale", triggerProductId: seededProducts[0].id, suggestedProductId: seededProducts[1].id, message: "فقط عمده" }),
+    });
+    assert.equal(response.status, 200, await response.text());
+    const retail = await (await fetch(`${baseUrl}/api/cart-suggestions?mode=retail&productIds=${seededProducts[0].id}`)).json();
+    const wholesale = await (await fetch(`${baseUrl}/api/cart-suggestions?mode=wholesale&productIds=${seededProducts[0].id}`)).json();
+    assert.equal(retail.suggestions.length, 1);
+    assert.equal(wholesale.suggestions.length, 1);
+    assert.equal(retail.suggestions[0].mode, "retail");
+    assert.equal(wholesale.suggestions[0].mode, "wholesale");
+    assert.equal(wholesale.suggestions[0].suggestedProduct.suggestedPrice, seededProducts[1].wholesalePrice);
+    assert.equal((await fetch(`${baseUrl}/api/cart-suggestions?mode=invalid&productIds=1`)).status, 400);
+  });
+
+  await test("legacy recommendations migrate with IDs and default to retail without duplication", async () => {
+    await pool.query("INSERT INTO cart_product_suggestions (id, trigger_product_id, suggested_product_id, message) VALUES ($1, $2, $3, $4)",
+      [100, seededProducts[1].id, seededProducts[0].id, "میراث قدیمی"]);
+    const sql = await readFile(path.resolve("migrations/20261116000100_sales_modes.sql"), "utf8");
+    await pool.query(sql);
+    await pool.query(sql);
+    const copied = await pool.query("SELECT id, mode, message FROM cart_product_suggestions_by_mode WHERE id = 100");
+    assert.deepEqual(copied.rows, [{ id: 100, mode: "retail", message: "میراث قدیمی" }]);
+  });
+
+  await test("checkout rejects a mode mismatch without creating an order", async () => {
+    const before = (await db.select().from(orders)).length;
+    const response = await post("/api/orders", { orderType: "retail", customerName: customerA.name, customerPhone: customerA.phone,
+      customerAddress: "تهران خیابان آزادی پلاک ۱۰۰", items: [{ productId: product.id, quantity: 1, mode: "wholesale" }] },
+      `akma_customer_session=${createCustomerToken(customerA.phone)}`);
+    assert.equal(response.status, 400);
+    assert.equal((await db.select().from(orders)).length, before);
   });
 
   let wholesaleOrder;

@@ -69,24 +69,42 @@ const CartContext = createContext<CartContextType | null>(null);
 
 // A new storage namespace avoids interpreting pre-pack-model wholesale unit
 // quantities as pack counts after deployment.
-const STORAGE_KEY = "akma_cart_v3";
+const STORAGE_KEY = "akma_cart_v4";
+const LEGACY_STORAGE_KEY = "akma_cart_v3";
+const MODE_STORAGE_KEY = "akma_cart_mode_v1";
+
+export function migrateCartItems(value: unknown): CartItem[] {
+  if (!Array.isArray(value)) return [];
+  const byMode = new Map<string, CartItem>();
+  for (const item of value) {
+    if (!item || !Number.isSafeInteger(item.productId) || item.productId <= 0 ||
+      !Number.isSafeInteger(item.quantity) || item.quantity <= 0 ||
+      (item.mode !== "retail" && item.mode !== "wholesale")) continue;
+    const key = `${item.mode}:${item.productId}`;
+    if (!byMode.has(key)) byMode.set(key, item as CartItem);
+  }
+  return [...byMode.values()];
+}
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cartMode, setCartMode] = useState<"retail" | "wholesale">("retail");
   // Keep the server render and the browser's first render identical. Reading
   // localStorage in the state initializer makes a persisted cart appear only
   // on the client and causes a hydration mismatch on checkout.
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [allItems, setItems] = useState<CartItem[]>([]);
+  const items = useMemo(() => allItems.filter((item) => item.mode === cartMode), [allItems, cartMode]);
   const [storageHydrated, setStorageHydrated] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       try {
-        const saved = localStorage.getItem(STORAGE_KEY);
+        const saved = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
+        const savedMode = localStorage.getItem(MODE_STORAGE_KEY);
+        if (savedMode === "retail" || savedMode === "wholesale") setCartMode(savedMode);
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) setItems(parsed);
+          setItems(migrateCartItems(parsed));
         }
       } catch {
         // Ignore malformed or unavailable browser storage.
@@ -100,11 +118,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!storageHydrated) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(allItems));
+      localStorage.setItem(MODE_STORAGE_KEY, cartMode);
     } catch {
       // ignore
     }
-  }, [items, storageHydrated]);
+  }, [allItems, cartMode, storageHydrated]);
 
   const recalculateItem = (item: CartItem, newQty: number, newMode?: "retail" | "wholesale"): CartItem => {
     const mode = newMode || item.mode || cartMode;
@@ -165,7 +184,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       : targetMode === "wholesale" ? pack.minimumPackCount : 1;
 
     setItems((prev) => {
-      const existingIdx = prev.findIndex((it) => it.productId === product.id);
+      const existingIdx = prev.findIndex((it) => it.productId === product.id && it.mode === targetMode);
       if (existingIdx !== -1) {
         const existing = prev[existingIdx];
         const newQty = existing.quantity + addQty;
@@ -197,11 +216,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       };
       return [...prev, newItem];
     });
+    setCartMode(targetMode);
     setIsOpen(true);
   };
 
   const removeItem = (productId: number) => {
-    setItems((prev) => prev.filter((it) => it.productId !== productId));
+    setItems((prev) => prev.filter((it) => it.productId !== productId || it.mode !== cartMode));
   };
 
   const updateQuantity = (productId: number, quantity: number) => {
@@ -211,7 +231,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
     setItems((prev) =>
       prev.map((it) => {
-        if (it.productId === productId) {
+        if (it.productId === productId && it.mode === cartMode) {
           return recalculateItem(it, quantity);
         }
         return it;
@@ -220,18 +240,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const setItemMode = (productId: number, mode: "retail" | "wholesale") => {
-    setItems((prev) =>
-      prev.map((it) => {
-        if (it.productId === productId) {
-          return recalculateItem(it, it.quantity, mode);
-        }
-        return it;
-      }),
-    );
+    // Preserve both variants; a mode change never mutates a saved line.
+    if (items.some((item) => item.productId === productId)) setCartMode(mode);
   };
 
   const clearCart = () => {
-    setItems([]);
+    setItems((prev) => prev.filter((item) => item.mode !== cartMode));
   };
 
   const totalCount = useMemo(

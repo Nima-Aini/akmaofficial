@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Check, Minus, Plus, ShoppingBag, Building2, User } from "lucide-react";
 import { useCart } from "@/context/cart-context";
 import { formatPrice, toFa } from "@/lib/format";
 import { getProductPricePresentation, getWholesalePackConfig } from "@/lib/pricing";
 import type { ProductRow } from "@/db/schema";
 import { useProductMode } from "@/context/product-mode-context";
+import { usePathname, useRouter } from "next/navigation";
 
 export function AddToCartButton({
   product,
@@ -19,12 +20,17 @@ export function AddToCartButton({
   showQty?: boolean;
   initialMode?: "retail" | "wholesale";
 }) {
-  const { addItem, cartMode } = useCart();
+  const { addItem, cartMode, setCartMode } = useCart();
+  const router = useRouter();
+  const pathname = usePathname();
   const sharedMode = useProductMode();
   const initial = initialMode || sharedMode?.mode || cartMode || "retail";
   const pack = getWholesalePackConfig(product);
   const [localMode, setLocalMode] = useState<"retail" | "wholesale">(initial);
   const mode = sharedMode?.mode ?? localMode;
+  useEffect(() => {
+    if (showQty && sharedMode?.mode) queueMicrotask(() => setCartMode(sharedMode.mode));
+  }, [showQty, sharedMode?.mode, setCartMode]);
   const [qty, setQty] = useState(mode === "wholesale" ? pack.minimumPackCount : 1);
   const [added, setAdded] = useState(false);
 
@@ -60,7 +66,9 @@ export function AddToCartButton({
   const handleSwitchMode = (newMode: "retail" | "wholesale") => {
     setLocalMode(newMode);
     sharedMode?.setMode(newMode);
+    setCartMode(newMode);
     setQty(newMode === "wholesale" ? pack.minimumPackCount : 1);
+    router.push(`${pathname}?mode=${newMode}`, { scroll: false });
   };
 
   const btnClasses = {

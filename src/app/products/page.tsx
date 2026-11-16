@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { getActiveProducts, getSettings } from "@/lib/store";
-import { DEFAULT_CONTACT, type ContactSettings } from "@/lib/defaults";
+import { DEFAULT_CONTACT, type ContactSettings, type CategoryItem } from "@/lib/defaults";
 import { CatalogClient } from "./catalog-client";
 
 export const metadata: Metadata = { title: "محصولات | آکما" };
@@ -21,7 +21,7 @@ export default async function ProductsPage() {
         </p>
       </header>
       <Suspense fallback={<div className="py-20 text-center text-xs text-muted">در حال بارگذاری کاتالوگ…</div>}>
-        <CatalogClient products={products} phone={phone} />
+        <CatalogClient products={products} phone={phone} categories={s.categories as CategoryItem[] | undefined} />
       </Suspense>
     </div>
   );

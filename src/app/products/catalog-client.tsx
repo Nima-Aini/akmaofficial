@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { Search, SlidersHorizontal, PackageSearch, Sparkles, Building2, ShoppingBag } from "lucide-react";
 import { CATEGORIES } from "@/lib/defaults";
+import { resolveProductCategoryLabel, type CategoryDefinition } from "@/lib/product-category";
 import { ProductCard } from "@/components/product-card";
 import { toFa } from "@/lib/format";
 import type { ProductRow } from "@/db/schema";
@@ -21,13 +22,18 @@ const SORTS: { key: SortKey; label: string }[] = [
 export function CatalogClient({
   products,
   phone,
+  categories,
 }: {
   products: ProductRow[];
   phone: string;
+  categories?: CategoryDefinition[];
 }) {
+  const categoryOptions = [...CATEGORIES, ...(categories ?? []).filter((c) => !CATEGORIES.some((builtIn) => builtIn.key === c.key))];
   const params = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const urlCat = params.get("cat");
-  const urlMode = params.get("mode") as "retail" | "wholesale" | null;
+  const urlMode = params.get("mode") === "wholesale" ? "wholesale" : params.get("mode") === "retail" ? "retail" : null;
 
   const { cartMode, setCartMode } = useCart();
   const [mode, setMode] = useState<"retail" | "wholesale">(urlMode || cartMode || "retail");
@@ -49,6 +55,9 @@ export function CatalogClient({
   const handleModeChange = (newMode: "retail" | "wholesale") => {
     setMode(newMode);
     setCartMode(newMode);
+    const next = new URLSearchParams(params.toString());
+    next.set("mode", newMode);
+    router.push(`${pathname}?${next}`, { scroll: false });
   };
 
   const filtered = useMemo(() => {
@@ -66,8 +75,8 @@ export function CatalogClient({
       const t = q.trim().replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)));
       list = list.filter(
         (p) =>
-          `${p.name} ${p.subtitle} ${p.categoryLabel}`.includes(t) ||
-          `${p.name} ${p.subtitle} ${p.categoryLabel}`.includes(q.trim()),
+          `${p.name} ${p.subtitle} ${resolveProductCategoryLabel(p.category, categories, p.categoryLabel)}`.includes(t) ||
+          `${p.name} ${p.subtitle} ${resolveProductCategoryLabel(p.category, categories, p.categoryLabel)}`.includes(q.trim()),
       );
     }
 
@@ -93,7 +102,7 @@ export function CatalogClient({
         list.sort((a, b) => a.sortOrder - b.sortOrder);
     }
     return list;
-  }, [products, mode, cat, q, sort]);
+  }, [products, mode, cat, q, sort, categories]);
 
   return (
     <div className="mt-6 space-y-5 md:mt-8 md:space-y-6">
@@ -136,7 +145,7 @@ export function CatalogClient({
       <div className="flex flex-col gap-3 rounded-2xl border border-[#E7E3DC] bg-white p-3 shadow-xs md:gap-4 md:rounded-[2rem] md:p-4 lg:flex-row lg:items-center lg:justify-between">
         {/* Categories Chips */}
         <div className="flex flex-wrap items-center gap-1.5">
-          {CATEGORIES.map((c) => (
+          {categoryOptions.map((c) => (
             <button
               key={c.key}
               onClick={() => setSelectedCat(c.key)}
@@ -146,7 +155,7 @@ export function CatalogClient({
                   : "bg-[#FAF8F5] text-[#4A423D] hover:bg-[#F3EFEA]"
               }`}
             >
-              {c.label}
+              {resolveProductCategoryLabel(c.key, categories, c.label)}
             </button>
           ))}
         </div>
