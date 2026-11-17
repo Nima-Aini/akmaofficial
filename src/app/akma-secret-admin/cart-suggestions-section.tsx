@@ -9,6 +9,7 @@ import type { RichTextValue } from "@/lib/rich-text";
 
 type Rule = {
   id: number;
+  mode: "retail" | "wholesale";
   triggerProductId: number | null;
   suggestedProductId: number | null;
   message: string;
@@ -17,7 +18,7 @@ type Rule = {
   sortOrder: number;
 };
 
-const emptyRule: Rule = { id: 0, triggerProductId: null, suggestedProductId: null, message: "", messageRichText: { segments: [] }, active: true, sortOrder: 0 };
+const emptyRule: Rule = { id: 0, mode: "retail", triggerProductId: null, suggestedProductId: null, message: "", messageRichText: { segments: [] }, active: true, sortOrder: 0 };
 
 export function CartSuggestionsSection({ products, toast }: { products: AdminProduct[]; toast: (message: string, ok?: boolean) => void }) {
   const [rules, setRules] = useState<Rule[]>([]);
@@ -69,7 +70,7 @@ export function CartSuggestionsSection({ products, toast }: { products: AdminPro
         {rules.length === 0 && <p className="rounded-2xl border border-dashed border-line p-8 text-center text-xs text-muted">هنوز پیشنهادی تعریف نشده است.</p>}
         {rules.map((rule) => (
           <div key={rule.id} className="flex flex-wrap items-center gap-4 rounded-2xl border border-line p-4">
-            <div className="min-w-0 flex-1"><p className="text-sm font-extrabold">{productName(rule.triggerProductId)} ← {productName(rule.suggestedProductId)}</p><RichText as="p" className="mt-1 line-clamp-2 text-[11px] text-muted" value={rule.messageRichText} fallback={rule.message || "بدون پیام اختصاصی"} /></div>
+            <div className="min-w-0 flex-1"><p className="text-sm font-extrabold">{productName(rule.triggerProductId)} ← {productName(rule.suggestedProductId)} · {rule.mode === "wholesale" ? "خرید عمده" : "خرید تکی"}</p><RichText as="p" className="mt-1 line-clamp-2 text-[11px] text-muted" value={rule.messageRichText} fallback={rule.message || "بدون پیام اختصاصی"} /></div>
             <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${rule.active ? "bg-emerald-400/10 text-emerald-400" : "bg-surface text-muted"}`}>{rule.active ? "فعال" : "غیرفعال"}</span>
             <button type="button" onClick={() => setEditing({ ...rule })} className="btn btn-ghost h-10 px-4 text-xs"><Pencil size={14} /> ویرایش</button>
             <button type="button" onClick={() => void remove(rule.id)} className="grid size-10 place-items-center rounded-xl border border-line text-rose-400 hover:border-rose-400" aria-label="حذف پیشنهاد"><Trash2 size={15} /></button>
@@ -81,9 +82,10 @@ export function CartSuggestionsSection({ products, toast }: { products: AdminPro
           <div className="card my-auto w-full max-w-2xl p-6 sm:p-8">
             <div className="flex items-center justify-between"><h4 className="text-lg font-black">{editing.id ? "ویرایش پیشنهاد" : "پیشنهاد جدید"}</h4><button type="button" onClick={() => setEditing(null)} className="grid size-10 place-items-center rounded-xl border border-line" aria-label="بستن"><X size={17} /></button></div>
             <div className="mt-6 space-y-5">
+              <label className="block"><span className="mb-1.5 block text-xs font-bold text-muted">نوع فروش پیشنهاد</span><select className="field" value={editing.mode} onChange={(event) => setEditing({ ...editing, mode: event.target.value as Rule["mode"], triggerProductId: null, suggestedProductId: null })}><option value="retail">خرید تکی</option><option value="wholesale">خرید عمده</option></select></label>
               <div className="grid gap-5 sm:grid-cols-2">
-                <label><span className="mb-1.5 block text-xs font-bold text-muted">محصول محرک</span><select className="field" value={editing.triggerProductId ?? ""} onChange={(event) => setEditing({ ...editing, triggerProductId: Number(event.target.value) || null })}><option value="">انتخاب کنید</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
-                <label><span className="mb-1.5 block text-xs font-bold text-muted">محصول پیشنهادی</span><select className="field" value={editing.suggestedProductId ?? ""} onChange={(event) => setEditing({ ...editing, suggestedProductId: Number(event.target.value) || null })}><option value="">انتخاب کنید</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
+                <label><span className="mb-1.5 block text-xs font-bold text-muted">محصول محرک</span><select className="field" value={editing.triggerProductId ?? ""} onChange={(event) => setEditing({ ...editing, triggerProductId: Number(event.target.value) || null })}><option value="">انتخاب کنید</option>{products.filter((p) => p.active && (editing.mode === "retail" ? p.isRetail : p.isWholesale)).map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
+                <label><span className="mb-1.5 block text-xs font-bold text-muted">محصول پیشنهادی</span><select className="field" value={editing.suggestedProductId ?? ""} onChange={(event) => setEditing({ ...editing, suggestedProductId: Number(event.target.value) || null })}><option value="">انتخاب کنید</option>{products.filter((p) => p.active && (editing.mode === "retail" ? p.isRetail : p.isWholesale)).map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
               </div>
               <RichTextEditor label="پیام اختصاصی" value={editing.message} richValue={editing.messageRichText} onChange={(message, messageRichText) => setEditing({ ...editing, message, messageRichText })} rows={4} />
               <Field label="ترتیب نمایش" type="number" dir="ltr" value={editing.sortOrder} onChange={(value) => setEditing({ ...editing, sortOrder: Number(value) || 0 })} />

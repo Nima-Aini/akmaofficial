@@ -16,6 +16,7 @@ import {
 } from "@/db/schema";
 import { asc, desc, eq, or } from "drizzle-orm";
 import { DEFAULT_SETTINGS, PRODUCT_SEEDS } from "./defaults";
+import { resolveProductCategoryLabel, type CategoryDefinition } from "./product-category";
 import { toEnDigits } from "./format";
 import { normalizeFocalPoint, sanitizeImageUrl, type ImageFocalPoint } from "./responsive-image";
 import { sanitizeRichTextMap, type RichTextMap } from "./rich-text";
@@ -94,6 +95,10 @@ export function getMemoryStore() {
       badge: p.badge,
       inStock: true,
       featured: p.featured,
+      featuredRetail: p.featured,
+      featuredWholesale: false,
+      retailFeaturedOrder: p.sortOrder,
+      wholesaleFeaturedOrder: 0,
       sortOrder: p.sortOrder,
       active: true,
       createdAt: new Date(),
@@ -229,6 +234,10 @@ export async function ensureSeeded() {
         badge: p.badge,
         inStock: true,
         featured: p.featured,
+        featuredRetail: p.featured,
+        featuredWholesale: false,
+        retailFeaturedOrder: p.sortOrder,
+        wholesaleFeaturedOrder: 0,
         sortOrder: p.sortOrder,
         active: true,
       }));
@@ -315,10 +324,11 @@ export async function getAllProducts(): Promise<ProductRow[]> {
   if (db || process.env.DATABASE_URL) {
     try {
       await ensureSeeded();
-      const rows = await db!.select().from(products).orderBy(asc(products.sortOrder));
+      const rows: ProductRow[] = await db!.select().from(products).orderBy(asc(products.sortOrder));
       if (rows) {
         globalForStore.__memoryProducts = rows;
-        return rows;
+        const site = await getSettings();
+        return rows.map((p) => ({ ...p, categoryLabel: resolveProductCategoryLabel(p.category, site.categories as CategoryDefinition[], p.categoryLabel) }));
       }
     } catch (e) {
       if (process.env.DATABASE_URL) {
@@ -327,7 +337,8 @@ export async function getAllProducts(): Promise<ProductRow[]> {
       }
     }
   }
-  return [...memStore.products].sort((a, b) => a.sortOrder - b.sortOrder);
+  const site = await getSettings();
+  return [...memStore.products].sort((a, b) => a.sortOrder - b.sortOrder).map((p) => ({ ...p, categoryLabel: resolveProductCategoryLabel(p.category, site.categories as CategoryDefinition[], p.categoryLabel) }));
 }
 
 export async function getActiveProducts(): Promise<ProductRow[]> {
@@ -348,38 +359,13 @@ export async function getProductBySlug(slug: string): Promise<ProductRow | null>
   const numericId = Number(raw);
   const isNum = !isNaN(numericId) && numericId > 0;
 
-  const memStore = getMemoryStore();
-  if (db || process.env.DATABASE_URL) {
-    try {
-      await ensureSeeded();
-      const allRows: ProductRow[] = await db!.select().from(products);
-      const match = allRows.find(
-        (p: ProductRow) =>
-          p.slug === raw ||
-          p.slug === decoded ||
-          (Boolean(p.slug) && decodeURIComponent(p.slug) === decoded) ||
-          (Boolean(p.slug) && decodeURIComponent(p.slug).toLowerCase() === decoded.toLowerCase()) ||
-          (isNum && p.id === numericId),
-      );
-      return match ?? null;
-    } catch (e) {
-      if (process.env.DATABASE_URL) {
-        console.error("Failed to read product by slug from DB:", e);
-        throw new Error("خطا در خواندن اطلاعات محصول از پایگاه داده");
-      }
-    }
-  }
+  const allRows = await getAllProducts();
+  return allRows.find(
+    (p) => p.slug === raw || p.slug === decoded ||
+      (Boolean(p.slug) && decodeURIComponent(p.slug).toLowerCase() === decoded.toLowerCase()) ||
+      (isNum && p.id === numericId),
+  ) ?? null;
 
-  return (
-    memStore.products.find(
-      (p: ProductRow) =>
-        p.slug === raw ||
-        p.slug === decoded ||
-        (Boolean(p.slug) && decodeURIComponent(p.slug) === decoded) ||
-        (Boolean(p.slug) && decodeURIComponent(p.slug).toLowerCase() === decoded.toLowerCase()) ||
-        (isNum && p.id === numericId),
-    ) ?? null
-  );
 }
 
 export type ProductInput = {
@@ -416,6 +402,10 @@ export type ProductInput = {
   badge: string;
   inStock: boolean;
   featured: boolean;
+  featuredRetail: boolean;
+  featuredWholesale: boolean;
+  retailFeaturedOrder: number;
+  wholesaleFeaturedOrder: number;
   sortOrder: number;
   active: boolean;
 };
@@ -423,6 +413,7 @@ export type ProductInput = {
 export { calculateProductPricing } from "./pricing";
 
 export async function createProduct(input: ProductInput): Promise<ProductRow> {
+  input = { ...input, categoryLabel: resolveProductCategoryLabel(input.category, (await getSettings()).categories as CategoryDefinition[], input.categoryLabel) };
   if (!db) assertMemoryStoreAllowed("product creation");
   const memStore = getMemoryStore();
   if (db || process.env.DATABASE_URL) {
@@ -457,6 +448,7 @@ export async function updateProduct(
   id: number,
   input: Partial<ProductInput>,
 ): Promise<ProductRow | null> {
+  if (input.category) input = { ...input, categoryLabel: resolveProductCategoryLabel(input.category, (await getSettings()).categories as CategoryDefinition[], input.categoryLabel) };
   if (!db) assertMemoryStoreAllowed("product updates");
   const memStore = getMemoryStore();
   let updatedRow: ProductRow | null = null;
@@ -557,7 +549,7 @@ export function sanitizeProduct(body: Record<string, unknown>): ProductInput {
     videoUrl: str(body.videoUrl),
     unitPrice: str(body.unitPrice),
     category: str(body.category) || "foam",
-    categoryLabel: str(body.categoryLabel) || "فوم تمیزکننده",
+    categoryLabel: resolveProductCategoryLabel(str(body.category) || "foam", undefined, str(body.categoryLabel)),
     images: arr(body.images),
     retailImages: arr(body.retailImages),
     wholesaleImages: arr(body.wholesaleImages),
@@ -573,6 +565,10 @@ export function sanitizeProduct(body: Record<string, unknown>): ProductInput {
     badge: str(body.badge),
     inStock: body.inStock !== false,
     featured: body.featured === true,
+    featuredRetail: body.featuredRetail === true && body.isRetail !== false,
+    featuredWholesale: body.featuredWholesale === true && body.isWholesale !== false,
+    retailFeaturedOrder: Number.isSafeInteger(Number(body.retailFeaturedOrder)) ? Number(body.retailFeaturedOrder) : 0,
+    wholesaleFeaturedOrder: Number.isSafeInteger(Number(body.wholesaleFeaturedOrder)) ? Number(body.wholesaleFeaturedOrder) : 0,
     sortOrder: Number(body.sortOrder) || 0,
     active: body.active !== false,
   };

@@ -10,6 +10,8 @@ import {
 } from "@/db/schema";
 import { getAllProducts, slugify } from "@/lib/store";
 import { sanitizeRichTextMap, sanitizeRichTextValue, type RichTextMap, type RichTextValue } from "@/lib/rich-text";
+import { getProductPricePresentation, getWholesalePackConfig } from "@/lib/pricing";
+import { getProductImages } from "@/lib/product-media";
 
 type ContentMemory = {
   suggestions: CartProductSuggestionRow[];
@@ -29,6 +31,7 @@ function nextId(rows: { id: number }[]) {
 }
 
 export type SuggestionInput = {
+  mode: "retail" | "wholesale";
   triggerProductId: number;
   suggestedProductId: number;
   message: string;
@@ -38,6 +41,7 @@ export type SuggestionInput = {
 };
 
 export function sanitizeSuggestion(body: Record<string, unknown>): SuggestionInput {
+  if (body.mode !== "retail" && body.mode !== "wholesale") throw new Error("نوع فروش پیشنهاد نامعتبر است");
   const triggerProductId = Number(body.triggerProductId);
   const suggestedProductId = Number(body.suggestedProductId);
   if (!Number.isInteger(triggerProductId) || triggerProductId <= 0) throw new Error("محصول محرک نامعتبر است");
@@ -46,6 +50,7 @@ export function sanitizeSuggestion(body: Record<string, unknown>): SuggestionInp
   const message = typeof body.message === "string" ? body.message.trim().slice(0, 1000) : "";
   const messageRichText = sanitizeRichTextValue(body.messageRichText, 1_000);
   return {
+    mode: body.mode,
     triggerProductId,
     suggestedProductId,
     message,
@@ -59,16 +64,17 @@ export function sanitizeSuggestion(body: Record<string, unknown>): SuggestionInp
 
 async function validateSuggestionProducts(input: SuggestionInput) {
   const products = await getAllProducts();
-  if (!products.some((p) => p.id === input.triggerProductId)) throw new Error("محصول محرک پیدا نشد");
-  if (!products.some((p) => p.id === input.suggestedProductId)) throw new Error("محصول پیشنهادی پیدا نشد");
+  const eligible = (id: number) => products.some((p) => p.id === id && p.active && (input.mode === "retail" ? p.isRetail : p.isWholesale));
+  if (!eligible(input.triggerProductId)) throw new Error("محصول محرک در این نوع فروش فعال نیست");
+  if (!eligible(input.suggestedProductId)) throw new Error("محصول پیشنهادی در این نوع فروش فعال نیست");
 }
 
 export async function getAllSuggestions(): Promise<CartProductSuggestionRow[]> {
   if (db) {
     try {
       return await db.select().from(cartProductSuggestions).orderBy(asc(cartProductSuggestions.sortOrder), desc(cartProductSuggestions.createdAt));
-    } catch {
-      // fallback to memory
+    } catch (error) {
+      if (process.env.DATABASE_URL) throw error;
     }
   }
   return [...memory().suggestions].sort((a, b) => a.sortOrder - b.sortOrder);
@@ -81,10 +87,11 @@ export async function createSuggestion(input: SuggestionInput) {
       const rows = await db.insert(cartProductSuggestions).values(input).returning();
       if (rows[0]) return rows[0];
     } catch (e) {
+      if (process.env.DATABASE_URL) throw e;
       console.warn("Failed to create suggestion in DB, falling back to memory:", e);
     }
   }
-  if (memory().suggestions.some((r) => r.triggerProductId === input.triggerProductId && r.suggestedProductId === input.suggestedProductId)) {
+  if (memory().suggestions.some((r) => r.triggerProductId === input.triggerProductId && r.suggestedProductId === input.suggestedProductId && r.mode === input.mode)) {
     throw new Error("این پیشنهاد قبلاً تعریف شده است");
   }
   const now = new Date();
@@ -100,6 +107,7 @@ export async function updateSuggestion(id: number, input: SuggestionInput) {
       const rows = await db.update(cartProductSuggestions).set({ ...input, updatedAt: new Date() }).where(eq(cartProductSuggestions.id, id)).returning();
       if (rows[0]) return rows[0];
     } catch (e) {
+      if (process.env.DATABASE_URL) throw e;
       console.warn("Failed to update suggestion in DB, falling back to memory:", e);
     }
   }
@@ -115,33 +123,41 @@ export async function deleteSuggestion(id: number) {
       await db.delete(cartProductSuggestions).where(eq(cartProductSuggestions.id, id));
       return;
     } catch (e) {
+      if (process.env.DATABASE_URL) throw e;
       console.warn("Failed to delete suggestion in DB:", e);
     }
   }
   memory().suggestions = memory().suggestions.filter((row) => row.id !== id);
 }
 
-export type PublicCartSuggestion = CartProductSuggestionRow & { suggestedProduct: ProductRow };
+export type PublicCartSuggestion = CartProductSuggestionRow & {
+  suggestedProduct: ProductRow & { suggestedPrice: number; suggestedImages: string[]; minimumPackCount: number };
+};
 
-export async function getCartSuggestions(triggerIds: number[]): Promise<PublicCartSuggestion[]> {
+export async function getCartSuggestions(triggerIds: number[], mode: "retail" | "wholesale"): Promise<PublicCartSuggestion[]> {
   const uniqueIds = [...new Set(triggerIds.filter((id) => Number.isInteger(id) && id > 0))].slice(0, 50);
   if (!uniqueIds.length) return [];
   let rules: CartProductSuggestionRow[] = [];
   if (db) {
     try {
-      rules = await db.select().from(cartProductSuggestions).where(and(eq(cartProductSuggestions.active, true), inArray(cartProductSuggestions.triggerProductId, uniqueIds))).orderBy(asc(cartProductSuggestions.sortOrder));
-    } catch {
-      rules = memory().suggestions.filter((row) => row.active && row.triggerProductId !== null && uniqueIds.includes(row.triggerProductId)).sort((a, b) => a.sortOrder - b.sortOrder);
+      rules = await db.select().from(cartProductSuggestions).where(and(eq(cartProductSuggestions.active, true), eq(cartProductSuggestions.mode, mode), inArray(cartProductSuggestions.triggerProductId, uniqueIds))).orderBy(asc(cartProductSuggestions.sortOrder));
+    } catch (error) {
+      if (process.env.DATABASE_URL) throw error;
+      rules = memory().suggestions.filter((row) => row.active && row.mode === mode && row.triggerProductId !== null && uniqueIds.includes(row.triggerProductId)).sort((a, b) => a.sortOrder - b.sortOrder);
     }
   } else {
-    rules = memory().suggestions.filter((row) => row.active && row.triggerProductId !== null && uniqueIds.includes(row.triggerProductId)).sort((a, b) => a.sortOrder - b.sortOrder);
+    rules = memory().suggestions.filter((row) => row.active && row.mode === mode && row.triggerProductId !== null && uniqueIds.includes(row.triggerProductId)).sort((a, b) => a.sortOrder - b.sortOrder);
   }
   const products = await getAllProducts();
   const productMap = new Map(products.map((product) => [product.id, product]));
+  const used = new Set<number>();
   return rules.flatMap((rule: CartProductSuggestionRow) => {
     const product = rule.suggestedProductId ? productMap.get(rule.suggestedProductId) : undefined;
-    if (!product || !product.active || !product.inStock || uniqueIds.includes(product.id)) return [];
-    return [{ ...rule, suggestedProduct: product }];
+    if (!product || !product.active || !product.inStock || !(mode === "retail" ? product.isRetail : product.isWholesale) || uniqueIds.includes(product.id) || used.has(product.id)) return [];
+    used.add(product.id);
+    const minimumPackCount = mode === "wholesale" ? getWholesalePackConfig(product).minimumPackCount : 1;
+    return [{ ...rule, suggestedProduct: { ...product, suggestedPrice: getProductPricePresentation(product, minimumPackCount, mode).unitPrice,
+      suggestedImages: getProductImages(product, mode), minimumPackCount } }];
   });
 }
 

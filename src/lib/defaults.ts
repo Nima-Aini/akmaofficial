@@ -42,6 +42,12 @@ export type BottomBanner = ResponsiveImageSettings & RichFields<"alt"> & {
 
 export type SectionTitles = RichFields<Exclude<keyof SectionTitlesBase, "promoCtaHref">> & SectionTitlesBase;
 type SectionTitlesBase = {
+  retailFeaturedTitle: string;
+  retailFeaturedSubtitle: string;
+  retailFeaturedVisible: boolean;
+  wholesaleFeaturedTitle: string;
+  wholesaleFeaturedSubtitle: string;
+  wholesaleFeaturedVisible: boolean;
   whyAkmaBadge: string;
   whyAkmaTitle: string;
   whyAkmaSubtitle: string;
@@ -388,6 +394,12 @@ export const DEFAULT_BOTTOM_BANNERS: BottomBanner[] = [
 ];
 
 export const DEFAULT_SECTION_TITLES: SectionTitles = {
+  retailFeaturedTitle: "محصولات ویژه خرید تکی آکما",
+  retailFeaturedSubtitle: "منتخب محصولات آکما برای خرید تکی",
+  retailFeaturedVisible: true,
+  wholesaleFeaturedTitle: "محصولات ویژه خرید عمده آکما",
+  wholesaleFeaturedSubtitle: "منتخب محصولات آکما برای خرید همکاری",
+  wholesaleFeaturedVisible: true,
   whyAkmaBadge: "چرا آکما؟",
   whyAkmaTitle: "آکما؛ انتخاب فروشگاه‌های حرفه‌ای",
   whyAkmaSubtitle:

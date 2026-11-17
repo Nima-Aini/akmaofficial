@@ -25,7 +25,9 @@ import {
   sanitizeResponsiveSetting,
 } from "../src/lib/responsive-image.ts";
 import { ResponsiveBannerMedia, getResponsiveTextLayoutClass } from "../src/components/responsive-banner.tsx";
-import { CartProvider } from "../src/context/cart-context.tsx";
+import { CartProvider, migrateCartItems } from "../src/context/cart-context.tsx";
+import { resolveProductCategoryLabel, isKnownProductCategory } from "../src/lib/product-category.ts";
+import { getFeaturedProducts } from "../src/lib/sales-mode.ts";
 import {
   ProductCard,
   getProductDetailHref,
@@ -255,7 +257,8 @@ runTest("Product price presentation ignores legacy unitPrice text", () => {
 });
 
 runTest("Product card link covers the whole card and targets its detail route", () => {
-  assert.equal(getProductDetailHref("foam-box-10"), "/products/foam-box-10");
+  assert.equal(getProductDetailHref("foam-box-10"), "/products/foam-box-10?mode=retail");
+  assert.equal(getProductDetailHref("foam-box-10", "wholesale"), "/products/foam-box-10?mode=wholesale");
   assert.match(PRODUCT_CARD_LINK_CLASS, /absolute inset-0/);
   assert.match(PRODUCT_CARD_LINK_CLASS, /z-10/);
   assert.match(PRODUCT_CARD_LINK_CLASS, /touch-manipulation/);
@@ -624,6 +627,32 @@ runTest("Payment result URL rejects invalid configured and internal origins", ()
   for (const raw of ["http://localhost:3010", "https://localhost:3010", "https://127.0.0.1", "http://akmaofficial.ir", "https://evil.example", "https://akmaofficial.ir.evil.example", "https://akmaofficial.ir@evil.example", "https://akmaofficial.ir/path", "https://akmaofficial.ir?next=https://evil.example", "not a URL"]) {
     assert.throws(() => paymentResultUrl("/checkout/result", { status: "failed" }, raw, true), /Invalid public APP_URL/);
   }
+});
+
+runTest("Featured selections and order stay independent by sales mode", () => {
+  const rows = [
+    { id: 1, active: true, isRetail: true, isWholesale: false, featuredRetail: true, featuredWholesale: true, retailFeaturedOrder: 2, wholesaleFeaturedOrder: 1 },
+    { id: 2, active: true, isRetail: true, isWholesale: true, featuredRetail: true, featuredWholesale: true, retailFeaturedOrder: 1, wholesaleFeaturedOrder: 3 },
+    { id: 3, active: true, isRetail: false, isWholesale: true, featuredRetail: false, featuredWholesale: true, retailFeaturedOrder: 0, wholesaleFeaturedOrder: 1 },
+  ];
+  assert.deepEqual(getFeaturedProducts(rows, "retail").map((p) => p.id), [2, 1]);
+  assert.deepEqual(getFeaturedProducts(rows, "wholesale").map((p) => p.id), [3, 2]);
+});
+
+runTest("Category display resolves renamed CMS labels without changing product keys", () => {
+  assert.equal(resolveProductCategoryLabel("foam", [{ key: "foam", label: "نام جدید" }], "نام قدیمی"), "نام جدید");
+  assert.equal(isKnownProductCategory("unexpected", []), false);
+  assert.equal(resolveProductCategoryLabel("unexpected", [], "نام موجود"), "نام موجود");
+});
+
+runTest("Legacy cart migration retains separate modes of one product", () => {
+  const original = [
+    { productId: 1, mode: "retail", quantity: 2 },
+    { productId: 1, mode: "wholesale", quantity: 3 },
+    { productId: 1, mode: "retail", quantity: 2 },
+    { productId: 2, mode: "invalid", quantity: 1 },
+  ];
+  assert.deepEqual(migrateCartItems(original).map((item) => [item.productId, item.mode, item.quantity]), [[1, "retail", 2], [1, "wholesale", 3]]);
 });
 
 console.log("\n==================================================================");

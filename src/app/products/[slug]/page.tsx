@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import {
   ArrowLeft,
   BadgeCheck,
@@ -23,9 +23,11 @@ import { ProductGallery } from "@/components/product-gallery";
 import { ProductModeProvider } from "@/context/product-mode-context";
 import { getProductImages } from "@/lib/product-media";
 import { RichText } from "@/components/rich-text";
+import { WholesaleOnly } from "@/components/wholesale-only";
 
 type ProductPageProps = {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ mode?: string }>;
 };
 
 function absoluteUrl(path: string): string {
@@ -65,22 +67,29 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 
 export default async function ProductPage({
   params,
+  searchParams,
 }: ProductPageProps) {
   const { slug } = await params;
+  const requestedMode = (await searchParams).mode;
   const [product, s, all] = await Promise.all([
     getProductBySlug(slug),
     getSettings(),
     getActiveProducts(),
   ]);
   if (!product || !product.active) notFound();
+  if (!product.isRetail && !product.isWholesale) notFound();
+  const mode = requestedMode === "wholesale" ? "wholesale" : "retail";
+  if ((mode === "wholesale" && !product.isWholesale) || (mode === "retail" && !product.isRetail)) {
+    redirect(`/products/${encodeURIComponent(product.slug)}?mode=${product.isRetail ? "retail" : "wholesale"}`);
+  }
 
   const contact = { ...DEFAULT_CONTACT, ...(s.contact as Partial<ContactSettings>) };
   const phone = contact.phones[0] ?? "09033253065";
   const related = all
-    .filter((p) => p.id !== product.id && p.category === product.category)
+    .filter((p) => p.id !== product.id && p.category === product.category && (mode === "retail" ? p.isRetail : p.isWholesale))
     .slice(0, 3);
   const relatedFinal =
-    related.length > 0 ? related : all.filter((p) => p.id !== product.id).slice(0, 3);
+    related.length > 0 ? related : all.filter((p) => p.id !== product.id && (mode === "retail" ? p.isRetail : p.isWholesale)).slice(0, 3);
 
   const paragraphs = product.description
     .split(/\n{2,}/)
@@ -95,12 +104,12 @@ export default async function ProductPage({
           <Home size={13} /> خانه
         </Link>
         <ChevronLeft size={13} />
-        <Link href="/products" className="transition-colors hover:text-accent">
+        <Link href={`/products?mode=${mode}`} className="transition-colors hover:text-accent">
           محصولات
         </Link>
         <ChevronLeft size={13} />
         <Link
-          href={`/products?cat=${product.category}`}
+          href={`/products?mode=${mode}&cat=${encodeURIComponent(product.category)}`}
           className="transition-colors hover:text-accent"
         >
           {product.categoryLabel}
@@ -109,7 +118,7 @@ export default async function ProductPage({
         <span className="font-bold text-ink">{product.name}</span>
       </nav>
 
-      <ProductModeProvider initialMode={product.isRetail === false && product.isWholesale !== false ? "wholesale" : "retail"}>
+      <ProductModeProvider key={mode} initialMode={mode}>
       <div className="mt-8 grid gap-10 lg:grid-cols-2 lg:gap-14">
         {/* gallery */}
         <Reveal className="relative">
@@ -146,6 +155,7 @@ export default async function ProductPage({
 
               {/* Wholesale Tiers Table if product has tiers */}
               {Array.isArray(product.wholesaleTiers) && product.wholesaleTiers.length > 0 && (
+                <WholesaleOnly>
                 <div className="rounded-2xl border border-line bg-surface/50 p-4 space-y-2">
                   <p className="text-xs font-black text-ink">تخفیف‌های پلکانی سفارش عمده:</p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
@@ -161,6 +171,7 @@ export default async function ProductPage({
                     ))}
                   </div>
                 </div>
+                </WholesaleOnly>
               )}
 
               {/* Add to cart action with quantity selector */}
@@ -250,7 +261,7 @@ export default async function ProductPage({
           <div className="flex items-end justify-between">
             <h2 className="text-2xl font-black leading-snug">محصولات مرتبط</h2>
             <Link
-              href="/products"
+              href={`/products?mode=${mode}`}
               className="flex items-center gap-1.5 text-xs font-bold text-muted transition-colors hover:text-accent"
             >
               همه محصولات <ArrowLeft size={14} />
@@ -258,7 +269,7 @@ export default async function ProductPage({
           </div>
           <div className="mt-8 grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 md:gap-5 lg:grid-cols-3">
             {relatedFinal.map((p) => (
-              <ProductCard key={p.id} product={p} phone={phone} />
+              <ProductCard key={p.id} product={p} mode={mode} phone={phone} />
             ))}
           </div>
         </section>

@@ -163,7 +163,7 @@ export function AdminPanel() {
           )}
           {tab === "orders" && <OrdersSection toast={toast} />}
           {tab === "products" && (
-            <ProductsSection products={products} setProducts={setProducts} toast={toast} />
+            <ProductsSection products={products} setProducts={setProducts} categories={settings.categories as { key: string; label: string }[] | undefined} toast={toast} />
           )}
           {tab === "homepage" && (
             <HomePageCardsSection settings={settings} setKey={setKey} saveKey={saveKey} saving={saving} />

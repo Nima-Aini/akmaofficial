@@ -35,6 +35,7 @@ import {
   ResponsiveTextRegionBackdrop,
 } from "@/components/responsive-banner";
 import { RichText } from "@/components/rich-text";
+import { getFeaturedProducts } from "@/lib/sales-mode";
 
 export const dynamic = "force-dynamic";
 
@@ -56,9 +57,8 @@ export default async function HomePage() {
   const features = (s.features as Feature[]) ?? DEFAULT_FEATURES;
   const sectionTitles = { ...DEFAULT_SECTION_TITLES, ...(s.sectionTitles as Partial<SectionTitles>) };
 
-  // Showcase 4 featured bestseller items matching reference panel
-  const featured = products.filter((p) => p.featured);
-  const showcase = featured.length >= 4 ? featured.slice(0, 4) : products.slice(0, 4);
+  const retailFeatured = getFeaturedProducts(products, "retail");
+  const wholesaleFeatured = getFeaturedProducts(products, "wholesale");
 
   return (
     <div className="bg-[#FAF8F5] text-[#1C1816] min-h-screen pb-16">
@@ -268,8 +268,8 @@ export default async function HomePage() {
 
         {banners.length > 0 && (
           <section className="grid gap-6 md:grid-cols-2" aria-label="پیشنهادهای ویژه">
-            {banners.map((banner) => (
-              <Link key={banner.id} href={banner.href || "/products"} className="group relative isolate min-h-[340px] overflow-hidden rounded-[2rem] border border-white/50 shadow-lg md:min-h-[300px]">
+            {banners.map((banner, index) => (
+              <Link key={banner.id} href={banner.href || "/products"} className={`group relative isolate min-h-[340px] overflow-hidden rounded-[2rem] border border-white/50 shadow-lg md:min-h-[300px] ${banners.length % 2 === 1 && index === banners.length - 1 ? "md:col-span-2 md:w-[calc(50%-0.75rem)] md:justify-self-center" : ""}`}>
                 <ResponsiveBannerMedia settings={banner} fallback="/images/hero.png" alt="" />
                 <ResponsiveTextRegionBackdrop settings={banner} />
                 <ResponsiveBannerContent settings={banner} className="min-h-[340px] p-6 md:min-h-[300px]">
@@ -284,14 +284,16 @@ export default async function HomePage() {
           </section>
         )}
 
-        {/* ================= 6. FEATURED BESTSELLERS SECTION ================= */}
-        <section className="space-y-6">
+        {/* Separate, explicitly selected retail and wholesale featured products. */}
+        {([
+          { mode: "retail" as const, list: retailFeatured, title: sectionTitles.retailFeaturedTitle, subtitle: sectionTitles.retailFeaturedSubtitle, titleRich: sectionTitles.retailFeaturedTitleRichText, subtitleRich: sectionTitles.retailFeaturedSubtitleRichText, visible: sectionTitles.retailFeaturedVisible },
+          { mode: "wholesale" as const, list: wholesaleFeatured, title: sectionTitles.wholesaleFeaturedTitle, subtitle: sectionTitles.wholesaleFeaturedSubtitle, titleRich: sectionTitles.wholesaleFeaturedTitleRichText, subtitleRich: sectionTitles.wholesaleFeaturedSubtitleRichText, visible: sectionTitles.wholesaleFeaturedVisible },
+        ]).filter((section) => section.visible !== false && section.list.length > 0).map((section) => <section key={section.mode} className="space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl sm:text-3xl font-black text-[#1C1816]">
-              <RichText value={sectionTitles.featuredTitleRichText} fallback={sectionTitles.featuredTitle} />
-            </h2>
+            <div><h2 className="text-2xl sm:text-3xl font-black text-[#1C1816]"><RichText value={section.titleRich} fallback={section.title} /></h2>
+              <RichText as="p" className="mt-2 text-xs text-[#574F49]" value={section.subtitleRich} fallback={section.subtitle} /></div>
             <Link
-              href="/products"
+              href={`/products?mode=${section.mode}`}
               className="inline-flex items-center gap-1.5 rounded-full border border-[#E7E3DC] bg-white px-4 py-2 text-xs font-black text-[#8E111E] hover:bg-[#FAF8F5] transition-colors"
             >
               <span>مشاهده همه</span>
@@ -300,11 +302,11 @@ export default async function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 min-[360px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-6">
-            {showcase.map((product) => (
-              <ProductCard key={product.id} product={product} mode="retail" />
+            {section.list.slice(0, 8).map((product) => (
+              <ProductCard key={product.id} product={product} mode={section.mode} />
             ))}
           </div>
-        </section>
+        </section>)}
 
         {/* ================= 7. LOWER WHOLESALE COLLABORATION BANNER ================= */}
         <section className="relative isolate min-h-[390px] overflow-hidden rounded-[2.5rem] bg-[#4A0811] text-white shadow-xl md:min-h-[360px]">
@@ -347,8 +349,8 @@ export default async function HomePage() {
 
         {bottomBanners.length > 0 && (
           <section className="grid gap-5 sm:grid-cols-2" aria-label="بنرهای پایانی">
-            {bottomBanners.map((banner) => (
-              <Link key={banner.id} href={banner.href || "/products"} aria-label={banner.alt} className="relative isolate min-h-[280px] overflow-hidden rounded-[2rem] border border-white/50 shadow-lg md:min-h-[220px]">
+            {bottomBanners.map((banner, index) => (
+              <Link key={banner.id} href={banner.href || "/products"} aria-label={banner.alt} className={`relative isolate min-h-[280px] overflow-hidden rounded-[2rem] border border-white/50 shadow-lg md:min-h-[220px] ${bottomBanners.length % 2 === 1 && index === bottomBanners.length - 1 ? "sm:col-span-2 sm:w-[calc(50%-0.625rem)] sm:justify-self-center" : ""}`}>
                 <ResponsiveBannerMedia settings={banner} fallback="/images/craft.png" alt="" />
                 <ResponsiveTextRegionBackdrop settings={banner} desktopFallback="bottom" mobileFallback="bottom" />
                 <ResponsiveBannerContent settings={banner} desktopFallback="bottom" mobileFallback="bottom" className="min-h-[280px] p-5 md:min-h-[220px]">

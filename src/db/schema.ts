@@ -56,6 +56,10 @@ export const products = pgTable("products", {
   badge: text("badge").notNull().default(""),
   inStock: boolean("in_stock").notNull().default(true),
   featured: boolean("featured").notNull().default(false),
+  featuredRetail: boolean("featured_retail").notNull().default(false),
+  featuredWholesale: boolean("featured_wholesale").notNull().default(false),
+  retailFeaturedOrder: integer("retail_featured_order").notNull().default(0),
+  wholesaleFeaturedOrder: integer("wholesale_featured_order").notNull().default(0),
   sortOrder: integer("sort_order").notNull().default(0),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -191,8 +195,10 @@ export const smsNotifications = pgTable("sms_notifications", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// The original table's two-column unique index cannot support separate modes.
+// Keep it intact for historical data and migrate rows into the mode-aware table.
 export const cartProductSuggestions = pgTable(
-  "cart_product_suggestions",
+  "cart_product_suggestions_by_mode",
   {
     id: serial("id").primaryKey(),
     triggerProductId: integer("trigger_product_id").references(() => products.id, {
@@ -201,6 +207,7 @@ export const cartProductSuggestions = pgTable(
     suggestedProductId: integer("suggested_product_id").references(() => products.id, {
       onDelete: "set null",
     }),
+    mode: text("mode").$type<"retail" | "wholesale">().notNull().default("retail"),
     message: text("message").notNull().default(""),
     messageRichText: jsonb("message_rich_text").$type<RichTextValue>().notNull().default({ segments: [] }),
     active: boolean("active").notNull().default(true),
@@ -209,9 +216,10 @@ export const cartProductSuggestions = pgTable(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex("cart_product_suggestions_pair_unique_idx").on(
+    uniqueIndex("cart_product_suggestions_mode_pair_unique_idx").on(
       table.triggerProductId,
       table.suggestedProductId,
+      table.mode,
     ),
   ],
 );

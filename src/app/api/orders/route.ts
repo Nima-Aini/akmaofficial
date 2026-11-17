@@ -32,7 +32,10 @@ export async function POST(req: NextRequest) {
     const customerCity = String(body.customerCity || customer.city || "").trim();
     const postalCode = toEnDigits(String(body.postalCode || customer.postalCode || "")).trim();
     const notes = String(body.notes ?? "").trim();
-    const orderType = body.orderType === "wholesale" ? "wholesale" : "retail";
+    if (body.orderType !== undefined && body.orderType !== "retail" && body.orderType !== "wholesale") {
+      return NextResponse.json({ error: "نوع خرید نامعتبر است" }, { status: 400 });
+    }
+    const orderType: "retail" | "wholesale" = body.orderType === "wholesale" ? "wholesale" : "retail";
     const paymentMethod = body.paymentMethod === "card_to_card" ? "card_to_card" : "online";
     const rawItems = Array.isArray(body.items) ? body.items : [];
 
@@ -74,11 +77,11 @@ export async function POST(req: NextRequest) {
       }
 
       const qty = Number(raw.quantity);
-      const itemMode = raw.mode === "wholesale"
-        ? "wholesale"
-        : raw.mode === "retail"
-          ? "retail"
-          : orderType;
+      // Older saved carts may omit a mode. Never accept an explicit mismatch.
+      const itemMode = raw.mode === undefined ? orderType : raw.mode;
+      if (itemMode !== orderType) {
+        return NextResponse.json({ error: "نوع کالا با نوع سفارش یکسان نیست" }, { status: 400 });
+      }
 
       if (!isPositiveSafeInteger(qty)) {
         return NextResponse.json(

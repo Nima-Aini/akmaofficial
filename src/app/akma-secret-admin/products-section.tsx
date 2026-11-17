@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { Pencil, Plus, Save, Star, Trash2, X } from "lucide-react";
 import { CATEGORIES } from "@/lib/defaults";
+import { isKnownProductCategory, resolveProductCategoryLabel, type CategoryDefinition } from "@/lib/product-category";
 import { formatPrice } from "@/lib/format";
 import { Field, FocalPointControl, ImageUploader, ListEditor, RichTextEditor, TextRegionControl, Toggle } from "./fields";
 import type { TextRegionPosition } from "@/lib/text-region";
@@ -51,6 +52,10 @@ export type AdminProduct = {
   badge: string;
   inStock: boolean;
   featured: boolean;
+  featuredRetail: boolean;
+  featuredWholesale: boolean;
+  retailFeaturedOrder: number;
+  wholesaleFeaturedOrder: number;
   sortOrder: number;
   active: boolean;
 };
@@ -89,6 +94,10 @@ const EMPTY: Omit<AdminProduct, "id"> = {
   badge: "",
   inStock: true,
   featured: false,
+  featuredRetail: false,
+  featuredWholesale: false,
+  retailFeaturedOrder: 0,
+  wholesaleFeaturedOrder: 0,
   sortOrder: 0,
   active: true,
 };
@@ -96,10 +105,12 @@ const EMPTY: Omit<AdminProduct, "id"> = {
 export function ProductsSection({
   products,
   setProducts,
+  categories,
   toast,
 }: {
   products: AdminProduct[];
   setProducts: (p: AdminProduct[]) => void;
+  categories?: CategoryDefinition[];
   toast: (m: string, ok?: boolean) => void;
 }) {
   const [editing, setEditing] = useState<AdminProduct | null>(null);
@@ -107,6 +118,7 @@ export function ProductsSection({
   const [saving, setSaving] = useState(false);
   const [previewWidth, setPreviewWidth] = useState<360 | 390 | 430 | 1440>(390);
   const [previewMode, setPreviewMode] = useState<"retail" | "wholesale">("retail");
+  const categoryOptions = [...CATEGORIES.filter((c) => c.key !== "all"), ...(categories ?? []).filter((c) => !CATEGORIES.some((builtIn) => builtIn.key === c.key))];
 
   function openNew() {
     setIsNew(true);
@@ -217,6 +229,8 @@ export function ProductsSection({
       </div>
 
       <div className="mt-7 space-y-3">
+        {!products.some((p) => p.active && p.isRetail && p.featuredRetail) && <p className="rounded-xl border border-dashed border-line p-3 text-xs text-muted">هنوز محصولی برای بخش ویژه خرید تکی انتخاب نشده است.</p>}
+        {!products.some((p) => p.active && p.isWholesale && p.featuredWholesale) && <p className="rounded-xl border border-dashed border-line p-3 text-xs text-muted">هنوز محصولی برای بخش ویژه خرید عمده انتخاب نشده است.</p>}
         {products.map((p) => (
           <div
             key={p.id}
@@ -230,10 +244,11 @@ export function ProductsSection({
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-extrabold">
                 {p.name}
-                {p.featured && <Star size={13} className="mr-1.5 inline text-accent" />}
+                {(p.featuredRetail || p.featuredWholesale) && <Star size={13} className="mr-1.5 inline text-accent" />}
               </p>
               <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-muted">
-                <span>دسته‌بندی: {p.categoryLabel}</span>
+                <span>دسته‌بندی: {resolveProductCategoryLabel(p.category, categories, p.categoryLabel)}</span>
+                {!isKnownProductCategory(p.category, categories) && <span className="font-bold text-amber-700">کلید دسته‌بندی ناشناخته؛ نیازمند بررسی</span>}
                 <span>• تکی: {formatPrice(p.retailPrice || p.price)} ت</span>
                 <span>• عمده: {formatPrice(p.wholesalePrice || p.price)} ت</span>
                 {!p.active && <span className="text-rose-400 font-bold">(غیرفعال)</span>}
@@ -302,7 +317,9 @@ export function ProductsSection({
 
               <div className="rounded-2xl border border-line bg-surface/50 p-4 space-y-4">
                 <h5 className="text-sm font-black text-ink">فروش تکی</h5>
-                <Toggle label="فعال بودن فروش تکی" checked={editing.isRetail !== false} onChange={(v) => patch({ isRetail: v })} />
+                <Toggle label="فعال بودن فروش تکی" checked={editing.isRetail !== false} onChange={(v) => patch({ isRetail: v, featuredRetail: v ? editing.featuredRetail : false })} />
+                <Toggle label="نمایش در محصولات ویژه تکی" checked={editing.featuredRetail} onChange={(featuredRetail) => patch({ featuredRetail })} />
+                <Field label="ترتیب محصولات ویژه تکی" type="number" value={editing.retailFeaturedOrder} onChange={(v) => patch({ retailFeaturedOrder: Number(v) || 0 })} dir="ltr" />
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field
                     label="قیمت خرید تکی (تومان)"
@@ -337,7 +354,9 @@ export function ProductsSection({
 
               <div className="rounded-2xl border border-line bg-surface/50 p-4 space-y-4">
                 <h5 className="text-sm font-black text-ink">فروش عمده</h5>
-                <Toggle label="فعال بودن فروش عمده" checked={editing.isWholesale !== false} onChange={(v) => patch({ isWholesale: v })} />
+                <Toggle label="فعال بودن فروش عمده" checked={editing.isWholesale !== false} onChange={(v) => patch({ isWholesale: v, featuredWholesale: v ? editing.featuredWholesale : false })} />
+                <Toggle label="نمایش در محصولات ویژه عمده" checked={editing.featuredWholesale} onChange={(featuredWholesale) => patch({ featuredWholesale })} />
+                <Field label="ترتیب محصولات ویژه عمده" type="number" value={editing.wholesaleFeaturedOrder} onChange={(v) => patch({ wholesaleFeaturedOrder: Number(v) || 0 })} dir="ltr" />
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="تعداد محصول در هر بسته" type="number" value={editing.wholesalePackSize ?? ""} onChange={(v) => patch({ wholesalePackSize: v ? Number(v) : null })} dir="ltr" hint="اگر مشخص نیست خالی بگذارید؛ رفتار قدیمی حفظ می‌شود." />
                   <Field label="نام بسته" value={editing.wholesalePackLabel || ""} onChange={(v) => patch({ wholesalePackLabel: v })} hint="نمونه: بسته ۱۲ عددی" />
@@ -443,9 +462,15 @@ export function ProductsSection({
                   const image = getResponsiveProductImages(editing, previewMode, viewport)[0];
                   const focal = viewport === "mobile" ? editing.mobileObjectPosition : editing.desktopObjectPosition;
                   const pricing = getProductPricePresentation(editing, 1, previewMode, { applyWholesaleTiers: false });
+                  if (viewport === "mobile") return <div className="mx-auto overflow-hidden rounded-2xl border border-line bg-white" style={{ width: `${previewWidth}px` }}>
+                    <div className="aspect-square bg-white p-3"><img src={image} alt="" className="size-full object-contain" style={{ objectPosition: `${focal?.x ?? 50}% ${focal?.y ?? 50}%` }} /></div>
+                    <div className="border-t border-line p-4"><h6 className="text-sm font-black"><RichText value={editing.textFormatting?.name} fallback={editing.name || "نام محصول"} /></h6>
+                      <p className="mt-2 text-xs">{previewMode === "wholesale" ? editing.wholesalePackLabel || "بسته" : editing.retailUnitLabel || "عدد"}</p>
+                      <p className="mt-2 font-black text-accent">{formatPrice(pricing.unitPrice)} تومان</p></div>
+                  </div>;
                   const region = editing.cardTextRegionPosition || "bottom";
                   return <div className="overflow-x-auto rounded-2xl bg-bg p-3" data-responsive-product-preview><div className="relative isolate mx-auto flex overflow-hidden rounded-2xl border border-white/50 bg-[#eee7dd] shadow-md" style={{ width: previewWidth < 768 ? `${previewWidth}px` : "360px", height: previewWidth < 768 ? "420px" : "390px" }}>
-                    <img src={image} alt="" className={`absolute inset-0 size-full ${viewport === "mobile" ? "object-contain p-2" : "object-cover"}`} style={{ objectPosition: `${focal?.x ?? 50}% ${focal?.y ?? 50}%` }} />
+                    <img src={image} alt="" className="absolute inset-0 size-full object-cover" style={{ objectPosition: `${focal?.x ?? 50}% ${focal?.y ?? 50}%` }} />
                     <span className="pointer-events-none absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-t from-black/40 to-transparent backdrop-blur-[2px]" />
                     <div className={`relative z-10 flex size-full p-3 pt-14 ${getTextRegionLayoutClass(region, "bottom")}`}><div className={`${PRODUCT_GLASS_OVERLAY_CLASS} ${getTextRegionContentWidthClass(region, "bottom")} pointer-events-none`}><h6 className="text-sm font-black"><RichText value={editing.textFormatting?.name} fallback={editing.name || "نام محصول"} /></h6><p className="mt-1 text-[11px] text-white/75"><RichText value={editing.textFormatting?.subtitle} fallback={editing.subtitle} /></p><div className="mt-3 border-t border-white/15 pt-2 text-sm font-black text-[#FFB0B7]">{formatPrice(pricing.unitPrice)} تومان</div></div></div>
                   </div></div>;
@@ -459,16 +484,17 @@ export function ProductsSection({
                     className="field"
                     value={editing.category}
                     onChange={(e) => {
-                      const c = CATEGORIES.find((x) => x.key === e.target.value);
+                      const c = categories?.find((x) => x.key === e.target.value) ?? CATEGORIES.find((x) => x.key === e.target.value);
                       patch({
                         category: e.target.value,
                         categoryLabel: c?.label ?? editing.categoryLabel,
                       });
                     }}
                   >
-                    {CATEGORIES.filter((c) => c.key !== "all").map((c) => (
+                    {!isKnownProductCategory(editing.category, categories) && <option value={editing.category}>کلید ناشناخته: {editing.category}</option>}
+                    {categoryOptions.map((c) => (
                       <option key={c.key} value={c.key}>
-                        {c.label}
+                        {resolveProductCategoryLabel(c.key, categories)}
                       </option>
                     ))}
                   </select>
@@ -492,11 +518,6 @@ export function ProductsSection({
                   label="موجود در انبار"
                   checked={editing.inStock}
                   onChange={(v) => patch({ inStock: v })}
-                />
-                <Toggle
-                  label="نمایش در منتخب / پرفروش"
-                  checked={editing.featured}
-                  onChange={(v) => patch({ featured: v })}
                 />
               </div>
 

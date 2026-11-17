@@ -159,7 +159,7 @@ export default function CheckoutPage() {
     }
   };
 
-  const isWholesaleOrder = items.some((it) => it.mode === "wholesale") || cartMode === "wholesale";
+  const isWholesaleOrder = cartMode === "wholesale";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

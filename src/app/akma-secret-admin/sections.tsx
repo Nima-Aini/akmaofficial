@@ -882,14 +882,22 @@ export function ContentSection({
             <CopyEditor label="توضیح زیر عنوان" object={sectionTitles} field="categoriesSubtitle" set={setTitles} />
           </div>
 
-          {/* Featured Products */}
+          {/* Retail and wholesale featured sections */}
           <div className="rounded-2xl border border-line p-4 space-y-4">
-            <h4 className="text-xs font-black text-accent">بخش محصولات ویژه (اسلایدر صفحه اصلی)</h4>
+            <h4 className="text-xs font-black text-accent">محصولات ویژه خرید تکی</h4>
             <div className="grid gap-4 sm:grid-cols-2">
-              <CopyEditor label="متن بج بالای بخش" object={sectionTitles} field="featuredBadge" set={setTitles} />
-              <CopyEditor label="عنوان اصلی بخش" object={sectionTitles} field="featuredTitle" set={setTitles} />
+              <CopyEditor label="عنوان بخش" object={sectionTitles} field="retailFeaturedTitle" set={setTitles} />
+              <CopyEditor label="توضیح بخش" object={sectionTitles} field="retailFeaturedSubtitle" set={setTitles} />
             </div>
-            <CopyEditor label="توضیح زیر عنوان" object={sectionTitles} field="featuredSubtitle" set={setTitles} />
+            <Toggle label="نمایش بخش تکی" checked={sectionTitles.retailFeaturedVisible !== false} onChange={(retailFeaturedVisible) => setTitles({ retailFeaturedVisible })} />
+          </div>
+          <div className="rounded-2xl border border-line p-4 space-y-4">
+            <h4 className="text-xs font-black text-accent">محصولات ویژه خرید عمده</h4>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <CopyEditor label="عنوان بخش" object={sectionTitles} field="wholesaleFeaturedTitle" set={setTitles} />
+              <CopyEditor label="توضیح بخش" object={sectionTitles} field="wholesaleFeaturedSubtitle" set={setTitles} />
+            </div>
+            <Toggle label="نمایش بخش عمده" checked={sectionTitles.wholesaleFeaturedVisible !== false} onChange={(wholesaleFeaturedVisible) => setTitles({ wholesaleFeaturedVisible })} />
           </div>
 
           {/* Promo / Akma offers */}

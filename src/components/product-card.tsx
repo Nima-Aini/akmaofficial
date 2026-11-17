@@ -22,8 +22,8 @@ export const PRODUCT_GLASS_OVERLAY_CLASS =
 export const PRODUCT_CARD_LINK_CLASS =
   "absolute inset-0 z-10 touch-manipulation rounded-2xl outline-none focus-visible:ring-4 focus-visible:ring-[#FFB0B7]/80 focus-visible:ring-inset";
 
-export function getProductDetailHref(slug: string) {
-  return `/products/${slug}`;
+export function getProductDetailHref(slug: string, mode: "retail" | "wholesale" = "retail") {
+  return `/products/${encodeURIComponent(slug)}?mode=${mode}`;
 }
 
 export function stopProductCardNavigation(event: { preventDefault: () => void; stopPropagation: () => void }) {
@@ -54,7 +54,7 @@ export function ProductCard({
     mode,
     { applyWholesaleTiers: false },
   );
-  const productHref = getProductDetailHref(product.slug);
+  const productHref = getProductDetailHref(product.slug, mode);
 
   const handleQuickAdd = (e: React.MouseEvent) => {
     stopProductCardNavigation(e);
