@@ -19,3 +19,11 @@ CREATE INDEX IF NOT EXISTS "payment_attempts_intent_idx" ON "payment_attempts" (
 CREATE UNIQUE INDEX IF NOT EXISTS "payment_attempts_intent_paid_ref_idx"
   ON "payment_attempts" ("provider", "verified_ref")
   WHERE "checkout_intent_id" IS NOT NULL AND "status" = 'paid' AND "verified_ref" <> '';
+
+-- The old default site description was copied into settings on first install.
+-- Remove the obsolete telephone-order claim without changing other CMS text.
+UPDATE "settings"
+SET "value" = jsonb_set("value", '{seoDescription}',
+    to_jsonb(replace("value"->>'seoDescription', 'سفارش تلفنی: ۰۹۰۳۳۲۵۳۰۶۵', 'پرداخت امن آنلاین'))),
+    "updated_at" = now()
+WHERE "key" = 'site' AND "value"->>'seoDescription' LIKE '%سفارش تلفنی: ۰۹۰۳۳۲۵۳۰۶۵%';
