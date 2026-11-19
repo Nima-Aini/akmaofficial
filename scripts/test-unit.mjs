@@ -10,6 +10,7 @@ import { paymentResultUrl } from "../src/lib/payment-result-url.ts";
 import { calculateProductPricing, getProductPricePresentation, getWholesalePackConfig, isPositiveSafeInteger } from "../src/lib/pricing.ts";
 import { getProductImages, getResponsiveProductImages } from "../src/lib/product-media.ts";
 import { retailProductListing } from "../src/lib/torob-product.ts";
+import { containsTelephoneOrderAction, safePurchaseHref } from "../src/lib/phone-order.ts";
 import { applyRichTextMark, normalizeRichTextValue, replaceRichTextPlainText, richTextToPlainText, sanitizeRichTextMap, sanitizeTextColor } from "../src/lib/rich-text.ts";
 import {
   getTextRegionBackdropClass,
@@ -122,6 +123,13 @@ runTest("Torob listing uses stable retail ID, trusted retail price, and honest o
   assert.equal(retailProductListing({ ...product, isRetail: false }), null);
   assert.equal(retailProductListing({ ...product, active: false }), null);
   assert.equal(retailProductListing({ ...product, inStock: false }).available, false);
+});
+
+runTest("legacy telephone-order CTAs resolve to online shopping", () => {
+  assert.equal(containsTelephoneOrderAction({ label: "سفارش تلفنی", href: "tel:09033253065" }), true);
+  assert.equal(containsTelephoneOrderAction({ label: "پشتیبانی محصولات", href: "/products" }), false);
+  assert.equal(safePurchaseHref("tel:09033253065", "/products"), "/products");
+  assert.equal(safePurchaseHref("/products?mode=wholesale", "/products"), "/products?mode=wholesale");
 });
 
 runTest("Wholesale min quantity validation logic", () => {
