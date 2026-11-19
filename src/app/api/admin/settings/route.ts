@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/auth";
 import { getAllProducts, getSettings, saveSetting } from "@/lib/store";
 import { sanitizeResponsiveSetting } from "@/lib/responsive-image";
 import { sanitizeRichTextMetadataDeep, sanitizeRichTextValue } from "@/lib/rich-text";
+import { containsTelephoneOrderAction } from "@/lib/phone-order";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,9 @@ export async function PUT(req: Request) {
     const sanitizedValue = key === "marqueeFormatting"
       ? (Array.isArray(value) ? value.slice(0, 100).map((entry) => sanitizeRichTextValue(entry, 2_000) ?? { segments: [] }) : [])
       : sanitizeRichTextMetadataDeep(sanitizeResponsiveSetting(key, value));
+    if (key !== "contact" && containsTelephoneOrderAction(sanitizedValue)) {
+      return NextResponse.json({ ok: false, error: "ثبت سفارش تلفنی پشتیبانی نمی‌شود؛ لینک خرید آنلاین قرار دهید" }, { status: 400 });
+    }
     if (key === "categories") {
       if (!Array.isArray(sanitizedValue)) return NextResponse.json({ ok: false, error: "فهرست دسته‌بندی نامعتبر است" }, { status: 400 });
       const keys = sanitizedValue.map((item: unknown) => (item && typeof item === "object" ? (item as { key?: unknown }).key : undefined));

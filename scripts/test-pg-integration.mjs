@@ -178,6 +178,22 @@ try {
     assert.equal(savedHero.titleRichText.segments[1].color, undefined);
   });
 
+  await test("legacy CMS telephone-order button is replaced and cannot be saved again", async () => {
+    const hero = (await db.select().from(settings).where(eq(settings.key, "hero")))[0].value;
+    const legacy = { ...hero, secondaryCta: { label: "سفارش تلفنی", href: "tel:09033253065",
+      labelRichText: { segments: [{ text: "سفارش تلفنی" }] } } };
+    await db.update(settings).set({ value: legacy }).where(eq(settings.key, "hero"));
+    const homepage = await (await fetch(`${baseUrl}/`)).text();
+    assert.doesNotMatch(homepage, /سفارش تلفنی/);
+    assert.match(homepage, /خرید عمده و همکاری/);
+    const rejected = await fetch(`${baseUrl}/api/admin/settings`, {
+      method: "PUT", headers: { "Content-Type": "application/json", Cookie: `akma_admin_session=${createSessionToken(admin.username)}` },
+      body: JSON.stringify({ key: "hero", value: legacy }),
+    });
+    assert.equal(rejected.status, 400);
+    await db.update(settings).set({ value: hero }).where(eq(settings.key, "hero"));
+  });
+
   await test("initial checkout persists only an intent, and verified settlement creates one order", async () => {
     const before = (await db.select().from(orders)).length;
     const response = await post("/api/orders", {

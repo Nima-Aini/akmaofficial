@@ -36,6 +36,7 @@ import {
 } from "@/components/responsive-banner";
 import { RichText } from "@/components/rich-text";
 import { getFeaturedProducts } from "@/lib/sales-mode";
+import { containsTelephoneOrderAction, safePurchaseHref } from "@/lib/phone-order";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,8 @@ export default async function HomePage() {
   const [s, products] = await Promise.all([getSettings(), getActiveProducts()]);
 
   const hero = { ...DEFAULT_HERO, ...(s.hero as Partial<HeroSettings>) };
+  const primaryCta = containsTelephoneOrderAction(hero.primaryCta) ? DEFAULT_HERO.primaryCta : hero.primaryCta;
+  const secondaryCta = containsTelephoneOrderAction(hero.secondaryCta) ? DEFAULT_HERO.secondaryCta : hero.secondaryCta;
   const dualCards: DualCardsSettings = {
     retail: { ...DEFAULT_DUAL_CARDS.retail, ...(s.dualCards as Partial<DualCardsSettings>)?.retail },
     wholesale: { ...DEFAULT_DUAL_CARDS.wholesale, ...(s.dualCards as Partial<DualCardsSettings>)?.wholesale },
@@ -89,18 +92,18 @@ export default async function HomePage() {
 
               <div className="flex flex-wrap items-center gap-3 pt-2">
                 <Link
-                  href={hero.primaryCta.href || "/products"}
+                  href={safePurchaseHref(primaryCta.href, "/products")}
                   className="inline-flex items-center gap-3 rounded-full bg-[#8E111E] hover:bg-[#720C17] text-white border border-white/20 px-8 py-3.5 text-sm font-black shadow-lg shadow-black/25 transition-transform active:scale-95"
                 >
                   <ArrowRight size={17} className="rotate-180" />
-                  <RichText value={hero.primaryCta.labelRichText} fallback={hero.primaryCta.label || "مشاهده محصولات"} />
+                  <RichText value={primaryCta.labelRichText} fallback={primaryCta.label || "مشاهده محصولات"} />
                 </Link>
 
                 <Link
-                  href={hero.secondaryCta.href || "/products?mode=wholesale"}
+                  href={safePurchaseHref(secondaryCta.href, "/products?mode=wholesale")}
                   className="inline-flex items-center gap-2 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 px-6 py-3.5 text-sm font-bold backdrop-blur-xs transition-colors"
                 >
-                  <RichText value={hero.secondaryCta.labelRichText} fallback={hero.secondaryCta.label || "خرید عمده و همکاری"} />
+                  <RichText value={secondaryCta.labelRichText} fallback={secondaryCta.label || "خرید عمده و همکاری"} />
                 </Link>
               </div>
             </div>
@@ -166,7 +169,7 @@ export default async function HomePage() {
 
                 <div className="pt-2">
                   <Link
-                    href={dualCards.retail.buttonHref || "/products?mode=retail"}
+                    href={safePurchaseHref(dualCards.retail.buttonHref, "/products?mode=retail")}
                     className="inline-flex items-center gap-2.5 rounded-full bg-[#8E111E] hover:bg-[#720C17] text-white px-6 py-3 text-xs font-black shadow-md shadow-[#8E111E]/20 transition-transform active:scale-95"
                   >
                     <ArrowRight size={15} className="rotate-180" />
@@ -206,7 +209,7 @@ export default async function HomePage() {
 
                 <div className="pt-2">
                   <Link
-                    href={dualCards.wholesale.buttonHref || "/products?mode=wholesale"}
+                    href={safePurchaseHref(dualCards.wholesale.buttonHref, "/products?mode=wholesale")}
                     className="inline-flex items-center gap-2.5 rounded-full bg-[#8E111E] hover:bg-[#720C17] text-white px-6 py-3 text-xs font-black shadow-md shadow-[#8E111E]/20 transition-transform active:scale-95"
                   >
                     <ArrowRight size={15} className="rotate-180" />
@@ -253,7 +256,7 @@ export default async function HomePage() {
             {categories.map((cat) => (
               <Link
                 key={cat.key}
-                href={cat.href || `/products?cat=${cat.key}`}
+                href={safePurchaseHref(cat.href, `/products?cat=${cat.key}`)}
                 className="group relative isolate aspect-square overflow-hidden rounded-2xl border border-white/60 text-center shadow-md transition-all hover:-translate-y-1 hover:shadow-xl"
               >
                 <ResponsiveBannerMedia settings={cat} fallback="/images/redesign/cat-packs.jpg" alt="" />
@@ -269,7 +272,7 @@ export default async function HomePage() {
         {banners.length > 0 && (
           <section className="grid gap-6 md:grid-cols-2" aria-label="پیشنهادهای ویژه">
             {banners.map((banner, index) => (
-              <Link key={banner.id} href={banner.href || "/products"} className={`group relative isolate min-h-[340px] overflow-hidden rounded-[2rem] border border-white/50 shadow-lg md:min-h-[300px] ${banners.length % 2 === 1 && index === banners.length - 1 ? "md:col-span-2 md:w-[calc(50%-0.75rem)] md:justify-self-center" : ""}`}>
+              <Link key={banner.id} href={safePurchaseHref(banner.href, "/products")} className={`group relative isolate min-h-[340px] overflow-hidden rounded-[2rem] border border-white/50 shadow-lg md:min-h-[300px] ${banners.length % 2 === 1 && index === banners.length - 1 ? "md:col-span-2 md:w-[calc(50%-0.75rem)] md:justify-self-center" : ""}`}>
                 <ResponsiveBannerMedia settings={banner} fallback="/images/hero.png" alt="" />
                 <ResponsiveTextRegionBackdrop settings={banner} />
                 <ResponsiveBannerContent settings={banner} className="min-h-[340px] p-6 md:min-h-[300px]">
@@ -336,7 +339,7 @@ export default async function HomePage() {
 
               <div className="pt-3">
                 <Link
-                  href={wholesalePromo.buttonHref || "/products?mode=wholesale"}
+                  href={safePurchaseHref(wholesalePromo.buttonHref, "/products?mode=wholesale")}
                   className="inline-flex items-center gap-2.5 rounded-full bg-white text-[#8E111E] hover:bg-[#FAF8F5] px-8 py-3.5 text-xs font-black shadow-lg transition-transform active:scale-95"
                 >
                   <ArrowRight size={15} className="rotate-180 text-[#8E111E]" />
@@ -350,7 +353,7 @@ export default async function HomePage() {
         {bottomBanners.length > 0 && (
           <section className="grid gap-5 sm:grid-cols-2" aria-label="بنرهای پایانی">
             {bottomBanners.map((banner, index) => (
-              <Link key={banner.id} href={banner.href || "/products"} aria-label={banner.alt} className={`relative isolate min-h-[280px] overflow-hidden rounded-[2rem] border border-white/50 shadow-lg md:min-h-[220px] ${bottomBanners.length % 2 === 1 && index === bottomBanners.length - 1 ? "sm:col-span-2 sm:w-[calc(50%-0.625rem)] sm:justify-self-center" : ""}`}>
+              <Link key={banner.id} href={safePurchaseHref(banner.href, "/products")} aria-label={banner.alt} className={`relative isolate min-h-[280px] overflow-hidden rounded-[2rem] border border-white/50 shadow-lg md:min-h-[220px] ${bottomBanners.length % 2 === 1 && index === bottomBanners.length - 1 ? "sm:col-span-2 sm:w-[calc(50%-0.625rem)] sm:justify-self-center" : ""}`}>
                 <ResponsiveBannerMedia settings={banner} fallback="/images/craft.png" alt="" />
                 <ResponsiveTextRegionBackdrop settings={banner} desktopFallback="bottom" mobileFallback="bottom" />
                 <ResponsiveBannerContent settings={banner} desktopFallback="bottom" mobileFallback="bottom" className="min-h-[280px] p-5 md:min-h-[220px]">
