@@ -381,6 +381,7 @@ export async function findPaymentAttempt(provider: string, trackId: string): Pro
     return {
       id: match.id,
       orderId: match.orderId,
+      checkoutIntentId: null,
       provider: match.provider,
       trackId: match.trackId,
       amount: match.amount,
@@ -445,6 +446,7 @@ export async function recordPaymentAttempt(attempt: {
   const newRow: PaymentAttemptRow = {
     id: memAttempts.length + 1,
     orderId: attempt.orderId,
+    checkoutIntentId: null,
     provider,
     trackId: attempt.trackId,
     amount: attempt.amountTomans,

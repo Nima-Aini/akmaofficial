@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "node:crypto";
-import { createOrder, updateOrder, getAllProducts, calculateProductPricing, type OrderInput } from "@/lib/store";
+import { getAllProducts, calculateProductPricing } from "@/lib/store";
 import { normalizePhone, toEnDigits } from "@/lib/format";
 import { getCurrentCustomer } from "@/lib/customer-auth";
-import { atomicUpdateOrderPaymentRetry, createPayment, recordPaymentAttempt } from "@/lib/payment";
+import { startPaidCheckout } from "@/lib/paid-checkout";
 import type { OrderItem } from "@/db/schema";
 import { getWholesalePackConfig, isPositiveSafeInteger } from "@/lib/pricing";
 import { getProductImages } from "@/lib/product-media";
@@ -36,7 +35,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "نوع خرید نامعتبر است" }, { status: 400 });
     }
     const orderType: "retail" | "wholesale" = body.orderType === "wholesale" ? "wholesale" : "retail";
-    const paymentMethod = body.paymentMethod === "card_to_card" ? "card_to_card" : "online";
+    if (body.paymentMethod && body.paymentMethod !== "online") {
+      return NextResponse.json({ error: "ثبت سفارش فقط با پرداخت آنلاین امکان‌پذیر است" }, { status: 400 });
+    }
     const rawItems = Array.isArray(body.items) ? body.items : [];
 
     if (!customerName) {
@@ -47,6 +48,9 @@ export async function POST(req: NextRequest) {
     }
     if (!customerAddress || customerAddress.length < 8) {
       return NextResponse.json({ error: "لطفاً آدرس دقیق جهت ارسال را وارد کنید" }, { status: 400 });
+    }
+    if (!/^\d{10}$/.test(postalCode)) {
+      return NextResponse.json({ error: "کد پستی باید ۱۰ رقم باشد" }, { status: 400 });
     }
     if (rawItems.length === 0) {
       return NextResponse.json({ error: "سبد خرید شما خالی است" }, { status: 400 });
@@ -162,8 +166,10 @@ export async function POST(req: NextRequest) {
     // Strictly compute total amount server-side (do NOT trust client totalPrice)
     const totalAmount = validatedItems.reduce((sum, it) => sum + (it.lineTotal ?? it.price * it.quantity), 0);
 
-    const input: OrderInput = {
-      customerId: customer.id,
+    if (!Number.isSafeInteger(totalAmount) || totalAmount <= 0) {
+      return NextResponse.json({ error: "مبلغ قابل پرداخت باید مثبت و معتبر باشد" }, { status: 400 });
+    }
+    const checkout = await startPaidCheckout(customer.id, {
       orderType,
       customerName,
       customerPhone,
@@ -173,69 +179,10 @@ export async function POST(req: NextRequest) {
       postalCode,
       notes,
       items: validatedItems,
-      totalAmount,
-      paymentMethod,
-    };
+    }, totalAmount);
 
-    const order = await createOrder(input);
-
-    let paymentLink = "";
-    let paymentTrackId = "";
-    let paymentError = "";
-
-    // If online payment, generate real gateway payment link
-    if (paymentMethod === "online" && totalAmount > 0) {
-      const payRes = await createPayment({
-        trackingCode: order.trackingCode,
-        totalAmount,
-        customerPhone,
-        customerName,
-        orderType,
-      });
-
-      if (payRes.success && payRes.paymentUrl) {
-        paymentLink = payRes.paymentUrl;
-        paymentTrackId = payRes.trackId || "";
-        const activated = await atomicUpdateOrderPaymentRetry(order.id, paymentTrackId, paymentLink, payRes.provider);
-        if (!activated) {
-          return NextResponse.json({ error: "سفارش پیش از فعال‌سازی پرداخت تسویه یا نامعتبر شد." }, { status: 409 });
-        }
-      } else {
-        paymentError = payRes.error || "خطا در اتصال به درگاه پرداخت اینترنتی";
-        await recordPaymentAttempt({
-          orderId: order.id,
-          provider: payRes.provider,
-          trackId: `request-failed-${order.id}-${crypto.randomUUID()}`,
-          amountTomans: totalAmount,
-          status: "failed",
-          rawGatewayResponse: { error: paymentError.slice(0, 1000) },
-        });
-        await updateOrder(order.id, {
-          paymentStatus: "failed",
-          adminNotes: `خطای اولیه اتصال به درگاه: ${paymentError}`,
-        });
-      }
-    }
-
-    return NextResponse.json({
-      ok: true,
-      trackingCode: order.trackingCode,
-      paymentLink,
-      paymentTrackId,
-      paymentError,
-      order: {
-        id: order.id,
-        trackingCode: order.trackingCode,
-        orderType: order.orderType,
-        customerName: order.customerName,
-        customerPhone: order.customerPhone,
-        totalAmount: order.totalAmount,
-        status: order.status,
-        paymentStatus: paymentError ? "failed" : order.paymentStatus,
-        paymentLink,
-        createdAt: order.createdAt,
-      },
-    });
+    return NextResponse.json({ ok: true, intentId: checkout.intentId,
+      paymentLink: checkout.paymentLink, totalAmount: checkout.totalAmount });
   } catch (error: unknown) {
     console.error("Order creation failed:", error);
     const msg = error instanceof Error && !/MERCHANT|PAYMENT_PROVIDER|پیکربندی/.test(error.message)

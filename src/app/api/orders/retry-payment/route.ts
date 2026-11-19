@@ -5,12 +5,19 @@ import { createPayment, atomicUpdateOrderPaymentRetry, recordPaymentAttempt } fr
 import { getCurrentCustomer } from "@/lib/customer-auth";
 import { getAdminUsername } from "@/lib/auth";
 import { normalizePhone } from "@/lib/format";
+import { requestIntentPayment } from "@/lib/paid-checkout";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    const { trackingCode } = await req.json();
+    const { trackingCode, intentId } = await req.json();
+    if (typeof intentId === "string" && /^[0-9a-f-]{36}$/i.test(intentId)) {
+      const current = await getCurrentCustomer();
+      if (!current) return NextResponse.json({ ok: false, error: "ابتدا وارد حساب کاربری شوید" }, { status: 401 });
+      const retry = await requestIntentPayment(intentId, current.id);
+      return NextResponse.json({ ok: true, ...retry });
+    }
     if (!trackingCode || typeof trackingCode !== "string") {
       return NextResponse.json({ ok: false, error: "کد پیگیری سفارش الزامی است." }, { status: 400 });
     }

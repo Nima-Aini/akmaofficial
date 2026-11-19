@@ -24,6 +24,7 @@ import { ProductModeProvider } from "@/context/product-mode-context";
 import { getProductImages } from "@/lib/product-media";
 import { RichText } from "@/components/rich-text";
 import { WholesaleOnly } from "@/components/wholesale-only";
+import { retailProductListing } from "@/lib/torob-product";
 
 type ProductPageProps = {
   params: Promise<{ slug: string }>;
@@ -31,23 +32,25 @@ type ProductPageProps = {
 };
 
 function absoluteUrl(path: string): string {
-  const siteUrl = (process.env.SITE_URL ?? "https://akmaofficial.ir").replace(/\/$/, "");
+  const siteUrl = "https://akmaofficial.ir";
   if (/^https?:\/\//i.test(path)) return path;
   return `${siteUrl}${path.startsWith("/") ? "" : "/"}${path}`;
 }
 
-export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: ProductPageProps): Promise<Metadata> {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
   if (!product || !product.active) return {};
 
-  const image = absoluteUrl(getProductImages(product, "retail")[0] ?? "/favicon.ico");
-  const canonical = `/products/${encodeURIComponent(product.slug)}`;
+  const listing = (await searchParams).mode === "wholesale" ? null : retailProductListing(product);
+  const image = listing?.image ?? absoluteUrl(getProductImages(product, "wholesale")[0]);
+  const canonical = retailProductListing(product)?.url ?? `/products/${encodeURIComponent(product.slug)}?mode=wholesale`;
 
   return {
     title: `${product.name} | آکما`,
     description: product.subtitle || product.description.slice(0, 160),
     alternates: { canonical },
+    robots: listing ? undefined : { index: false, follow: true },
     openGraph: {
       type: "website",
       title: product.name,
@@ -55,13 +58,14 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
       url: canonical,
       images: [{ url: image, alt: product.name }],
     },
-    other: {
-      product_id: String(product.id),
-      product_name: product.name,
-      product_price: String(product.price),
-      product_old_price: String(product.price),
-      availability: product.inStock ? "instock" : "outofstock",
-    },
+    other: listing ? {
+      product_id: listing.id,
+      product_name: listing.name,
+      product_price: String(listing.price),
+      // Equal to the current price means there is no discount; never invent one.
+      product_old_price: String(listing.oldPrice ?? listing.price),
+      availability: listing.available ? "instock" : "outofstock",
+    } : {},
   };
 }
 
@@ -82,6 +86,14 @@ export default async function ProductPage({
   if ((mode === "wholesale" && !product.isWholesale) || (mode === "retail" && !product.isRetail)) {
     redirect(`/products/${encodeURIComponent(product.slug)}?mode=${product.isRetail ? "retail" : "wholesale"}`);
   }
+  const retailListing = mode === "retail" ? retailProductListing(product) : null;
+  const structuredData = retailListing ? {
+    "@context": "https://schema.org", "@type": "Product", name: retailListing.name,
+    description: product.description || product.subtitle,
+    image: [retailListing.image], sku: retailListing.id, url: retailListing.url,
+    offers: { "@type": "Offer", url: retailListing.url, price: retailListing.price * 10,
+      priceCurrency: "IRR", availability: retailListing.available ? "https://schema.org/InStock" : "https://schema.org/OutOfStock" },
+  } : null;
 
   const contact = { ...DEFAULT_CONTACT, ...(s.contact as Partial<ContactSettings>) };
   const phone = contact.phones[0] ?? "09033253065";
@@ -98,6 +110,7 @@ export default async function ProductPage({
 
   return (
     <div className="mx-auto max-w-7xl px-5 py-10 lg:px-8">
+      {structuredData && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, "\\u003c") }} />}
       {/* breadcrumb */}
       <nav className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
         <Link href="/" className="flex items-center gap-1 transition-colors hover:text-accent">
@@ -185,7 +198,7 @@ export default async function ProductPage({
                   className="btn btn-ghost h-12 flex-1 text-xs font-bold"
                 >
                   <Phone size={16} />
-                  مشاوره و پشتیبانی سفارش عمده و تکی — {toFa(phone)}
+                  مشاوره محصولات و پشتیبانی — {toFa(phone)}
                 </a>
               </div>
               <p className="text-center text-[11px] leading-5 text-muted">

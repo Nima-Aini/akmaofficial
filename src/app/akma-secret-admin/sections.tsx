@@ -789,7 +789,7 @@ export function ContactSection({
   return (
     <SectionCard
       title="اطلاعات تماس و ارتباط"
-      desc="اولین شماره تمام دکمه‌های «سفارش تلفنی» سراسر سایت را تشکیل می‌دهد."
+      desc="شماره تماس برای پشتیبانی مشتریان در سایت نمایش داده می‌شود."
       onSave={() => saveKey("contact")}
       saving={saving}
     >

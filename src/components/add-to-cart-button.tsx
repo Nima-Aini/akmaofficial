@@ -116,6 +116,9 @@ export function AddToCartButton({
             {formatPrice(pricing.unitPrice)}
             <span className="mr-1.5 text-xs font-bold text-[#78716C]">تومان</span>
           </p>
+          {mode === "retail" && product.retailOldPrice && product.retailOldPrice > pricing.unitPrice && (
+            <p className="mt-1 text-xs text-[#78716C]">قیمت قبل از تخفیف: <del>{formatPrice(product.retailOldPrice)} تومان</del></p>
+          )}
           {pricing.isTierPrice && pricing.tierLabel && (
             <p className="mt-1 text-[11px] font-bold text-[#8E111E]">{pricing.tierLabel}</p>
           )}

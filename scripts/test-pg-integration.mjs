@@ -33,8 +33,9 @@ function validatedDatabaseUrl() {
 
 const dbUrl = validatedDatabaseUrl();
 const schema = await import("../src/db/schema.ts");
-const { orders, paymentAttempts, smsNotifications, customerUsers, customerOtps, adminUsers, settings, products, cartProductSuggestions } = schema;
+const { checkoutIntents, orders, paymentAttempts, smsNotifications, customerUsers, customerOtps, adminUsers, settings, products, cartProductSuggestions } = schema;
 const { atomicUpdateOrderPaymentRetry, createPayment, processOrderPaymentVerification } = await import("../src/lib/payment.ts");
+const { startPaidCheckout, requestIntentPayment, verifyIntentPayment } = await import("../src/lib/paid-checkout.ts");
 const { createCustomerToken, sendCustomerOtp } = await import("../src/lib/customer-auth.ts");
 const { createSessionToken, hashPassword } = await import("../src/lib/auth.ts");
 const { getAllProducts, saveSetting } = await import("../src/lib/store.ts");
@@ -177,7 +178,8 @@ try {
     assert.equal(savedHero.titleRichText.segments[1].color, undefined);
   });
 
-  await test("initial HTTP checkout stores trusted order and attempt", async () => {
+  await test("initial checkout persists only an intent, and verified settlement creates one order", async () => {
+    const before = (await db.select().from(orders)).length;
     const response = await post("/api/orders", {
       customerName: customerA.name, customerPhone: customerA.phone, customerAddress: "تهران خیابان آزادی پلاک ۱۰۰",
       customerProvince: "تهران", customerCity: "تهران", postalCode: "1234567890", paymentMethod: "online",
@@ -186,11 +188,84 @@ try {
     const body = await response.json();
     assert.equal(response.status, 200, JSON.stringify(body));
     assert.match(body.paymentLink, /^https:\/\/payments\.invalid\//);
-    const order = (await db.select().from(orders).where(eq(orders.trackingCode, body.trackingCode)))[0];
-    assert.ok(order); assert.notEqual(order.totalAmount, 1);
-    const attempts = await db.select().from(paymentAttempts).where(eq(paymentAttempts.orderId, order.id));
-    assert.equal(attempts.length, 1); assert.equal(attempts[0].status, "pending");
-    assert.equal(attempts[0].provider, "zarinpal");
+    assert.equal((await db.select().from(orders)).length, before);
+    const intent = (await db.select().from(checkoutIntents).where(eq(checkoutIntents.id, body.intentId)))[0];
+    assert.ok(intent); assert.notEqual(intent.totalAmount, 1);
+    const attempt = (await db.select().from(paymentAttempts).where(eq(paymentAttempts.checkoutIntentId, intent.id)))[0];
+    assert.equal(attempt.orderId, null); assert.equal(attempt.provider, "zarinpal");
+    const fake = await verifyIntentPayment(intent.id, attempt.trackId, "zarinpal", async () => ({ success: false, resultCode: -1 }));
+    assert.equal(fake.success, false);
+    assert.equal((await db.select().from(orders)).length, before);
+    const verify = async () => ({ success: true, resultCode: 100, refNumber: `REF-${intent.id}`, rawAmountRials: intent.totalAmount * 10 });
+    const results = await Promise.all([verifyIntentPayment(intent.id, attempt.trackId, "zarinpal", verify), verifyIntentPayment(intent.id, attempt.trackId, "zarinpal", verify)]);
+    assert.ok(results.every((r) => r.success), JSON.stringify(results));
+    assert.equal(results[0].trackingCode, results[1].trackingCode);
+    assert.equal((await db.select().from(orders)).length, before + 1);
+    assert.equal((await db.select().from(smsNotifications).where(eq(smsNotifications.kind, "payment_success"))).length, 1);
+  });
+
+  await test("telephone/card transfer order and zero-value checkout are rejected", async () => {
+    const before = (await db.select().from(orders)).length;
+    const details = { customerName: customerA.name, customerPhone: customerA.phone, customerAddress: "تهران خیابان آزادی پلاک ۱۰۰",
+      items: [{ productId: product.id, quantity: 1 }] };
+    assert.equal((await post("/api/orders", { ...details, paymentMethod: "card_to_card" }, `akma_customer_session=${createCustomerToken(customerA.phone)}`)).status, 400);
+    assert.equal((await post("/api/orders", { ...details, paymentMethod: "telephone" }, `akma_customer_session=${createCustomerToken(customerA.phone)}`)).status, 400);
+    assert.equal((await db.select().from(orders)).length, before);
+  });
+
+  await test("failed payment stays outside orders, then Zibal retry can settle", async () => {
+    const beforeOrders = (await db.select().from(orders)).length;
+    const snapshot = { orderType: "retail", customerName: customerA.name, customerPhone: customerA.phone,
+      customerAddress: "تهران خیابان آزادی پلاک ۱۰۰", customerProvince: "تهران", customerCity: "تهران",
+      postalCode: "1234567890", notes: "", items: [{ productId: product.id, productName: product.name,
+        productImage: "/images/redesign/cat-foam.jpg", price: 100000, quantity: 1, mode: "retail" }] };
+    const checkout = await startPaidCheckout(customerA.id, snapshot, 100000);
+    const first = (await db.select().from(paymentAttempts).where(eq(paymentAttempts.checkoutIntentId, checkout.intentId)))[0];
+    assert.equal(first.provider, "zibal");
+    const failed = await verifyIntentPayment(checkout.intentId, first.trackId, "zibal", async () => ({ success: false, confirmedFailure: true, resultCode: 202 }));
+    assert.equal(failed.success, false);
+    assert.equal((await db.select().from(orders)).length, beforeOrders);
+    const retry = await requestIntentPayment(checkout.intentId, customerA.id);
+    assert.match(retry.paymentLink, /^https:\/\/payments\.invalid\//);
+    const attempts = await db.select().from(paymentAttempts).where(eq(paymentAttempts.checkoutIntentId, checkout.intentId));
+    assert.equal(attempts.length, 2);
+    const last = attempts.at(-1);
+    const mismatch = await verifyIntentPayment(checkout.intentId, last.trackId, "zibal", async () => ({ success: true, resultCode: 100, refNumber: `BAD-${checkout.intentId}`, rawAmountRials: 999999 }));
+    assert.equal(mismatch.success, false);
+    assert.equal(mismatch.needsReconciliation, true);
+    assert.equal((await db.select().from(orders)).length, beforeOrders);
+  });
+
+  await test("raw retail HTML exposes Torob fields in head for ordinary and crawler agents", async () => {
+    await db.update(products).set({ retailImages: ["/images/redesign/cat-foam.jpg"], retailOldPrice: null }).where(eq(products.id, product.id));
+    for (const userAgent of ["Mozilla/5.0", "TorobBot/1.0", "Googlebot/2.1"]) {
+      const response = await fetch(`${baseUrl}/products/${product.slug}?mode=retail`, { headers: { "User-Agent": userAgent } });
+      assert.equal(response.status, 200);
+      const html = await response.text();
+      const head = /<head[^>]*>([\s\S]*?)<\/head>/i.exec(html)?.[1];
+      assert.ok(head, "missing complete HTML head");
+      assert.match(head, new RegExp(`name="product_id" content="${product.id}"`));
+      assert.match(head, new RegExp(`name="product_price" content="${product.retailPrice}"`));
+      assert.match(head, new RegExp(`name="product_old_price" content="${product.retailPrice}"`));
+      assert.match(head, /name="availability" content="instock"/);
+      assert.match(head, /property="og:image" content="https:\/\/akmaofficial\.ir\/images\/redesign\/cat-foam\.jpg"/);
+      assert.ok(head.includes(product.name));
+      assert.match(html, /application\/ld\+json/);
+    }
+    const image = await fetch(`${baseUrl}/images/redesign/cat-foam.jpg`);
+    assert.equal(image.status, 200);
+    assert.match(image.headers.get("content-type") || "", /^image\//);
+    assert.equal((await fetch(`${baseUrl}/robots.txt`)).status, 200);
+    assert.equal((await fetch(`${baseUrl}/sitemap.xml`)).status, 200);
+  });
+
+  await test("real old price and stock reflect CMS data without inventing discounts", async () => {
+    await db.update(products).set({ retailOldPrice: product.retailPrice + 50000, inStock: false }).where(eq(products.id, product.id));
+    const html = await (await fetch(`${baseUrl}/products/${product.slug}`)).text();
+    const head = /<head[^>]*>([\s\S]*?)<\/head>/i.exec(html)?.[1] || "";
+    assert.match(head, new RegExp(`name="product_old_price" content="${product.retailPrice + 50000}"`));
+    assert.match(head, /name="availability" content="outofstock"/);
+    await db.update(products).set({ retailOldPrice: null, inStock: true }).where(eq(products.id, product.id));
   });
 
   await test("configured Zarinpal creation persists Authority and provider", async () => {
@@ -340,7 +415,7 @@ try {
   await test("checkout rejects a mode mismatch without creating an order", async () => {
     const before = (await db.select().from(orders)).length;
     const response = await post("/api/orders", { orderType: "retail", customerName: customerA.name, customerPhone: customerA.phone,
-      customerAddress: "تهران خیابان آزادی پلاک ۱۰۰", items: [{ productId: product.id, quantity: 1, mode: "wholesale" }] },
+      customerAddress: "تهران خیابان آزادی پلاک ۱۰۰", postalCode: "1234567890", items: [{ productId: product.id, quantity: 1, mode: "wholesale" }] },
       `akma_customer_session=${createCustomerToken(customerA.phone)}`);
     assert.equal(response.status, 400);
     assert.equal((await db.select().from(orders)).length, before);
@@ -350,29 +425,34 @@ try {
   });
 
   let wholesaleOrder;
-  await test("wholesale checkout persists trusted pack snapshot and rejects price tampering", async () => {
+  await test("wholesale checkout settles the trusted pack snapshot only after payment", async () => {
+    const before = (await db.select().from(orders)).length;
     const response = await post("/api/orders", {
       orderType: "wholesale", customerName: customerA.name, customerPhone: customerA.phone, customerAddress: "تهران خیابان آزادی پلاک ۱۰۰",
-      customerProvince: "تهران", customerCity: "تهران", postalCode: "1234567890", paymentMethod: "card_to_card",
+      customerProvince: "تهران", customerCity: "تهران", postalCode: "1234567890", paymentMethod: "online",
       items: [{ productId: product.id, quantity: 3, price: 1, wholesalePackSize: 999, tierLabel: "جعلی" }],
     }, `akma_customer_session=${createCustomerToken(customerA.phone)}`);
     const body = await response.json();
     assert.equal(response.status, 200, JSON.stringify(body));
-    wholesaleOrder = (await db.select().from(orders).where(eq(orders.trackingCode, body.trackingCode)))[0];
-    const item = wholesaleOrder.items[0];
-    assert.equal(wholesaleOrder.totalAmount, 3600000);
+    assert.equal((await db.select().from(orders)).length, before);
+    const intent = (await db.select().from(checkoutIntents).where(eq(checkoutIntents.id, body.intentId)))[0];
+    const item = intent.orderData.items[0];
+    assert.equal(intent.totalAmount, 3600000);
     assert.equal(item.mode, "wholesale");
-    assert.equal(item.packCount, 3);
-    assert.equal(item.unitsPerPack, 12);
-    assert.equal(item.totalUnits, 36);
-    assert.equal(item.unitOrPackPrice, 1200000);
+    assert.equal(item.packCount, 3); assert.equal(item.unitsPerPack, 12);
+    assert.equal(item.totalUnits, 36); assert.equal(item.unitOrPackPrice, 1200000);
     assert.equal(item.lineTotal, 3600000);
     assert.equal(item.productImage, "/uploads/products/wholesale-ci.webp");
+    const attempt = (await db.select().from(paymentAttempts).where(eq(paymentAttempts.checkoutIntentId, intent.id)))[0];
+    const paid = await verifyIntentPayment(intent.id, attempt.trackId, "zarinpal", async () => ({ success: true, resultCode: 100, refNumber: `REF-${intent.id}`, rawAmountRials: 36000000 }));
+    assert.equal(paid.success, true, JSON.stringify(paid));
+    wholesaleOrder = (await db.select().from(orders).where(eq(orders.trackingCode, paid.trackingCode)))[0];
+    assert.equal(wholesaleOrder.paymentStatus, "paid");
   });
 
   await test("wholesale checkout enforces minimum pack count", async () => {
     await db.update(products).set({ wholesaleMinPackQty: 2 }).where(eq(products.id, product.id));
-    const response = await post("/api/orders", { orderType: "wholesale", customerName: customerA.name, customerPhone: customerA.phone, customerAddress: "تهران خیابان آزادی پلاک ۱۰۰", paymentMethod: "card_to_card", items: [{ productId: product.id, quantity: 1 }] }, `akma_customer_session=${createCustomerToken(customerA.phone)}`);
+    const response = await post("/api/orders", { orderType: "wholesale", customerName: customerA.name, customerPhone: customerA.phone, customerAddress: "تهران خیابان آزادی پلاک ۱۰۰", postalCode: "1234567890", paymentMethod: "online", items: [{ productId: product.id, quantity: 1 }] }, `akma_customer_session=${createCustomerToken(customerA.phone)}`);
     assert.equal(response.status, 400);
     await db.update(products).set({ wholesaleMinPackQty: 1 }).where(eq(products.id, product.id));
   });
@@ -388,7 +468,7 @@ try {
   await test("checkout rejects invalid retail and wholesale quantities", async () => {
     for (const mode of ["retail", "wholesale"]) {
       for (const quantity of [0, -1, 1.5, "NaN", Number.MAX_SAFE_INTEGER + 1]) {
-        const response = await post("/api/orders", { orderType: mode, customerName: customerA.name, customerPhone: customerA.phone, customerAddress: "تهران خیابان آزادی پلاک ۱۰۰", paymentMethod: "card_to_card", items: [{ productId: product.id, quantity, mode }] }, `akma_customer_session=${createCustomerToken(customerA.phone)}`);
+        const response = await post("/api/orders", { orderType: mode, customerName: customerA.name, customerPhone: customerA.phone, customerAddress: "تهران خیابان آزادی پلاک ۱۰۰", postalCode: "1234567890", paymentMethod: "online", items: [{ productId: product.id, quantity, mode }] }, `akma_customer_session=${createCustomerToken(customerA.phone)}`);
         assert.equal(response.status, 400, `mode=${mode} quantity=${quantity}`);
       }
     }

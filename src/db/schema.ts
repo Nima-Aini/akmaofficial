@@ -29,6 +29,7 @@ export const products = pgTable("products", {
   contents: jsonb("contents").$type<string[]>().notNull().default([]),
   price: bigint("price", { mode: "number" }).notNull().default(0),
   retailPrice: bigint("retail_price", { mode: "number" }).notNull().default(0),
+  retailOldPrice: bigint("retail_old_price", { mode: "number" }),
   retailUnitLabel: text("retail_unit_label").notNull().default("عدد"),
   wholesalePrice: bigint("wholesale_price", { mode: "number" }).notNull().default(0),
   wholesaleMinQty: integer("wholesale_min_qty").notNull().default(1),
@@ -158,8 +159,8 @@ export const paymentAttempts = pgTable(
   {
     id: serial("id").primaryKey(),
     orderId: integer("order_id")
-      .notNull()
       .references(() => orders.id, { onDelete: "restrict" }),
+    checkoutIntentId: text("checkout_intent_id").references(() => checkoutIntents.id, { onDelete: "restrict" }),
     provider: text("provider").notNull().default("zibal"),
     trackId: text("track_id").notNull(),
     amount: bigint("amount", { mode: "number" }).notNull().default(0),
@@ -175,6 +176,23 @@ export const paymentAttempts = pgTable(
     uniqueIndex("payment_attempts_provider_track_id_idx").on(table.provider, table.trackId),
   ],
 );
+
+export const checkoutIntents = pgTable("checkout_intents", {
+  id: text("id").primaryKey(),
+  customerId: integer("customer_id").notNull().references(() => customerUsers.id, { onDelete: "restrict" }),
+  orderData: jsonb("order_data").$type<{
+    orderType: "retail" | "wholesale";
+    customerName: string; customerPhone: string; customerAddress: string;
+    customerProvince: string; customerCity: string; postalCode: string;
+    notes: string; items: OrderItem[];
+  }>().notNull(),
+  totalAmount: bigint("total_amount", { mode: "number" }).notNull(),
+  status: text("status").notNull().default("pending"),
+  orderId: integer("order_id").unique().references(() => orders.id, { onDelete: "restrict" }),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
 
 export const smsNotifications = pgTable("sms_notifications", {
   id: serial("id").primaryKey(),
