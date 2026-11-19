@@ -2,9 +2,10 @@
 
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { CheckCircle2, XCircle, Copy, Check, ArrowLeft, ShoppingBag, Truck } from "lucide-react";
 import { toFa } from "@/lib/format";
+import { useCart } from "@/context/cart-context";
 
 function PaymentResultContent() {
   const searchParams = useSearchParams();
@@ -15,8 +16,17 @@ function PaymentResultContent() {
   const error = searchParams.get("error") || "";
 
   const [copied, setCopied] = useState(false);
+  const { clearCart, storageHydrated } = useCart();
+  const cleared = useRef(false);
 
   const isSuccess = status === "success";
+  const needsReview = status === "review";
+  useEffect(() => {
+    if (isSuccess && trackingCode && storageHydrated && !cleared.current) {
+      cleared.current = true;
+      clearCart();
+    }
+  }, [isSuccess, trackingCode, storageHydrated, clearCart]);
 
   const copyTracking = () => {
     if (trackingCode) {
@@ -105,36 +115,36 @@ function PaymentResultContent() {
 
             <div className="space-y-2">
               <span className="inline-block rounded-full bg-rose-100/80 px-4 py-1 text-xs font-black text-rose-800">
-                پرداخت ناموفق
+                {needsReview ? "نیازمند بررسی بانکی" : "پرداخت ناموفق"}
               </span>
-              <h1 className="text-2xl sm:text-3xl font-black text-[#1C1816]">پرداخت انجام نشد</h1>
+              <h1 className="text-2xl sm:text-3xl font-black text-[#1C1816]">{needsReview ? "پرداخت نیازمند بررسی است" : "پرداخت انجام نشد"}</h1>
               <p className="text-sm text-[#736B63]">
                 {error || "عملیات پرداخت توسط کاربر لغو گردید یا از سمت درگاه بانکی تایید نشد."}
+                {needsReview && " لطفاً دوباره پرداخت نکنید؛ پشتیبانی وضعیت تراکنش را بررسی می‌کند."}
               </p>
             </div>
 
             {trackingCode && (
               <div className="rounded-2xl border border-[#E7E3DC] bg-[#FAF8F5] p-4 text-right">
                 <p className="text-xs text-[#736B63]">
-                  سفارش شما با کد پیگیری <b className="font-mono text-[#8E111E]">{trackingCode}</b> ثبت
-                  شده و در وضعیت منتظر پرداخت باقی مانده است.
+                  پرداخت سفارش با کد <b className="font-mono text-[#8E111E]">{trackingCode}</b> تکمیل نشد. از حساب کاربری می‌توانید وضعیت سفارش‌های قدیمی را ببینید.
                 </p>
               </div>
             )}
 
             <div className="pt-4 flex flex-col sm:flex-row gap-3">
               <Link
-                href="/account"
+                href={needsReview ? "/contact" : "/account"}
                 className="flex-1 rounded-2xl bg-[#8E111E] py-4 text-center text-sm font-black text-white hover:bg-[#720C17]"
               >
-                ورود به حساب و تلاش مجدد
+                {needsReview ? "ارتباط با پشتیبانی" : "ورود به حساب و تلاش مجدد"}
               </Link>
-              <Link
+              {!needsReview && <Link
                 href="/checkout"
                 className="flex-1 rounded-2xl border border-[#E7E3DC] bg-white py-4 text-center text-sm font-bold text-[#1C1816] hover:bg-[#FAF8F5]"
               >
                 بازگشت به سبد خرید
-              </Link>
+              </Link>}
             </div>
           </>
         )}

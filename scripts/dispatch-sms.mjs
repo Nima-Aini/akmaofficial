@@ -2,6 +2,7 @@ import 'dotenv/config';
 import pg from 'pg';
 import { sendMelliPattern } from '../src/lib/sms.ts';
 import { processOrderPaymentVerification } from '../src/lib/payment.ts';
+import { verifyIntentPayment } from '../src/lib/paid-checkout.ts';
 
 if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL required');
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 2 });
@@ -20,6 +21,23 @@ async function claim() {
   finally { client.release(); }
 }
 try {
+  // New paid-only sessions must be reconciled even if the buyer closes the tab.
+  // Legacy unpaid orders retain their separate opt-in switch below.
+  const { rows: intentAttempts } = await pool.query(`WITH due AS (
+    SELECT a.id FROM payment_attempts a JOIN checkout_intents i ON i.id=a.checkout_intent_id
+    WHERE (a.status='pending' OR (a.status='needs_reconciliation' AND a.raw_gateway_response->>'reason'='finalization_failed'))
+      AND i.status='pending' AND a.created_at < now()-interval '2 minutes'
+      AND a.updated_at < now()-interval '5 minutes'
+    ORDER BY a.id FOR UPDATE OF a SKIP LOCKED LIMIT 10
+  ) UPDATE payment_attempts a SET updated_at=now() FROM due WHERE a.id=due.id
+  RETURNING a.checkout_intent_id, a.track_id, a.provider`);
+  for (const attempt of intentAttempts) {
+    try {
+      await verifyIntentPayment(attempt.checkout_intent_id, attempt.track_id, attempt.provider);
+    } catch (error) {
+      console.error('[PAYMENT] intent reconciliation failed', { intentId: attempt.checkout_intent_id, error: error instanceof Error ? error.message : 'unknown' });
+    }
+  }
   if (process.env.AKMA_PAYMENT_RECONCILIATION_ENABLED === "true") {
     // Reconcile pending bank attempts even if the buyer closed the browser before redirect.
     // Each claim delays another inquiry by five minutes; reconciliation never sends SMS directly.

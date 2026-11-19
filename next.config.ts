@@ -32,6 +32,10 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Torob and other HTML-only clients require metadata before the head closes.
+  // A custom bot regex replaces Next's default list; disable streaming for all
+  // clients so no crawler silently loses the default protected behavior.
+  htmlLimitedBots: /.*/,
   poweredByHeader: false,
   async headers() {
     return [

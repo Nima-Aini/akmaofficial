@@ -32,7 +32,8 @@ const globalForStore = globalThis as typeof globalThis & {
 
 export type MemoryPaymentAttempt = {
   id: number;
-  orderId: number;
+  orderId: number | null;
+  checkoutIntentId?: string | null;
   provider: string;
   trackId: string;
   amount: number;
@@ -70,6 +71,7 @@ export function getMemoryStore() {
       contents: p.contents,
       price: p.price,
       retailPrice: p.retailPrice ?? p.price,
+      retailOldPrice: null,
       retailUnitLabel: p.retailUnitLabel ?? "عدد",
       wholesalePrice: p.wholesalePrice ?? p.price,
       wholesaleMinQty: p.wholesaleMinQty ?? 1,
@@ -209,6 +211,7 @@ export async function ensureSeeded() {
         contents: p.contents,
         price: p.price,
         retailPrice: p.retailPrice ?? p.price,
+        retailOldPrice: null,
         retailUnitLabel: p.retailUnitLabel ?? "عدد",
         wholesalePrice: p.wholesalePrice ?? p.price,
         wholesaleMinQty: p.wholesaleMinQty ?? 1,
@@ -377,6 +380,7 @@ export type ProductInput = {
   contents: string[];
   price: number;
   retailPrice: number;
+  retailOldPrice: number | null;
   retailUnitLabel: string;
   wholesalePrice: number;
   wholesaleMinQty: number;
@@ -526,6 +530,11 @@ export function sanitizeProduct(body: Record<string, unknown>): ProductInput {
 
   const price = Math.max(0, Number(body.price) || 0);
   const retailPrice = body.retailPrice !== undefined ? Math.max(0, Number(body.retailPrice) || 0) : price;
+  const retailOldPrice = body.retailOldPrice === null || body.retailOldPrice === undefined || body.retailOldPrice === ""
+    ? null : Number(body.retailOldPrice);
+  if (retailOldPrice !== null && (!Number.isSafeInteger(retailOldPrice) || retailOldPrice <= retailPrice)) {
+    throw new Error("قیمت قبلی باید عدد صحیح و بیشتر از قیمت فروش تکی باشد");
+  }
   const wholesalePrice = body.wholesalePrice !== undefined ? Math.max(0, Number(body.wholesalePrice) || 0) : price;
 
   return {
@@ -537,6 +546,7 @@ export function sanitizeProduct(body: Record<string, unknown>): ProductInput {
     contents: textArr(body.contents),
     price,
     retailPrice,
+    retailOldPrice,
     retailUnitLabel: str(body.retailUnitLabel) || "عدد",
     wholesalePrice,
     wholesaleMinQty: Math.max(1, Number(body.wholesaleMinQty) || 1),
@@ -585,101 +595,6 @@ export function slugify(text: string): string {
     .replace(/^-+/, "")
     .replace(/-+$/, "");
   return base || `p-${Date.now()}`;
-}
-
-export type OrderInput = {
-  customerName: string;
-  customerPhone: string;
-  customerAddress: string;
-  customerProvince?: string;
-  customerCity?: string;
-  postalCode?: string;
-  notes?: string;
-  items: OrderItem[];
-  totalAmount?: number;
-  orderType?: "retail" | "wholesale";
-  customerId?: number | null;
-  paymentMethod?: "online" | "card_to_card";
-  paymentLink?: string;
-  paymentRefId?: string;
-  paymentTrackId?: string;
-};
-
-export function generateTrackingCode(): string {
-  const rand = Math.floor(100000 + Math.random() * 900000);
-  return `AKM-${rand}`;
-}
-
-export async function createOrder(input: OrderInput): Promise<OrderRow> {
-  if (!db) assertMemoryStoreAllowed("order creation");
-  const memStore = getMemoryStore();
-  const trackingCode = generateTrackingCode();
-  const now = new Date();
-
-  const safeItems = input.items.map((it) => ({
-    ...it,
-    price: Math.max(0, Number(it.price) || 0),
-    quantity: Math.max(1, Number(it.quantity) || 1),
-    mode: it.mode || input.orderType || "retail",
-  }));
-  const calcTotal = safeItems.reduce((acc, it) => acc + it.price * it.quantity, 0);
-  const totalAmount = input.totalAmount && input.totalAmount > 0 ? input.totalAmount : calcTotal;
-  const paymentLink = input.paymentLink || "";
-
-  const newOrderData = {
-    trackingCode,
-    customerId: input.customerId ?? null,
-    orderType: input.orderType || "retail",
-    customerName: input.customerName.trim(),
-    customerPhone: input.customerPhone.trim(),
-    customerAddress: input.customerAddress.trim(),
-    customerProvince: (input.customerProvince ?? "").trim(),
-    customerCity: (input.customerCity ?? "").trim(),
-    postalCode: (input.postalCode ?? "").trim(),
-    notes: (input.notes ?? "").trim(),
-    items: safeItems,
-    totalAmount,
-    status: "pending",
-    paymentStatus: "pending",
-    paymentMethod: input.paymentMethod || "online",
-    paymentLink,
-    paymentRefId: input.paymentRefId || "",
-    paymentTrackId: input.paymentTrackId || "",
-    paidAt: null,
-    shippingCode: "",
-    trackingLink: "",
-    adminNotes: "",
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  if (db || process.env.DATABASE_URL) {
-    try {
-      const rows = await db!.insert(orders).values(newOrderData).returning();
-      if (rows[0]) {
-        memStore.orders.unshift(rows[0]);
-        return rows[0];
-      }
-    } catch (e) {
-      if (process.env.DATABASE_URL) {
-        console.error("Failed to create order in DB:", e);
-        throw new Error("خطا در ثبت سفارش در پایگاه داده");
-      }
-      console.warn("Failed to create order in DB, using memory store:", e);
-    }
-  }
-
-  const nextId =
-    memStore.orders.length > 0
-      ? Math.max(...memStore.orders.map((o) => o.id)) + 1
-      : 1;
-
-  const orderRow: OrderRow = {
-    id: nextId,
-    ...newOrderData,
-  };
-  memStore.orders.unshift(orderRow);
-  return orderRow;
 }
 
 export async function getAllOrders(): Promise<OrderRow[]> {

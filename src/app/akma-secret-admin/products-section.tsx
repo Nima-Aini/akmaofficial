@@ -26,6 +26,7 @@ export type AdminProduct = {
   contents: string[];
   price: number;
   retailPrice?: number;
+  retailOldPrice?: number | null;
   retailUnitLabel?: string;
   wholesalePrice?: number;
   wholesaleMinQty?: number;
@@ -69,6 +70,7 @@ const EMPTY: Omit<AdminProduct, "id"> = {
   contents: [],
   price: 0,
   retailPrice: 0,
+  retailOldPrice: null,
   retailUnitLabel: "عدد",
   wholesalePrice: 0,
   wholesaleMinQty: 1,
@@ -328,6 +330,7 @@ export function ProductsSection({
                     onChange={(v) => patch({ retailPrice: Number(v) || 0, price: Number(v) || 0 })}
                     dir="ltr"
                   />
+                  <Field label="قیمت قبلی واقعی تکی (تومان، اختیاری)" type="number" value={editing.retailOldPrice ?? ""} onChange={(v) => patch({ retailOldPrice: v ? Number(v) : null })} dir="ltr" hint="فقط برای تخفیف واقعی؛ خالی = بدون تخفیف" />
                   <Field
                     label="واحد فروش تکی"
                     value={editing.retailUnitLabel || "عدد"}

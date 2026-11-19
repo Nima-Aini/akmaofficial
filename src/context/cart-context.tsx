@@ -56,6 +56,7 @@ type CartContextType = {
   updateQuantity: (productId: number, quantity: number) => void;
   setItemMode: (productId: number, mode: "retail" | "wholesale") => void;
   clearCart: () => void;
+  storageHydrated: boolean;
   totalCount: number;
   totalAmount: number;
   totalWholesaleSavings: number;
@@ -282,6 +283,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         updateQuantity,
         setItemMode,
         clearCart,
+        storageHydrated,
         totalCount,
         totalAmount,
         totalWholesaleSavings,

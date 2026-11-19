@@ -5,14 +5,10 @@ import Link from "next/link";
 import {
   ArrowLeft,
   CheckCircle2,
-  Copy,
-  Phone,
   ShieldCheck,
   ShoppingBag,
   Truck,
   Check,
-  Search,
-  User,
   CreditCard,
   Lock,
   Sparkle,
@@ -34,7 +30,7 @@ type CustomerInfo = {
 };
 
 export default function CheckoutPage() {
-  const { items, totalAmount, totalCount, clearCart, cartMode, totalWholesaleSavings } = useCart();
+  const { items, totalAmount, totalCount, cartMode, totalWholesaleSavings } = useCart();
 
   const [customer, setCustomer] = useState<CustomerInfo | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
@@ -56,22 +52,8 @@ export default function CheckoutPage() {
   const [postalCode, setPostalCode] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [notes, setNotes] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"online" | "card_to_card">("online");
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [retryLoading, setRetryLoading] = useState(false);
-  const [retryError, setRetryError] = useState<string | null>(null);
-  const [successOrder, setSuccessOrder] = useState<{
-    trackingCode: string;
-    totalAmount: number;
-    customerName: string;
-    orderType: string;
-    paymentLink?: string;
-    paymentError?: string;
-    paymentFailed?: boolean;
-  } | null>(null);
-  const [copied, setCopied] = useState(false);
 
   // Check auth session
   useEffect(() => {
@@ -183,6 +165,10 @@ export default function CheckoutPage() {
       setError("لطفاً آدرس دقیق پستی جهت ارسال را بنویسید.");
       return;
     }
+    if (!/^\d{10}$/.test(toEnDigits(postalCode).trim())) {
+      setError("کد پستی باید ۱۰ رقم باشد.");
+      return;
+    }
     if (items.length === 0) {
       setError("سبد خرید شما خالی است.");
       return;
@@ -202,7 +188,7 @@ export default function CheckoutPage() {
           customerAddress: address.trim(),
           postalCode: toEnDigits(postalCode).trim(),
           notes: notes.trim(),
-          paymentMethod,
+          paymentMethod: "online",
           items,
         }),
       });
@@ -223,28 +209,10 @@ export default function CheckoutPage() {
           }),
         }).catch(() => {});
 
-        if (data.paymentError) {
-          setSuccessOrder({
-            trackingCode: data.trackingCode,
-            totalAmount: data.order?.totalAmount || totalAmount,
-            customerName: name.trim(),
-            orderType: isWholesaleOrder ? "خرید عمده و همکاری" : "خرید تکی",
-            paymentLink: "",
-            paymentError: data.paymentError,
-            paymentFailed: true,
-          });
-        } else if (data.paymentLink) {
-          clearCart();
-          window.location.href = data.paymentLink;
+        if (data.paymentLink) {
+          window.location.assign(data.paymentLink);
         } else {
-          setSuccessOrder({
-            trackingCode: data.trackingCode,
-            totalAmount: data.order?.totalAmount || totalAmount,
-            customerName: name.trim(),
-            orderType: isWholesaleOrder ? "خرید عمده و همکاری" : "خرید تکی",
-            paymentLink: data.paymentLink,
-          });
-          clearCart();
+          setError("درگاه پرداخت در دسترس نیست؛ لطفاً دوباره تلاش کنید.");
         }
       } else {
         setError(data.error || "خطا در ثبت سفارش. لطفاً دوباره تلاش کنید.");
@@ -255,142 +223,6 @@ export default function CheckoutPage() {
       setLoading(false);
     }
   };
-
-  const copyTracking = () => {
-    if (successOrder?.trackingCode) {
-      navigator.clipboard.writeText(successOrder.trackingCode);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  // SUCCESS VIEW
-  if (successOrder) {
-    return (
-      <div className="mx-auto max-w-2xl px-4 py-16 text-center sm:px-6 lg:px-8">
-        <div className="rounded-[2.5rem] border border-emerald-500/20 bg-white p-8 sm:p-12 shadow-xl">
-          <div className="mx-auto grid size-20 place-items-center rounded-3xl bg-emerald-50 text-emerald-600">
-            <CheckCircle2 size={44} strokeWidth={2.2} />
-          </div>
-
-          <span className="mt-6 inline-block rounded-full bg-emerald-50 px-4 py-1.5 text-xs font-black text-emerald-700">
-            ثبت موفق سفارش ({successOrder.orderType})
-          </span>
-
-          <h1 className="mt-3 text-2xl font-black text-[#1C1816] sm:text-3xl">
-            {successOrder.customerName} عزیز، سفارش شما با موفقیت ثبت شد!
-          </h1>
-          <p className="mt-3 text-xs sm:text-sm leading-6 text-[#78716C]">
-            سفارش شما در پایگاه داده آکما ذخیره شد و در پنل کاربری شما قرار گرفت.
-          </p>
-
-          {/* Tracking Code Highlight Box */}
-          <div className="mt-8 rounded-2xl border-2 border-dashed border-[#8E111E]/30 bg-[#FAF8F5] p-6">
-            <p className="text-xs font-bold text-[#78716C]">کد رهگیری اختصاصی مرسوله:</p>
-            <div className="mt-3 flex items-center justify-center gap-3">
-              <span className="font-mono text-3xl font-black tracking-wider text-[#8E111E] sm:text-4xl">
-                {successOrder.trackingCode}
-              </span>
-              <button
-                type="button"
-                onClick={copyTracking}
-                className="grid size-10 place-items-center rounded-xl border border-[#E7E3DC] text-[#78716C] hover:text-[#1C1816] bg-white shadow-xs"
-                title="کپی کد رهگیری"
-              >
-                {copied ? <Check size={18} className="text-emerald-500" /> : <Copy size={18} />}
-              </button>
-            </div>
-            <p className="mt-3 text-[11px] text-[#78716C]">
-              این سفارش هم‌اکنون در بخش «سفارش‌های من» در حساب کاربری شما قابل مشاهده و پیگیری لحظه‌ای است.
-            </p>
-          </div>
-
-          {/* Payment Link Trigger Banner */}
-          {successOrder.paymentLink && (
-            <div className="mt-6 rounded-2xl bg-[#8E111E]/5 border border-[#8E111E]/20 p-5 text-center">
-              <p className="text-xs font-bold text-[#8E111E]">
-                مبلغ قابل پرداخت: {formatPrice(successOrder.totalAmount)} تومان
-              </p>
-              <a
-                href={successOrder.paymentLink}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 mt-3 rounded-full bg-[#8E111E] hover:bg-[#720C17] text-white px-8 py-3.5 text-xs font-black shadow-md shadow-[#8E111E]/25 transition-transform active:scale-95"
-              >
-                <CreditCard size={16} />
-                <span>پرداخت آنلاین از درگاه معتبر شاپرک</span>
-              </a>
-            </div>
-          )}
-
-          {/* Payment Failed Warning & Retry Banner */}
-          {successOrder.paymentFailed && (
-            <div className="mt-6 rounded-2xl bg-amber-50 border border-amber-200 p-5 text-right space-y-3">
-              <div className="flex items-center gap-2 text-amber-900 font-bold text-xs sm:text-sm">
-                <span>سفارش ثبت شد، اما اتصال به درگاه پرداخت ناموفق بود:</span>
-              </div>
-              <p className="text-xs text-amber-800 font-mono bg-amber-100/50 p-2.5 rounded-xl border border-amber-200">
-                {successOrder.paymentError || "خطا در برقراری ارتباط با شبکه آنلاین زیبال / شاپرک"}
-              </p>
-
-              {retryError && (
-                <p className="text-xs font-bold text-rose-600 bg-rose-50 p-2.5 rounded-xl border border-rose-200">
-                  {retryError}
-                </p>
-              )}
-
-              <button
-                type="button"
-                onClick={async () => {
-                  setRetryLoading(true);
-                  setRetryError(null);
-                  try {
-                    const res = await fetch("/api/orders/retry-payment", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ trackingCode: successOrder.trackingCode }),
-                    });
-                    const data = await res.json();
-                    if (res.ok && data.ok && data.paymentLink) {
-                      window.location.href = data.paymentLink;
-                    } else {
-                      setRetryError(data.error || "خطا در اتصال مجدد به درگاه پرداخت");
-                    }
-                  } catch {
-                    setRetryError("خطا در برقراری ارتباط با سرور");
-                  } finally {
-                    setRetryLoading(false);
-                  }
-                }}
-                disabled={retryLoading}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-[#8E111E] hover:bg-[#720C17] text-white py-3.5 px-6 text-xs font-black shadow-md shadow-[#8E111E]/20 transition-transform active:scale-95 disabled:opacity-50"
-              >
-                <CreditCard size={16} />
-                <span>{retryLoading ? "در حال دریافت لینک جدید درگاه…" : "پرداخت مجدد آنلاین"}</span>
-              </button>
-            </div>
-          )}
-
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <Link
-              href="/account"
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[#1C1816] hover:bg-black text-white h-12 px-6 text-xs font-black shadow-xs"
-            >
-              <User size={15} />
-              مشاهده در حساب کاربری من
-            </Link>
-            <Link
-              href={`/tracking?code=${successOrder.trackingCode}`}
-              className="inline-flex items-center justify-center gap-2 rounded-full border border-[#E7E3DC] bg-white hover:bg-[#FAF8F5] text-[#2A2421] h-12 px-6 text-xs font-bold"
-            >
-              <Search size={15} />
-              پیگیری عمومی مرسوله
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // EMPTY CART VIEW
   if (items.length === 0) {
@@ -656,12 +488,13 @@ export default function CheckoutPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs font-bold text-[#4A423D] mb-1.5">
-                    کد پستی ۱۰ رقمی
+                    کد پستی ۱۰ رقمی *
                   </label>
                   <input
                     type="text"
                     dir="ltr"
                     maxLength={10}
+                    required
                     value={postalCode}
                     onChange={(e) => setPostalCode(e.target.value)}
                     placeholder="1234567890"
@@ -693,57 +526,7 @@ export default function CheckoutPage() {
                 <span>انتخاب روش تسویه‌حساب</span>
               </h2>
 
-              <div className="grid sm:grid-cols-2 gap-3">
-                <label
-                  onClick={() => setPaymentMethod("online")}
-                  className={`flex items-start gap-3 rounded-2xl border p-4 cursor-pointer transition-colors ${
-                    paymentMethod === "online"
-                      ? "border-[#8E111E] bg-[#8E111E]/5"
-                      : "border-[#E7E3DC] bg-white"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="pm"
-                    checked={paymentMethod === "online"}
-                    onChange={() => setPaymentMethod("online")}
-                    className="mt-1 accent-[#8E111E]"
-                  />
-                  <div>
-                    <span className="block text-xs font-black text-[#1C1816]">
-                      درگاه پرداخت آنلاین شاپرک (آنی)
-                    </span>
-                    <span className="block text-[11px] text-[#78716C] mt-1">
-                      صدور لینک و اتصال آنی به شبکه پرداخت شتاب با تمامی کارت‌های عضو شتاب
-                    </span>
-                  </div>
-                </label>
-
-                <label
-                  onClick={() => setPaymentMethod("card_to_card")}
-                  className={`flex items-start gap-3 rounded-2xl border p-4 cursor-pointer transition-colors ${
-                    paymentMethod === "card_to_card"
-                      ? "border-[#8E111E] bg-[#8E111E]/5"
-                      : "border-[#E7E3DC] bg-white"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="pm"
-                    checked={paymentMethod === "card_to_card"}
-                    onChange={() => setPaymentMethod("card_to_card")}
-                    className="mt-1 accent-[#8E111E]"
-                  />
-                  <div>
-                    <span className="block text-xs font-black text-[#1C1816]">
-                      کارت‌به‌کارت و هماهنگی تلفنی
-                    </span>
-                    <span className="block text-[11px] text-[#78716C] mt-1">
-                      ثبت سفارش + ارسال شماره حساب توسط کارشناس فروش جهت حواله
-                    </span>
-                  </div>
-                </label>
-              </div>
+              <p className="text-xs font-bold text-[#1C1816]">پرداخت امن آنلاین؛ سفارش پس از تأیید بانک ثبت می‌شود.</p>
             </div>
 
             {error && (
@@ -763,7 +546,7 @@ export default function CheckoutPage() {
                   ? "در حال ثبت سفارش…"
                   : !customer
                     ? "لطفاً ابتدا با شماره همراه وارد شوید"
-                    : `تأیید نهایی و صدور فاکتور — ${formatPrice(totalAmount)} تومان`}
+                    : `ورود به درگاه پرداخت — ${formatPrice(totalAmount)} تومان`}
               </span>
             </button>
           </form>

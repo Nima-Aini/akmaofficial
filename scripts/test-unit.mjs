@@ -9,6 +9,7 @@ import { generateSecureOtp, sendMelliPattern, sendOtpSms } from "../src/lib/sms.
 import { paymentResultUrl } from "../src/lib/payment-result-url.ts";
 import { calculateProductPricing, getProductPricePresentation, getWholesalePackConfig, isPositiveSafeInteger } from "../src/lib/pricing.ts";
 import { getProductImages, getResponsiveProductImages } from "../src/lib/product-media.ts";
+import { retailProductListing } from "../src/lib/torob-product.ts";
 import { applyRichTextMark, normalizeRichTextValue, replaceRichTextPlainText, richTextToPlainText, sanitizeRichTextMap, sanitizeTextColor } from "../src/lib/rich-text.ts";
 import {
   getTextRegionBackdropClass,
@@ -105,6 +106,22 @@ runTest("Server-side retail price calculation ignores client overrides", () => {
 
   const wholesaleResult50 = calculateProductPricing(mockProduct, 60, "wholesale");
   assert.strictEqual(wholesaleResult50.unitPrice, 140000, "Tier 2 wholesale price for 60 pcs must be 140,000");
+});
+
+runTest("Torob listing uses stable retail ID, trusted retail price, and honest old price", () => {
+  const product = { id: 31, slug: "foam", name: "فوم آکما", active: true,
+    isRetail: true, inStock: true, price: 350000, retailPrice: 280000,
+    retailOldPrice: null, images: ["/uploads/products/foam.webp"], retailImages: [], wholesaleImages: ["/uploads/products/box.webp"] };
+  const listing = retailProductListing(product);
+  assert.equal(listing.id, "31");
+  assert.equal(listing.price, 280000);
+  assert.equal(listing.oldPrice, null);
+  assert.equal(listing.image, "https://akmaofficial.ir/uploads/products/foam.webp");
+  assert.equal(retailProductListing({ ...product, name: "نام تازه", slug: "foam-new" }).id, listing.id);
+  assert.equal(retailProductListing({ ...product, retailOldPrice: 340000 }).oldPrice, 340000);
+  assert.equal(retailProductListing({ ...product, isRetail: false }), null);
+  assert.equal(retailProductListing({ ...product, active: false }), null);
+  assert.equal(retailProductListing({ ...product, inStock: false }).available, false);
 });
 
 runTest("Wholesale min quantity validation logic", () => {
